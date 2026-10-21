@@ -8,7 +8,7 @@ import {
   Menu, X, LogOut, ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme, THEME_CONFIGS } from "@/context/ThemeContext";
 import { clsx } from "clsx";
 
 const NAV_ITEMS = [
@@ -79,22 +79,27 @@ export default function Sidebar() {
       )}
       {/* Theme picker */}
       <div className="px-3 mb-2">
-        <p className="text-[10px] text-slate-500 mb-1.5">Theme</p>
+        <p className="text-[10px] text-slate-500 mb-1.5 font-medium">Theme</p>
         <div className="flex flex-wrap gap-1.5">
-          {themes.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTheme(t)}
-              title={t}
-              className={clsx(
-                "w-5 h-5 rounded-full border-2 transition-all",
-                theme === t ? "border-white scale-110" : "border-transparent opacity-60 hover:opacity-100"
-              )}
-              style={{
-                background: `rgb(var(--theme-c1))`,
-              }}
-            />
-          ))}
+          {themes.map((t) => {
+            const config = THEME_CONFIGS[t];
+            return (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                title={`${config.name} (${config.description})`}
+                className={clsx(
+                  "w-5 h-5 rounded-full border-2 transition-all cursor-pointer shadow-sm",
+                  theme === t
+                    ? "border-white scale-110 ring-2 ring-white/20"
+                    : "border-transparent opacity-60 hover:opacity-100 hover:scale-105"
+                )}
+                style={{
+                  background: `linear-gradient(135deg, ${config.colors[0]}, ${config.colors[1]})`,
+                }}
+              />
+            );
+          })}
         </div>
       </div>
       <button

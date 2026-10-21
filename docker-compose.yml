@@ -27,17 +27,8 @@ services:
       - ./backend:/app
       - /app/__pycache__
       - /app/.venv
-    environment:
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3002}
-      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
-      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-sleepy_apply}
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-dev_discord_client_id}
-      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-dev_discord_client_secret}
-      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI:-http://localhost:3002/auth/callback}
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-dev_discord_bot_token}
-      - JWT_SECRET=${JWT_SECRET:-dev_jwt_secret_change_me_in_production_key_12345}
-      - CREDENTIAL_ENCRYPTION_KEY=${CREDENTIAL_ENCRYPTION_KEY:-6GMqsdNUgmTmjL83IWDFHjpuFaMRA5NLlts_5WGWL9A=}
-      - ENVIRONMENT=development
+    env_file:
+      - ./backend/.env
     depends_on:
       - mongodb
 

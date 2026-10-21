@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-type Theme =
+export type Theme =
   | "default"
   | "emerald"
   | "rose"
@@ -11,8 +11,73 @@ type Theme =
   | "amethyst"
   | "monochrome";
 
-const THEMES: Theme[] = [
-  "default", "emerald", "rose", "ocean", "cyberpunk", "forest", "amethyst", "monochrome",
+export interface ThemeConfig {
+  id: Theme;
+  name: string;
+  colors: [string, string];
+  description: string;
+}
+
+export const THEME_CONFIGS: Record<Theme, ThemeConfig> = {
+  default: {
+    id: "default",
+    name: "Twilight",
+    colors: ["#4f46e5", "#9333ea"],
+    description: "Default indigo & purple",
+  },
+  emerald: {
+    id: "emerald",
+    name: "Aurora",
+    colors: ["#10b981", "#06b6d4"],
+    description: "Vibrant emerald & cyan",
+  },
+  rose: {
+    id: "rose",
+    name: "Sunset",
+    colors: ["#e11d48", "#f59e0b"],
+    description: "Warm rose & amber",
+  },
+  ocean: {
+    id: "ocean",
+    name: "Deep Ocean",
+    colors: ["#3b82f6", "#06b6d4"],
+    description: "Cool blue & cyan",
+  },
+  cyberpunk: {
+    id: "cyberpunk",
+    name: "Cyberpunk",
+    colors: ["#db2777", "#eab308"],
+    description: "High-contrast neon pink & yellow",
+  },
+  forest: {
+    id: "forest",
+    name: "Forest",
+    colors: ["#15803d", "#84cc16"],
+    description: "Earthy green & lime",
+  },
+  amethyst: {
+    id: "amethyst",
+    name: "Amethyst",
+    colors: ["#7e22ce", "#4338ca"],
+    description: "Deep purple & rich indigo",
+  },
+  monochrome: {
+    id: "monochrome",
+    name: "Stealth",
+    colors: ["#64748b", "#334155"],
+    description: "Monochrome slate",
+  },
+};
+
+export const THEMES: Theme[] = [
+  "default",
+  "emerald",
+  "rose",
+  "ocean",
+  "cyberpunk",
+  "forest",
+  "amethyst",
+  "monochrome",
 ];
 
 interface ThemeContextValue {

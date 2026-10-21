@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query, BackgroundTasks
 from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
@@ -6,6 +6,23 @@ import structlog
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 logger = structlog.get_logger()
+
+
+@router.post("/fetch-now")
+async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks):
+    """Trigger job discovery and matching pipeline for current user."""
+    user_id = get_current_user_id(request)
+    from app.graphs.job_pipeline_graph import job_pipeline
+
+    async def run_pipeline():
+        try:
+            logger.info("Executing on-demand job pipeline for user", user_id=user_id)
+            await job_pipeline.ainvoke({"user_id": user_id})
+        except Exception as e:
+            logger.error("On-demand job pipeline failed", user_id=user_id, error=str(e))
+
+    background_tasks.add_task(run_pipeline)
+    return {"ok": True, "message": "Job discovery and matching started in background"}
 
 
 @router.get("")

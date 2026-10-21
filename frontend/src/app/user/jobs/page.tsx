@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2 } from "lucide-react";
+import { Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles } from "lucide-react";
 import { jobsApi } from "@/lib/api";
 
 interface JobItem {
@@ -27,6 +27,8 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverMsg, setDiscoverMsg] = useState("");
 
   const load = async (p = 1) => {
     setLoading(true);
@@ -42,6 +44,24 @@ export default function JobsPage() {
 
   useEffect(() => { load(); }, []);
 
+  const handleDiscoverJobs = async () => {
+    setDiscovering(true);
+    setDiscoverMsg("");
+    try {
+      const res = await jobsApi.fetchNow();
+      setDiscoverMsg(res.message || "Discovery started! Matching jobs to your profile…");
+      setTimeout(() => load(1), 3000);
+      setTimeout(() => load(1), 6000);
+      setTimeout(() => {
+        load(1);
+        setDiscovering(false);
+      }, 10000);
+    } catch (err: unknown) {
+      setDiscoverMsg(err instanceof Error ? err.message : "Failed to trigger discovery");
+      setDiscovering(false);
+    }
+  };
+
   const handleApply = async (jobId: string) => {
     setApplying(jobId);
     try {
@@ -56,10 +76,27 @@ export default function JobsPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs</h1>
-        <p className="text-slate-500 text-sm mt-1">{total} jobs matched to your profile · sorted by compatibility</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs</h1>
+          <p className="text-slate-500 text-sm mt-1">{total} jobs matched to your profile · sorted by compatibility</p>
+        </div>
+        <button
+          onClick={handleDiscoverJobs}
+          disabled={discovering}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto"
+        >
+          {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {discovering ? "Discovering & Matching…" : "Discover Jobs Now"}
+        </button>
       </div>
+
+      {discoverMsg && (
+        <div className="mb-6 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 text-indigo-400" />
+          <span>{discoverMsg}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center items-center py-20 gap-2 text-slate-500 text-sm">
@@ -67,8 +104,19 @@ export default function JobsPage() {
         </div>
       ) : jobs.length === 0 ? (
         <div className="glass rounded-2xl p-10 text-center">
-          <Briefcase className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">No matched jobs yet. Complete your profile to start discovering.</p>
+          <Briefcase className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-white mb-1">No matched jobs yet</h3>
+          <p className="text-slate-400 text-xs max-w-sm mx-auto mb-5 leading-relaxed">
+            Trigger our AI discovery pipeline to scrape active tech postings, enrich requirements, and score them against your profile.
+          </p>
+          <button
+            onClick={handleDiscoverJobs}
+            disabled={discovering}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {discovering ? "Discovering & Matching…" : "Fetch & Match Jobs Now"}
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

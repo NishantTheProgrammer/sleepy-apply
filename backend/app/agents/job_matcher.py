@@ -32,7 +32,20 @@ class JobMatcherAgent:
         if not profile or not job:
             return None
 
-        user_skills = set(s.lower() for s in profile.get("skills", []))
+        raw_skills = profile.get("skills", [])
+        if isinstance(raw_skills, dict):
+            flat_skills: list[str] = []
+            for val in raw_skills.values():
+                if isinstance(val, list):
+                    flat_skills.extend(val)
+                elif isinstance(val, str):
+                    flat_skills.append(val)
+            user_skills = set(str(s).lower() for s in flat_skills)
+        elif isinstance(raw_skills, list):
+            user_skills = set(str(s).lower() for s in raw_skills)
+        else:
+            user_skills = set()
+
         job_skills = set(s.lower() for s in job.get("required_skills", []))
 
         # 1. Skills score
@@ -46,9 +59,10 @@ class JobMatcherAgent:
             skills_score = 35
 
         # 2. Location & Remote score
-        prefs = profile.get("job_preferences", {})
+        prefs = profile.get("job_preferences") or profile.get("jobPreferences") or {}
         location_score = 20
-        if job.get("is_remote") or prefs.get("remote_preference") in ["remote", "any"]:
+        rem_pref = prefs.get("remote_preference") or prefs.get("remotePreference")
+        if job.get("is_remote") or rem_pref in ["remote", "any", "open"]:
             location_score = 25
         elif prefs.get("locations"):
             job_loc = (job.get("location") or "").lower()
@@ -58,8 +72,9 @@ class JobMatcherAgent:
                 location_score = 10
 
         # 3. Title / Preference match
-        pref_titles = [t.lower() for t in prefs.get("titles", [])]
-        job_title = job.get("title", "").lower()
+        raw_titles = prefs.get("jobTitles") or prefs.get("titles") or []
+        pref_titles = [str(t).lower() for t in raw_titles]
+        job_title = (job.get("title") or "").lower()
         title_score = 15
         if any(t in job_title for t in pref_titles):
             title_score = 25
@@ -72,7 +87,7 @@ class JobMatcherAgent:
             try:
                 provider = AIProviderFactory.resolve(user_settings)
                 prompt = MATCH_EXPLANATION_PROMPT.format(
-                    skills=", ".join(profile.get("skills", [])[:10]),
+                    skills=", ".join(list(user_skills)[:10]),
                     summary=profile.get("summary", ""),
                     job_title=job.get("title"),
                     company=job.get("company"),

@@ -65,6 +65,7 @@ export const jobsApi = {
   },
   get: (id: string) => request(`/api/jobs/${id}`),
   apply: (id: string) => request(`/api/jobs/${id}/apply`, { method: "POST" }),
+  fetchNow: () => request<{ ok: boolean; message: string }>("/api/jobs/fetch-now", { method: "POST" }),
 };
 
 // ── Settings ──────────────────────────────────────────────

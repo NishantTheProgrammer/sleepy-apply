@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard, User, Briefcase, Settings,
-  Menu, X, LogOut, ChevronRight,
+  Menu, X, LogOut, ChevronRight, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, THEME_CONFIGS } from "@/context/ThemeContext";
@@ -50,6 +50,27 @@ export default function Sidebar() {
           </Link>
         );
       })}
+
+      {user?.role === "admin" && (
+        <div className="pt-2 mt-2 border-t border-white/5">
+          <Link
+            href="/admin"
+            onClick={() => setOpen(false)}
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+              pathname.startsWith("/admin")
+                ? "bg-purple-500/20 text-purple-200 border border-purple-500/30"
+                : "text-purple-300/70 hover:text-purple-200 hover:bg-purple-500/10"
+            )}
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0 text-purple-400" />
+            Admin Panel
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 ml-auto border border-purple-500/30">
+              Admin
+            </span>
+          </Link>
+        </div>
+      )}
     </nav>
   );
 

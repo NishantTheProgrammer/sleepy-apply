@@ -67,21 +67,34 @@ async def discord_callback(request: Request, response: Response):
     db = get_db()
     now = datetime.now(timezone.utc)
 
+    user_email = (discord_user.get("email") or "").lower()
+    discord_id = str(discord_user.get("id") or "")
+    existing_count = await db.users.count_documents({})
+    is_admin = (
+        user_email in [e.lower() for e in settings.admin_emails]
+        or discord_id in settings.admin_discord_ids
+        or (not settings.is_production and existing_count <= 1)
+    )
+
+    update_set: dict = {
+        "discord_username": discord_user.get("username", ""),
+        "discord_avatar": discord_user.get("avatar"),
+        "email": discord_user.get("email"),
+        "last_login": now,
+        "updated_at": now,
+        "is_active": True,
+    }
+    if is_admin:
+        update_set["role"] = "admin"
+
     # Upsert user
     await db.users.update_one(
         {"discord_id": discord_user["id"]},
         {
-            "$set": {
-                "discord_username": discord_user.get("username", ""),
-                "discord_avatar": discord_user.get("avatar"),
-                "email": discord_user.get("email"),
-                "last_login": now,
-                "updated_at": now,
-                "is_active": True,
-            },
+            "$set": update_set,
             "$setOnInsert": {
                 "discord_id": discord_user["id"],
-                "role": "user",
+                "role": "admin" if is_admin else "user",
                 "created_at": now,
             },
         },
@@ -112,6 +125,7 @@ async def discord_callback(request: Request, response: Response):
     return {
         "user": {
             "id": user_id,
+            "_id": user_id,
             "discord_id": discord_user["id"],
             "discord_username": discord_user.get("username"),
             "discord_avatar": discord_user.get("avatar"),
@@ -158,7 +172,21 @@ async def get_me(request: Request):
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    settings = get_settings()
+    user_email = (user.get("email") or "").lower()
+    discord_id = str(user.get("discord_id") or "")
+    if (
+        user_email in [e.lower() for e in settings.admin_emails]
+        or discord_id in settings.admin_discord_ids
+        or (not settings.is_production and await db.users.count_documents({}) <= 1)
+    ):
+        if user.get("role") != "admin":
+            await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": "admin"}})
+            user["role"] = "admin"
+
     user["_id"] = str(user["_id"])
+    user["id"] = user["_id"]
     # Never expose sensitive fields
     user.pop("__v", None)
     return user

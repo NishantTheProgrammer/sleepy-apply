@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     discord_redirect_uri: str = "http://localhost:3000/auth/callback"
     discord_bot_token: str = "dev_discord_bot_token"
     discord_webhook_url: str | None = None
+    admin_emails: list[str] = ["knishant113@gmail.com"]
+    admin_discord_ids: list[str] = []
 
     # Security
     jwt_secret: str = "dev_jwt_secret_change_me_in_production_key_12345"

@@ -80,7 +80,12 @@ export const settingsApi = {
 
 // ── Admin ─────────────────────────────────────────────────
 export const adminApi = {
-  stats: () => request("/api/admin/stats"),
-  users: () => request("/api/admin/users"),
-  workflows: () => request("/api/admin/workflows"),
+  stats: () => request<Record<string, unknown>>("/api/admin/stats"),
+  users: () => request<{ users: Array<Record<string, unknown>> }>("/api/admin/users"),
+  workflows: () => request<{ runs: Array<Record<string, unknown>> }>("/api/admin/workflows"),
+  activity: () => request<{ recent_jobs: Array<Record<string, unknown>>; recent_matches: Array<Record<string, unknown>> }>("/api/admin/activity"),
+  updateUser: (userId: string, data: { role?: string; is_active?: boolean }) =>
+    request<{ ok: boolean; user: Record<string, unknown> }>(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  triggerDiscovery: () =>
+    request<{ ok: boolean; message: string }>("/api/admin/trigger-discovery", { method: "POST" }),
 };

@@ -1,0 +1,25 @@
+# Backend
+backend/.env
+backend/.venv/
+backend/storage/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+.venv/
+venv/
+storage/
+
+# Frontend
+frontend/.env.local
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# macOS Scheduler
+macos-scheduler/logs/
+macos-scheduler/config.sh
+
+# macOS
+.DS_Store
+**/.DS_Store

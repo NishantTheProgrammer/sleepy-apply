@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+}
+
+/* ── Theme colour tokens ────────────────────────────────── */
+:root {
+  --theme-c1: 79, 70, 229;   /* indigo */
+  --theme-c2: 147, 51, 234;  /* purple */
+}
+[data-theme="emerald"]    { --theme-c1: 16, 185, 129;  --theme-c2: 6, 182, 212; }
+[data-theme="rose"]       { --theme-c1: 225, 29, 72;   --theme-c2: 245, 158, 11; }
+[data-theme="ocean"]      { --theme-c1: 59, 130, 246;  --theme-c2: 6, 182, 212; }
+[data-theme="cyberpunk"]  { --theme-c1: 219, 39, 119;  --theme-c2: 234, 179, 8; }
+[data-theme="forest"]     { --theme-c1: 21, 128, 61;   --theme-c2: 132, 204, 22; }
+[data-theme="amethyst"]   { --theme-c1: 126, 34, 206;  --theme-c2: 67, 56, 202; }
+[data-theme="monochrome"] { --theme-c1: 100, 116, 139; --theme-c2: 51, 65, 85; }
+
+/* ── Base ───────────────────────────────────────────────── */
+body {
+  font-feature-settings: "rlig" 1, "calt" 1;
+  background-image:
+    radial-gradient(circle at top left,    rgba(var(--theme-c1), 0.15) 0%, transparent 40%),
+    radial-gradient(circle at bottom right, rgba(var(--theme-c2), 0.15) 0%, transparent 40%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* ── Glassmorphism ──────────────────────────────────────── */
+.glass {
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.glass-hover {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-hover:hover {
+  background-color: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px -10px rgba(var(--theme-c1), 0.3);
+}
+
+/* ── Gradient text helper ───────────────────────────────── */
+.gradient-text {
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--theme-c1)),
+    rgb(var(--theme-c2))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Score ring colours ─────────────────────────────────── */
+.score-high   { color: #34d399; }   /* emerald-400 */
+.score-medium { color: #fbbf24; }   /* amber-400   */
+.score-low    { color: #f87171; }   /* red-400     */
+
+/* ── Custom scrollbar ───────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }

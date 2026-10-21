@@ -33,7 +33,7 @@ class UserSettings(MongoBaseModel):
 
     # AI provider (all encrypted except provider name and model)
     ai_provider: AIProvider = "ollama"
-    ai_model: str = "llama3.2:1b"
+    ai_model: str = "llama3.2:latest"
     ai_api_key_encrypted: str | None = None      # For OpenAI/Gemini/Anthropic
     ai_base_url_encrypted: str | None = None     # For Ollama (e.g. http://localhost:11434)
 

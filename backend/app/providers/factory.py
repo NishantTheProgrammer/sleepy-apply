@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 
 # Suggested models shown in the Settings UI
 PROVIDER_MODEL_SUGGESTIONS: dict[AIProvider, list[str]] = {
-    "ollama": ["llama3.2:1b", "llama3.2:3b", "qwen2.5:3b", "mistral:7b", "llama3.1:8b"],
+    "ollama": ["qwen2.5-coder:14b", "llama3.1:8b", "llama3.2:latest", "llama3.2:3b", "qwen2.5:7b"],
     "openai": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4o"],
     "gemini": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"],
     "anthropic": ["claude-3-5-haiku-20241022", "claude-3-haiku-20240307", "claude-3-5-sonnet-20241022"],
@@ -33,7 +33,7 @@ class AIProviderFactory:
                 base_url = (
                     decrypt(settings.ai_base_url_encrypted)
                     if settings.ai_base_url_encrypted
-                    else "http://localhost:11434"
+                    else "http://host.docker.internal:11434"
                 )
                 return OllamaProvider(base_url=base_url, model=model)
 

@@ -37,7 +37,7 @@ async def get_settings_route(request: Request):
             _id=ObjectId(),
             user_id=ObjectId(user_id),
             ai_provider="ollama",
-            ai_model="llama3.2:1b",
+            ai_model="llama3.2:latest",
             ai_api_key_set=False,
             ai_base_url_set=False,
             smtp_password_set=False,

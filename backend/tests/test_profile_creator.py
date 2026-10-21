@@ -14,11 +14,10 @@ def test_heuristic_parsing_and_scoring():
 
     parsed = agent._heuristic_parse(sample_text)
     assert parsed["personal"]["email"] == "jordan.lee@example.com"
-    assert "Python" in parsed["skills"]
-    assert "TypeScript" in parsed["skills"]
+    assert "Python" in parsed["skills"]["backend"]
+    assert "TypeScript" in parsed["skills"]["frontend"]
 
     missing, questions = agent._identify_gaps_and_questions(parsed)
-    # Location was empty in personal dictionary from heuristic parse
     assert isinstance(missing, list)
     assert isinstance(questions, list)
 

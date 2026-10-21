@@ -21,7 +21,7 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
         )
 
         styles = getSampleStyleSheet()
-        
+
         # Custom Typography
         title_style = ParagraphStyle(
             "ResumeTitle",
@@ -72,15 +72,6 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             textColor=colors.HexColor("#0f172a"),
         )
 
-        item_sub_style = ParagraphStyle(
-            "ResumeItemSub",
-            parent=styles["Normal"],
-            fontName="Helvetica-Oblique",
-            fontSize=9,
-            leading=12,
-            textColor=colors.HexColor("#64748b"),
-        )
-
         bullet_style = ParagraphStyle(
             "ResumeBullet",
             parent=styles["Normal"],
@@ -96,15 +87,30 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
 
         # 1. Header (Personal Details)
         personal = content.get("personal", {})
-        name = personal.get("full_name") or "Candidate"
+        name = personal.get("fullName") or personal.get("full_name") or "Candidate"
         story.append(Paragraph(name, title_style))
         story.append(Spacer(1, 4))
 
         contact_parts = []
-        for key in ["email", "phone", "location", "linkedin", "github", "portfolio"]:
+        for key in ["email", "phone"]:
             val = personal.get(key)
             if val:
                 contact_parts.append(str(val))
+
+        # Location
+        loc = personal.get("location")
+        if isinstance(loc, dict):
+            loc_parts = [loc.get(k) for k in ["city", "country"] if loc.get(k)]
+            if loc_parts:
+                contact_parts.append(", ".join(loc_parts))
+        elif isinstance(loc, str) and loc:
+            contact_parts.append(loc)
+
+        for key in ["portfolio", "linkedin", "github"]:
+            val = personal.get(key)
+            if val:
+                contact_parts.append(str(val).replace("https://", ""))
+
         if contact_parts:
             story.append(Paragraph(" • ".join(contact_parts), contact_style))
             story.append(Spacer(1, 6))
@@ -117,12 +123,19 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             story.append(Paragraph(summary, body_style))
             story.append(Spacer(1, 4))
 
-        # 3. Skills
-        skills = content.get("skills", [])
-        if skills:
+        # 3. Skills (supports both categorized dict and flat list)
+        skills_raw = content.get("skills")
+        if skills_raw:
             story.append(Paragraph("TECHNICAL & PROFESSIONAL SKILLS", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
-            story.append(Paragraph(" • ".join(skills), body_style))
+
+            if isinstance(skills_raw, dict):
+                for cat, items in skills_raw.items():
+                    if items:
+                        cat_label = cat.capitalize()
+                        story.append(Paragraph(f"<b>{cat_label}:</b> {', '.join(items)}", body_style))
+            elif isinstance(skills_raw, list):
+                story.append(Paragraph(" • ".join(skills_raw), body_style))
             story.append(Spacer(1, 4))
 
         # 4. Experience
@@ -131,10 +144,11 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             story.append(Paragraph("WORK EXPERIENCE", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
             for exp in experience:
-                title = exp.get("title", "")
+                title = exp.get("jobTitle") or exp.get("title", "")
                 company = exp.get("company", "")
-                start = exp.get("start_date", "")
-                end = "Present" if exp.get("is_current") else exp.get("end_date", "")
+                start = exp.get("startDate") or exp.get("start_date", "")
+                is_curr = exp.get("current") or exp.get("is_current", False)
+                end = "Present" if is_curr else (exp.get("endDate") or exp.get("end_date", ""))
                 dates = f"{start} – {end}".strip(" –")
 
                 header_text = f"<b>{title}</b> — {company}"
@@ -146,12 +160,29 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                 if desc:
                     story.append(Paragraph(desc, body_style))
 
-                achievements = exp.get("achievements", [])
-                for ach in achievements:
+                # Responsibilities
+                for resp in exp.get("responsibilities", []):
+                    story.append(Paragraph(f"• {resp}", bullet_style))
+
+                # Sub-projects
+                for sub in exp.get("projects", []):
+                    sub_name = sub.get("name", "")
+                    sub_tech = ", ".join(sub.get("technologies", []))
+                    if sub_name:
+                        line = f"<b>Project: {sub_name}</b>"
+                        if sub_tech:
+                            line += f" <i>({sub_tech})</i>"
+                        story.append(Paragraph(line, item_title_style))
+                    for ach in sub.get("achievements", []):
+                        story.append(Paragraph(f"• {ach}", bullet_style))
+
+                # Flat achievements
+                for ach in exp.get("achievements", []):
                     story.append(Paragraph(f"• {ach}", bullet_style))
+
                 story.append(Spacer(1, 4))
 
-        # 5. Projects
+        # 5. Independent Projects
         projects = content.get("projects", [])
         if projects:
             story.append(Paragraph("PROJECTS", section_heading))
@@ -176,13 +207,23 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             for edu in education:
                 inst = edu.get("institution", "")
                 deg = edu.get("degree", "")
-                field = edu.get("field", "")
-                yr = edu.get("graduation_year", "")
-                line = f"<b>{deg} in {field}</b> — {inst}"
+                yr = edu.get("year") or edu.get("graduation_year", "")
+                line = f"<b>{deg}</b> — {inst}"
                 if yr:
                     line += f" <font color='#64748b'>({yr})</font>"
                 story.append(Paragraph(line, body_style))
                 story.append(Spacer(1, 3))
+
+        # 7. Achievements & Badges
+        achievements = content.get("achievements", [])
+        if achievements:
+            story.append(Paragraph("ACHIEVEMENTS", section_heading))
+            story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
+            for ach in achievements:
+                t = ach.get("title") if isinstance(ach, dict) else str(ach)
+                if t:
+                    story.append(Paragraph(f"• {t}", bullet_style))
+            story.append(Spacer(1, 3))
 
         doc.build(story)
         return output_path

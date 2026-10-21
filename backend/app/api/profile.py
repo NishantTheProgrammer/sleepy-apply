@@ -34,13 +34,21 @@ async def update_profile(request: Request):
     # Whitelist allowed top-level keys
     allowed = {
         "personal", "summary", "skills", "experience", "education",
-        "projects", "certifications", "job_preferences"
+        "projects", "certifications", "job_preferences", "jobPreferences",
+        "achievements", "additionalInformation", "additional_information",
     }
     update = {k: v for k, v in body.items() if k in allowed}
     if not update:
         raise HTTPException(status_code=400, detail="No valid fields to update")
 
+    # Recalculate completion score
+    from app.agents.profile_creator import ProfileCreatorAgent
+    agent = ProfileCreatorAgent()
+    current_doc = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
+    merged = {**current_doc, **update}
+    update["completion_score"] = agent._calculate_completion_score(merged)
     update["updated_at"] = now
+
     await db.profiles.update_one(
         {"user_id": ObjectId(user_id)},
         {"$set": update, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},

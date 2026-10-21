@@ -34,7 +34,7 @@ export const authApi = {
 export const profileApi = {
   get: () => request<{ profile: Record<string, unknown> | null }>("/api/profile"),
   patch: (data: Record<string, unknown>) =>
-    request("/api/profile", { method: "PATCH", body: JSON.stringify(data) }),
+    request<{ profile: Record<string, unknown> | null }>("/api/profile", { method: "PATCH", body: JSON.stringify(data) }),
   uploadResume: async (file: File) => {
     const form = new FormData();
     form.append("file", file);

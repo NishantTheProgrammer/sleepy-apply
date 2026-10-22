@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, Briefcase, Zap, Activity, ShieldCheck, ShieldAlert,
   Loader2, Sparkles, RefreshCw, CheckCircle, AlertCircle, ArrowUpRight,
-  UserCheck, UserX, Clock, Globe, ChevronRight
+  UserCheck, UserX, Clock, Globe, ChevronRight, Building2, ExternalLink,
+  Plus, Search, Trash2, Check, X, Filter
 } from "lucide-react";
-import { adminApi } from "@/lib/api";
+import { adminApi, companiesApi, TargetCompany } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
-type TabType = "overview" | "users" | "jobs" | "matches";
+type TabType = "overview" | "users" | "jobs" | "matches" | "companies";
 
 interface UserRecord {
   _id: string;
@@ -64,6 +65,124 @@ export default function AdminPage() {
   const [discoveryMsg, setDiscoveryMsg] = useState("");
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
 
+  // ── Target Companies State ──
+  const [companies, setCompanies] = useState<TargetCompany[]>([]);
+  const [companyCounts, setCompanyCounts] = useState<{
+    all: number;
+    "Tier-1": number;
+    "Tier-2": number;
+    "Tier-3": number;
+    Startup: number;
+    active: number;
+  }>({ all: 0, "Tier-1": 0, "Tier-2": 0, "Tier-3": 0, Startup: 0, active: 0 });
+  const [selectedGrade, setSelectedGrade] = useState<string>("all");
+  const [companySearch, setCompanySearch] = useState<string>("");
+  const [loadingCompanies, setLoadingCompanies] = useState<boolean>(false);
+  const [showAddCompanyModal, setShowAddCompanyModal] = useState<boolean>(false);
+  const [savingCompany, setSavingCompany] = useState<boolean>(false);
+  const [seedingCompanies, setSeedingCompanies] = useState<boolean>(false);
+  const [companyActionMsg, setCompanyActionMsg] = useState<string>("");
+  const [newCompany, setNewCompany] = useState({
+    name: "",
+    grade: "Tier-1",
+    career_page: "",
+    ats_type: "greenhouse",
+    board_token: "",
+    industry: "",
+    location_hq: "",
+    is_active: true,
+  });
+
+  const loadCompanies = async (grade = selectedGrade, search = companySearch) => {
+    setLoadingCompanies(true);
+    try {
+      const res = await companiesApi.list({ grade, search });
+      setCompanies(res.items || []);
+      if (res.grade_counts) {
+        setCompanyCounts(res.grade_counts);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to load target companies", err);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  const handleToggleCompany = async (comp: TargetCompany) => {
+    try {
+      await companiesApi.update(comp._id, { is_active: !comp.is_active });
+      setCompanies((prev) =>
+        prev.map((c) => (c._id === comp._id ? { ...c, is_active: !comp.is_active } : c))
+      );
+      setCompanyActionMsg(`${comp.name} status updated.`);
+      setTimeout(() => setCompanyActionMsg(""), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to toggle company";
+      alert(msg);
+    }
+  };
+
+  const handleDeleteCompany = async (id: string, name: string) => {
+    if (!confirm(`Delete ${name} from target companies?`)) return;
+    try {
+      await companiesApi.delete(id);
+      setCompanies((prev) => prev.filter((c) => c._id !== id));
+      loadCompanies(selectedGrade, companySearch);
+      setCompanyActionMsg(`${name} removed.`);
+      setTimeout(() => setCompanyActionMsg(""), 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete company";
+      alert(msg);
+    }
+  };
+
+  const handleCreateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCompany.name.trim() || !newCompany.career_page.trim()) {
+      alert("Company name and career page URL are required.");
+      return;
+    }
+    setSavingCompany(true);
+    try {
+      await companiesApi.create(newCompany);
+      setShowAddCompanyModal(false);
+      setNewCompany({
+        name: "",
+        grade: "Tier-1",
+        career_page: "",
+        ats_type: "greenhouse",
+        board_token: "",
+        industry: "",
+        location_hq: "",
+        is_active: true,
+      });
+      setCompanyActionMsg("Company successfully added to MongoDB!");
+      setTimeout(() => setCompanyActionMsg(""), 4000);
+      loadCompanies(selectedGrade, companySearch);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create company";
+      alert(msg);
+    } finally {
+      setSavingCompany(false);
+    }
+  };
+
+  const handleSeedCompanies = async () => {
+    if (!confirm("Re-sync default verified target companies list in MongoDB?")) return;
+    setSeedingCompanies(true);
+    try {
+      const res = await companiesApi.seed(true);
+      setCompanyActionMsg(res.message);
+      setTimeout(() => setCompanyActionMsg(""), 4000);
+      loadCompanies(selectedGrade, companySearch);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to seed companies";
+      alert(msg);
+    } finally {
+      setSeedingCompanies(false);
+    }
+  };
+
   const loadAll = async () => {
     setLoading(true);
     setError(null);
@@ -77,6 +196,7 @@ export default function AdminPage() {
       setUsers((uRes.users as UserRecord[]) || []);
       setRecentJobs((aRes.recent_jobs as RecentJob[]) || []);
       setRecentMatches((aRes.recent_matches as RecentMatch[]) || []);
+      await loadCompanies();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load admin data";
       setError(msg);
@@ -88,6 +208,12 @@ export default function AdminPage() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (tab === "companies") {
+      loadCompanies(selectedGrade, companySearch);
+    }
+  }, [tab, selectedGrade]);
 
   const handleToggleUserRole = async (targetUser: UserRecord) => {
     const nextRole = targetUser.role === "admin" ? "user" : "admin";
@@ -284,6 +410,20 @@ export default function AdminPage() {
         >
           Candidate Matches
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">{recentMatches.length}</span>
+        </button>
+        <button
+          onClick={() => setTab("companies")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+            tab === "companies"
+              ? "bg-purple-600/20 text-purple-200 border border-purple-500/30"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5 text-purple-400" />
+          Target Companies
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+            {companyCounts.all || companies.length}
+          </span>
         </button>
       </div>
 
@@ -564,6 +704,387 @@ export default function AdminPage() {
                 ))
               )}
             </div>
+          </motion.div>
+        )}
+
+        {tab === "companies" && (
+          <motion.div
+            key="companies"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-6"
+          >
+            {/* Grade KPI Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="glass rounded-xl p-3.5 border border-purple-500/30 bg-purple-500/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Tier-1 Companies</span>
+                <p className="text-2xl font-black text-white mt-1">{companyCounts["Tier-1"] || 0}</p>
+                <span className="text-[10px] text-slate-400">FAANG, Decacorns & MAANG</span>
+              </div>
+              <div className="glass rounded-xl p-3.5 border border-cyan-500/30 bg-cyan-500/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">Tier-2 Scaleups</span>
+                <p className="text-2xl font-black text-white mt-1">{companyCounts["Tier-2"] || 0}</p>
+                <span className="text-[10px] text-slate-400">Top Unicorns & Fast Growth</span>
+              </div>
+              <div className="glass rounded-xl p-3.5 border border-emerald-500/30 bg-emerald-500/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Tier-3 Enterprise</span>
+                <p className="text-2xl font-black text-white mt-1">{companyCounts["Tier-3"] || 0}</p>
+                <span className="text-[10px] text-slate-400">Established Global Tech</span>
+              </div>
+              <div className="glass rounded-xl p-3.5 border border-white/10 bg-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Total in MongoDB</span>
+                <p className="text-2xl font-black text-white mt-1">{companyCounts.all || companies.length}</p>
+                <span className="text-[10px] text-emerald-400 font-semibold">{companyCounts.active} Active for Scraping</span>
+              </div>
+            </div>
+
+            {companyActionMsg && (
+              <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{companyActionMsg}</span>
+              </div>
+            )}
+
+            {/* Filter & Action Toolbar */}
+            <div className="glass rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Grade Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: "all", label: `All (${companyCounts.all || companies.length})` },
+                  { id: "Tier-1", label: `Tier-1 (${companyCounts["Tier-1"] || 0})` },
+                  { id: "Tier-2", label: `Tier-2 (${companyCounts["Tier-2"] || 0})` },
+                  { id: "Tier-3", label: `Tier-3 (${companyCounts["Tier-3"] || 0})` },
+                ].map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => {
+                      setSelectedGrade(g.id);
+                      loadCompanies(g.id, companySearch);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      selectedGrade === g.id
+                        ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                        : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search & Actions */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={companySearch}
+                    onChange={(e) => {
+                      setCompanySearch(e.target.value);
+                      loadCompanies(selectedGrade, e.target.value);
+                    }}
+                    placeholder="Search company, industry, HQ..."
+                    className="pl-8 pr-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 w-52"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSeedCompanies}
+                  disabled={seedingCompanies}
+                  title="Re-sync verified companies"
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs border border-white/10 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${seedingCompanies ? "animate-spin" : ""}`} />
+                </button>
+
+                <button
+                  onClick={() => setShowAddCompanyModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all cursor-pointer shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Company
+                </button>
+              </div>
+            </div>
+
+            {/* Target Companies Table */}
+            <div className="glass rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-sm text-white">Target Companies Registry</h2>
+                  <p className="text-[11px] text-slate-400">
+                    Source companies stored in MongoDB collection `companies` with Grade and Career Pages
+                  </p>
+                </div>
+                {loadingCompanies && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4 font-semibold">Company & Domain</th>
+                      <th className="py-3 px-4 font-semibold">Grade</th>
+                      <th className="py-3 px-4 font-semibold">ATS Integration</th>
+                      <th className="py-3 px-4 font-semibold">Career Page</th>
+                      <th className="py-3 px-4 font-semibold">Scrape Status</th>
+                      <th className="py-3 px-4 font-semibold text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {companies.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-xs text-slate-500">
+                          {loadingCompanies ? "Loading companies from MongoDB..." : "No target companies match your filter."}
+                        </td>
+                      </tr>
+                    ) : (
+                      companies.map((c) => (
+                        <tr key={c._id} className="hover:bg-white/[0.02] transition-colors">
+                          {/* Company Name & Details */}
+                          <td className="py-3 px-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-xs">{c.name}</span>
+                                {c.location_hq && (
+                                  <span className="text-[10px] text-slate-500 hidden sm:inline">
+                                    • {c.location_hq}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-xs">
+                                {c.industry || "Technology"}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Grade Badge */}
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                c.grade === "Tier-1"
+                                  ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10"
+                                  : c.grade === "Tier-2"
+                                  ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                                  : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                              }`}
+                            >
+                              ★ {c.grade}
+                            </span>
+                          </td>
+
+                          {/* ATS Integration */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${
+                                  c.ats_type === "greenhouse"
+                                    ? "bg-emerald-950/40 text-emerald-400 border border-emerald-500/30"
+                                    : c.ats_type === "lever"
+                                    ? "bg-blue-950/40 text-blue-400 border border-blue-500/30"
+                                    : c.ats_type === "ashby"
+                                    ? "bg-purple-950/40 text-purple-400 border border-purple-500/30"
+                                    : "bg-slate-800 text-slate-400 border border-slate-700"
+                                }`}
+                              >
+                                {c.ats_type}
+                              </span>
+                              {c.board_token && (
+                                <span className="text-[10px] font-mono text-slate-500 truncate max-w-[100px]" title={c.board_token}>
+                                  [{c.board_token}]
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Career Page Link */}
+                          <td className="py-3 px-4">
+                            <a
+                              href={c.career_page}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-indigo-300 hover:text-white transition-all text-[11px]"
+                            >
+                              <span>Career Site</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          </td>
+
+                          {/* Scrape Status Toggle */}
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => handleToggleCompany(c)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                c.is_active
+                                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25"
+                                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  c.is_active ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                                }`}
+                              />
+                              {c.is_active ? "Active" : "Paused"}
+                            </button>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleDeleteCompany(c._id, c.name)}
+                              className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
+                              title="Delete from target list"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Add Target Company Modal */}
+            <AnimatePresence>
+              {showAddCompanyModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="glass rounded-3xl p-6 w-full max-w-md border border-white/15 bg-slate-900/95 shadow-2xl relative"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-purple-400" />
+                        <h3 className="font-bold text-white text-sm">Add Target Company</h3>
+                      </div>
+                      <button
+                        onClick={() => setShowAddCompanyModal(false)}
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleCreateCompany} className="space-y-3.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Company Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newCompany.name}
+                          onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+                          placeholder="e.g. OpenAI, Stripe, Zepto"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">Grade / Tier *</label>
+                          <select
+                            value={newCompany.grade}
+                            onChange={(e) => setNewCompany({ ...newCompany, grade: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/60"
+                          >
+                            <option value="Tier-1">★ Tier-1 (FAANG / Decacorn)</option>
+                            <option value="Tier-2">★ Tier-2 (Unicorn / Scaleup)</option>
+                            <option value="Tier-3">★ Tier-3 (Enterprise)</option>
+                            <option value="Startup">★ Startup</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">ATS Engine</label>
+                          <select
+                            value={newCompany.ats_type}
+                            onChange={(e) => setNewCompany({ ...newCompany, ats_type: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/60"
+                          >
+                            <option value="greenhouse">Greenhouse</option>
+                            <option value="lever">Lever</option>
+                            <option value="ashby">Ashby</option>
+                            <option value="custom">Custom / Direct Career Site</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">Career Page URL *</label>
+                        <input
+                          type="url"
+                          required
+                          value={newCompany.career_page}
+                          onChange={(e) => setNewCompany({ ...newCompany, career_page: e.target.value })}
+                          placeholder="https://company.com/careers"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          ATS Board Token <span className="text-[10px] text-slate-500">(Optional - for direct JSON scraper)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newCompany.board_token}
+                          onChange={(e) => setNewCompany({ ...newCompany, board_token: e.target.value })}
+                          placeholder="e.g. stripe, openai, datadog"
+                          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/60 font-mono"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">Industry</label>
+                          <input
+                            type="text"
+                            value={newCompany.industry}
+                            onChange={(e) => setNewCompany({ ...newCompany, industry: e.target.value })}
+                            placeholder="e.g. Fintech, AI"
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">Headquarters</label>
+                          <input
+                            type="text"
+                            value={newCompany.location_hq}
+                            onChange={(e) => setNewCompany({ ...newCompany, location_hq: e.target.value })}
+                            placeholder="e.g. San Francisco, Bengaluru"
+                            className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCompanyModal(false)}
+                          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={savingCompany}
+                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {savingCompany && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          Save Company to MongoDB
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

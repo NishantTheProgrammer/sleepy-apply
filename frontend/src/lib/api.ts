@@ -89,3 +89,61 @@ export const adminApi = {
   triggerDiscovery: () =>
     request<{ ok: boolean; message: string }>("/api/admin/trigger-discovery", { method: "POST" }),
 };
+
+// ── Companies ─────────────────────────────────────────────
+export interface TargetCompany {
+  _id: string;
+  name: string;
+  grade: string;
+  career_page: string;
+  ats_type: string;
+  board_token?: string;
+  api_url?: string;
+  industry?: string;
+  location_hq?: string;
+  is_active: boolean;
+  total_jobs_fetched: number;
+  last_fetched_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const companiesApi = {
+  list: (params?: { grade?: string; search?: string; is_active?: boolean; skip?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.grade && params.grade !== "all") q.set("grade", params.grade);
+    if (params?.search) q.set("search", params.search);
+    if (params?.is_active !== undefined) q.set("is_active", String(params.is_active));
+    if (params?.skip) q.set("skip", String(params.skip));
+    if (params?.limit) q.set("limit", String(params.limit));
+    return request<{
+      items: TargetCompany[];
+      total: number;
+      grade_counts: {
+        all: number;
+        "Tier-1": number;
+        "Tier-2": number;
+        "Tier-3": number;
+        Startup: number;
+        active: number;
+      };
+    }>(`/api/companies?${q}`);
+  },
+  get: (id: string) => request<TargetCompany>(`/api/companies/${id}`),
+  create: (data: {
+    name: string;
+    grade: string;
+    career_page: string;
+    ats_type?: string;
+    board_token?: string;
+    api_url?: string;
+    industry?: string;
+    location_hq?: string;
+    is_active?: boolean;
+  }) => request<TargetCompany>("/api/companies", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<TargetCompany>) =>
+    request<{ ok: boolean; company: TargetCompany }>(`/api/companies/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ ok: boolean; message: string }>(`/api/companies/${id}`, { method: "DELETE" }),
+  seed: (force?: boolean) => request<{ ok: boolean; message: string }>(`/api/companies/seed?force=${!!force}`, { method: "POST" }),
+};
+

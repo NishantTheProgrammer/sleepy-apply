@@ -7,7 +7,8 @@ from app.core.config import get_settings
 from app.db.client import connect_db, close_db
 from app.db.indexes import create_indexes
 from app.db.client import get_db
-from app.api import auth, profile, jobs, settings, admin, pipeline
+from app.api import auth, profile, jobs, settings, admin, pipeline, companies
+from app.db.seed_companies import seed_target_companies
 
 logger = structlog.get_logger()
 
@@ -17,7 +18,13 @@ async def lifespan(app: FastAPI):
     # Startup
     settings_cfg = get_settings()
     await connect_db()
-    await create_indexes(get_db())
+    db = get_db()
+    await create_indexes(db)
+
+    # Auto-seed verified target companies if empty
+    if await db.companies.count_documents({}) == 0:
+        await seed_target_companies(db)
+
     logger.info("Sleepy Apply backend started", env=settings_cfg.environment)
     yield
     # Shutdown
@@ -49,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(profile.router, prefix="/api")
     app.include_router(jobs.router, prefix="/api")
+    app.include_router(companies.router, prefix="/api")
     app.include_router(settings.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(pipeline.router, prefix="/api")

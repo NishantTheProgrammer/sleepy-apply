@@ -41,4 +41,10 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # job_sources
     await db.job_sources.create_index("is_active")
 
+    # companies
+    await db.companies.create_index("name", unique=True)
+    await db.companies.create_index("grade")
+    await db.companies.create_index("is_active")
+    await db.companies.create_index("ats_type")
+
     logger.info("MongoDB indexes created")

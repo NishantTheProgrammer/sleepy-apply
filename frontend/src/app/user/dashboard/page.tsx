@@ -154,17 +154,17 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <Sparkles className="w-3 h-3" /> Autonomous Job Pipeline Active
-            </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Swarm Online
+              🇮🇳 India Tech Hubs Active
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <Sparkles className="w-3 h-3" /> Bengaluru · Hyderabad · Pune · Gurugram · Remote
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Candidate Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-black gradient-text">India Candidate Dashboard</h1>
           <p className="text-slate-400 mt-1 text-sm">
             Welcome back, <span className="text-white font-semibold">{user?.discord_username || "Candidate"}</span>.
-            Your AI agents are actively scoring 47 verified company ATS feeds.
+            Monitoring active engineering openings across top Indian startups & MNC technology centers.
           </p>
         </div>
 
@@ -251,7 +251,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">1. Sourced</p>
-                <p className="text-xl font-bold text-white mt-1">355 <span className="text-xs font-normal text-slate-400">jobs</span></p>
+                <p className="text-xl font-bold text-white mt-1">{jobs.total || 550} <span className="text-xs font-normal text-slate-400">jobs</span></p>
                 <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
                   <div className="bg-blue-500 h-full rounded-full" style={{ width: "100%" }} />
                 </div>
@@ -259,9 +259,9 @@ export default function DashboardPage() {
 
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">2. Profile Matched</p>
-                <p className="text-xl font-bold text-white mt-1">{jobs.total || 40} <span className="text-xs font-normal text-slate-400">matches</span></p>
+                <p className="text-xl font-bold text-white mt-1">{jobs.total || 550} <span className="text-xs font-normal text-slate-400">matches</span></p>
                 <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div className="bg-indigo-500 h-full rounded-full" style={{ width: "70%" }} />
+                  <div className="bg-indigo-500 h-full rounded-full" style={{ width: "85%" }} />
                 </div>
               </div>
 
@@ -507,7 +507,7 @@ export default function DashboardPage() {
                     <p className="text-xs font-bold text-white">Job Scraper Agent</p>
                     <span className="text-[10px] text-emerald-400 font-semibold">Active</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">47 ATS target boards indexed (355 jobs)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Live India ATS boards indexed ({jobs.total || 550} Indian jobs)</p>
                 </div>
               </div>
 

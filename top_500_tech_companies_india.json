@@ -1,0 +1,3013 @@
+{
+  "title": "Top 500 Technology / Software Engineering Companies",
+  "scope": "Companies relevant to software engineering, product engineering, cloud, AI/ML, cybersecurity, fintech, SaaS, IT services and technology-enabled engineering roles, with strong India relevance.",
+  "grade_definition": {
+    "S": "Highest priority — exceptional engineering brand/product depth and/or strong compensation and career upside.",
+    "A": "High priority — strong product/engineering organization and good target for experienced software engineers.",
+    "B": "Good target — substantial engineering hiring, services/consulting, specialized technology, or strong domain relevance."
+  },
+  "important_note": "Career URLs are intended as a curated starting dataset. Career portals and ATS routes change; validate the URL before automated browsing/application. Do not auto-submit applications without human review.",
+  "source_context": "The 2026 ranking was curated using current India tech-employer/career-page references, including sources showing major tech employers and a current dataset tracking 617 India tech companies across company career pages and ATS platforms.",
+  "companies": [
+    {
+      "rank": 1,
+      "company_name": "Google",
+      "career_page": "https://careers.google.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 2,
+      "company_name": "Microsoft",
+      "career_page": "https://careers.microsoft.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 3,
+      "company_name": "Amazon",
+      "career_page": "https://www.amazon.jobs/",
+      "grade": "S"
+    },
+    {
+      "rank": 4,
+      "company_name": "Apple",
+      "career_page": "https://jobs.apple.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 5,
+      "company_name": "Meta",
+      "career_page": "https://www.metacareers.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 6,
+      "company_name": "NVIDIA",
+      "career_page": "https://www.nvidia.com/en-in/about-nvidia/careers/",
+      "grade": "S"
+    },
+    {
+      "rank": 7,
+      "company_name": "Netflix",
+      "career_page": "https://jobs.netflix.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 8,
+      "company_name": "OpenAI",
+      "career_page": "https://openai.com/careers/",
+      "grade": "S"
+    },
+    {
+      "rank": 9,
+      "company_name": "Anthropic",
+      "career_page": "https://www.anthropic.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 10,
+      "company_name": "Uber",
+      "career_page": "https://www.uber.com/in/en/careers/",
+      "grade": "S"
+    },
+    {
+      "rank": 11,
+      "company_name": "Adobe",
+      "career_page": "https://careers.adobe.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 12,
+      "company_name": "Salesforce",
+      "career_page": "https://careers.salesforce.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 13,
+      "company_name": "Oracle",
+      "career_page": "https://careers.oracle.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 14,
+      "company_name": "SAP",
+      "career_page": "https://www.sap.com/about/careers.html",
+      "grade": "S"
+    },
+    {
+      "rank": 15,
+      "company_name": "ServiceNow",
+      "career_page": "https://careers.servicenow.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 16,
+      "company_name": "Atlassian",
+      "career_page": "https://www.atlassian.com/company/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 17,
+      "company_name": "Stripe",
+      "career_page": "https://stripe.com/jobs",
+      "grade": "S"
+    },
+    {
+      "rank": 18,
+      "company_name": "Cloudflare",
+      "career_page": "https://www.cloudflare.com/careers/",
+      "grade": "S"
+    },
+    {
+      "rank": 19,
+      "company_name": "Datadog",
+      "career_page": "https://careers.datadoghq.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 20,
+      "company_name": "Snowflake",
+      "career_page": "https://careers.snowflake.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 21,
+      "company_name": "JPMorgan Chase",
+      "career_page": "https://www.jpmorganchase.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 22,
+      "company_name": "Goldman Sachs",
+      "career_page": "https://www.goldmansachs.com/careers/",
+      "grade": "S"
+    },
+    {
+      "rank": 23,
+      "company_name": "Morgan Stanley",
+      "career_page": "https://www.morganstanley.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 24,
+      "company_name": "Walmart Global Tech",
+      "career_page": "https://careers.walmart.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 25,
+      "company_name": "Visa",
+      "career_page": "https://corporate.visa.com/en/careers.html",
+      "grade": "S"
+    },
+    {
+      "rank": 26,
+      "company_name": "Mastercard",
+      "career_page": "https://careers.mastercard.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 27,
+      "company_name": "PayPal",
+      "career_page": "https://careers.pypl.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 28,
+      "company_name": "Qualcomm",
+      "career_page": "https://www.qualcomm.com/company/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 29,
+      "company_name": "Cisco",
+      "career_page": "https://jobs.cisco.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 30,
+      "company_name": "Intel",
+      "career_page": "https://jobs.intel.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 31,
+      "company_name": "Broadcom",
+      "career_page": "https://www.broadcom.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 32,
+      "company_name": "AMD",
+      "career_page": "https://www.amd.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 33,
+      "company_name": "VMware",
+      "career_page": "https://www.vmware.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 34,
+      "company_name": "IBM",
+      "career_page": "https://www.ibm.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 35,
+      "company_name": "LinkedIn",
+      "career_page": "https://www.linkedin.com/jobs/",
+      "grade": "S"
+    },
+    {
+      "rank": 36,
+      "company_name": "Airbnb",
+      "career_page": "https://careers.airbnb.com/",
+      "grade": "S"
+    },
+    {
+      "rank": 37,
+      "company_name": "Booking.com",
+      "career_page": "https://www.booking-com.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 38,
+      "company_name": "Spotify",
+      "career_page": "https://www.lifeatspotify.com/jobs",
+      "grade": "S"
+    },
+    {
+      "rank": 39,
+      "company_name": "Dropbox",
+      "career_page": "https://www.dropbox.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 40,
+      "company_name": "GitHub",
+      "career_page": "https://www.github.com/careers",
+      "grade": "S"
+    },
+    {
+      "rank": 41,
+      "company_name": "Flipkart",
+      "career_page": "https://www.flipkartcareers.com/",
+      "grade": "A"
+    },
+    {
+      "rank": 42,
+      "company_name": "PhonePe",
+      "career_page": "https://www.phonepe.com/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 43,
+      "company_name": "Razorpay",
+      "career_page": "https://razorpay.com/jobs/",
+      "grade": "A"
+    },
+    {
+      "rank": 44,
+      "company_name": "Swiggy",
+      "career_page": "https://careers.swiggy.com/",
+      "grade": "A"
+    },
+    {
+      "rank": 45,
+      "company_name": "Zomato",
+      "career_page": "https://www.zomato.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 46,
+      "company_name": "Meesho",
+      "career_page": "https://www.meesho.io/jobs",
+      "grade": "A"
+    },
+    {
+      "rank": 47,
+      "company_name": "Groww",
+      "career_page": "https://groww.in/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 48,
+      "company_name": "CRED",
+      "career_page": "https://www.cred.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 49,
+      "company_name": "Myntra",
+      "career_page": "https://www.myntra.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 50,
+      "company_name": "Freshworks",
+      "career_page": "https://www.freshworks.com/company/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 51,
+      "company_name": "Zoho",
+      "career_page": "https://www.zoho.com/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 52,
+      "company_name": "Postman",
+      "career_page": "https://www.postman.com/company/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 53,
+      "company_name": "BrowserStack",
+      "career_page": "https://www.browserstack.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 54,
+      "company_name": "Dream11",
+      "career_page": "https://www.dream11.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 55,
+      "company_name": "InMobi",
+      "career_page": "https://www.inmobi.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 56,
+      "company_name": "PayU",
+      "career_page": "https://www.payu.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 57,
+      "company_name": "Ola",
+      "career_page": "https://www.ola.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 58,
+      "company_name": "Lenskart",
+      "career_page": "https://www.lenskart.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 59,
+      "company_name": "Delhivery",
+      "career_page": "https://www.delhivery.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 60,
+      "company_name": "Cars24",
+      "career_page": "https://www.cars24.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 61,
+      "company_name": "Zepto",
+      "career_page": "https://www.zepto.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 62,
+      "company_name": "CoinDCX",
+      "career_page": "https://www.coindcx.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 63,
+      "company_name": "CoinSwitch",
+      "career_page": "https://www.coinswitch.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 64,
+      "company_name": "Navi",
+      "career_page": "https://www.navi.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 65,
+      "company_name": "Policybazaar",
+      "career_page": "https://www.policybazaar.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 66,
+      "company_name": "MakeMyTrip",
+      "career_page": "https://www.makemytrip.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 67,
+      "company_name": "Nykaa",
+      "career_page": "https://www.nykaa.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 68,
+      "company_name": "Moglix",
+      "career_page": "https://www.moglix.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 69,
+      "company_name": "Udaan",
+      "career_page": "https://www.udaan.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 70,
+      "company_name": "Unacademy",
+      "career_page": "https://www.unacademy.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 71,
+      "company_name": "Rapido",
+      "career_page": "https://www.rapido.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 72,
+      "company_name": "Jupiter",
+      "career_page": "https://www.jupiter.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 73,
+      "company_name": "Slice",
+      "career_page": "https://www.slice.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 74,
+      "company_name": "Pine Labs",
+      "career_page": "https://www.pine-labs.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 75,
+      "company_name": "Chargebee",
+      "career_page": "https://www.chargebee.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 76,
+      "company_name": "Druva",
+      "career_page": "https://www.druva.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 77,
+      "company_name": "Hasura",
+      "career_page": "https://www.hasura.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 78,
+      "company_name": "HighRadius",
+      "career_page": "https://www.highradius.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 79,
+      "company_name": "Darwinbox",
+      "career_page": "https://www.darwinbox.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 80,
+      "company_name": "Zerodha",
+      "career_page": "https://www.zerodha.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 81,
+      "company_name": "Tata Digital",
+      "career_page": "https://www.tata-digital.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 82,
+      "company_name": "Tata 1mg",
+      "career_page": "https://www.tata-1mg.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 83,
+      "company_name": "Acko",
+      "career_page": "https://www.acko.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 84,
+      "company_name": "Rupeek",
+      "career_page": "https://www.rupeek.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 85,
+      "company_name": "OfBusiness",
+      "career_page": "https://www.ofbusiness.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 86,
+      "company_name": "BlackBuck",
+      "career_page": "https://www.blackbuck.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 87,
+      "company_name": "ShareChat",
+      "career_page": "https://www.sharechat.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 88,
+      "company_name": "Dailyhunt",
+      "career_page": "https://www.dailyhunt.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 89,
+      "company_name": "Urban Company",
+      "career_page": "https://www.urban-company.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 90,
+      "company_name": "Games24x7",
+      "career_page": "https://www.games24x7.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 91,
+      "company_name": "MPL",
+      "career_page": "https://www.mpl.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 92,
+      "company_name": "Dream Sports",
+      "career_page": "https://www.dream-sports.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 93,
+      "company_name": "Ather Energy",
+      "career_page": "https://www.ather-energy.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 94,
+      "company_name": "Ola Electric",
+      "career_page": "https://www.ola-electric.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 95,
+      "company_name": "Rebel Foods",
+      "career_page": "https://www.rebel-foods.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 96,
+      "company_name": "Cult.fit",
+      "career_page": "https://www.cult-fit.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 97,
+      "company_name": "Livspace",
+      "career_page": "https://www.livspace.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 98,
+      "company_name": "Practo",
+      "career_page": "https://www.practo.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 99,
+      "company_name": "Gupshup",
+      "career_page": "https://www.gupshup.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 100,
+      "company_name": "MoEngage",
+      "career_page": "https://www.moengage.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 101,
+      "company_name": "CleverTap",
+      "career_page": "https://www.clevertap.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 102,
+      "company_name": "Whatfix",
+      "career_page": "https://www.whatfix.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 103,
+      "company_name": "Yellow.ai",
+      "career_page": "https://www.yellow-ai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 104,
+      "company_name": "Uniphore",
+      "career_page": "https://www.uniphore.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 105,
+      "company_name": "Observe.AI",
+      "career_page": "https://www.observe-ai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 106,
+      "company_name": "Sarvam AI",
+      "career_page": "https://www.sarvam-ai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 107,
+      "company_name": "Krutrim",
+      "career_page": "https://www.krutrim.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 108,
+      "company_name": "AI4Bharat",
+      "career_page": "https://www.ai4bharat.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 109,
+      "company_name": "Mad Street Den",
+      "career_page": "https://www.mad-street-den.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 110,
+      "company_name": "SigTuple",
+      "career_page": "https://www.sigtuple.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 111,
+      "company_name": "Niramai",
+      "career_page": "https://www.niramai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 112,
+      "company_name": "Qure.ai",
+      "career_page": "https://www.qure-ai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 113,
+      "company_name": "Mindtickle",
+      "career_page": "https://www.mindtickle.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 114,
+      "company_name": "Vymo",
+      "career_page": "https://www.vymo.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 115,
+      "company_name": "Sprinklr",
+      "career_page": "https://www.sprinklr.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 116,
+      "company_name": "Elastic",
+      "career_page": "https://www.elastic.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 117,
+      "company_name": "MongoDB",
+      "career_page": "https://www.mongodb.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 118,
+      "company_name": "Confluent",
+      "career_page": "https://www.confluent.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 119,
+      "company_name": "GitLab",
+      "career_page": "https://www.gitlab.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 120,
+      "company_name": "HashiCorp",
+      "career_page": "https://www.hashicorp.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 121,
+      "company_name": "Twilio",
+      "career_page": "https://www.twilio.com/company/jobs",
+      "grade": "A"
+    },
+    {
+      "rank": 122,
+      "company_name": "Okta",
+      "career_page": "https://www.okta.com/company/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 123,
+      "company_name": "Zscaler",
+      "career_page": "https://www.zscaler.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 124,
+      "company_name": "Palo Alto Networks",
+      "career_page": "https://www.palo-alto-networks.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 125,
+      "company_name": "CrowdStrike",
+      "career_page": "https://www.crowdstrike.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 126,
+      "company_name": "Fortinet",
+      "career_page": "https://www.fortinet.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 127,
+      "company_name": "Figma",
+      "career_page": "https://www.figma.com/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 128,
+      "company_name": "Canva",
+      "career_page": "https://www.canva.com/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 129,
+      "company_name": "Notion",
+      "career_page": "https://www.notion.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 130,
+      "company_name": "HubSpot",
+      "career_page": "https://www.hubspot.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 131,
+      "company_name": "Shopify",
+      "career_page": "https://www.shopify.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 132,
+      "company_name": "Block",
+      "career_page": "https://www.block.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 133,
+      "company_name": "Square",
+      "career_page": "https://www.square.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 134,
+      "company_name": "Coinbase",
+      "career_page": "https://www.coinbase.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 135,
+      "company_name": "Robinhood",
+      "career_page": "https://www.robinhood.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 136,
+      "company_name": "DoorDash",
+      "career_page": "https://www.doordash.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 137,
+      "company_name": "Instacart",
+      "career_page": "https://www.instacart.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 138,
+      "company_name": "Lyft",
+      "career_page": "https://www.lyft.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 139,
+      "company_name": "Databricks",
+      "career_page": "https://www.databricks.com/company/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 140,
+      "company_name": "Palantir",
+      "career_page": "https://www.palantir.com/careers/",
+      "grade": "A"
+    },
+    {
+      "rank": 141,
+      "company_name": "Scale AI",
+      "career_page": "https://www.scale-ai.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 142,
+      "company_name": "Waymo",
+      "career_page": "https://www.waymo.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 143,
+      "company_name": "Cruise",
+      "career_page": "https://www.cruise.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 144,
+      "company_name": "Tesla",
+      "career_page": "https://www.tesla.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 145,
+      "company_name": "Rivian",
+      "career_page": "https://www.rivian.com/careers",
+      "grade": "A"
+    },
+    {
+      "rank": 146,
+      "company_name": "TCS",
+      "career_page": "https://www.tcs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 147,
+      "company_name": "Infosys",
+      "career_page": "https://career.infosys.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 148,
+      "company_name": "HCLTech",
+      "career_page": "https://www.hcltech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 149,
+      "company_name": "Wipro",
+      "career_page": "https://careers.wipro.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 150,
+      "company_name": "Tech Mahindra",
+      "career_page": "https://careers.techmahindra.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 151,
+      "company_name": "LTIMindtree",
+      "career_page": "https://www.ltimindtree.com/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 152,
+      "company_name": "Cognizant",
+      "career_page": "https://careers.cognizant.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 153,
+      "company_name": "Accenture",
+      "career_page": "https://www.accenture.com/in-en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 154,
+      "company_name": "Capgemini",
+      "career_page": "https://www.capgemini.com/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 155,
+      "company_name": "Coforge",
+      "career_page": "https://www.coforge.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 156,
+      "company_name": "Persistent Systems",
+      "career_page": "https://www.persistent.com/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 157,
+      "company_name": "Mphasis",
+      "career_page": "https://careers.mphasis.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 158,
+      "company_name": "Hexaware",
+      "career_page": "https://jobs.hexaware.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 159,
+      "company_name": "Zensar",
+      "career_page": "https://www.zensar.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 160,
+      "company_name": "L&T Technology Services",
+      "career_page": "https://www.ltts.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 161,
+      "company_name": "KPIT Technologies",
+      "career_page": "https://www.kpit.com/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 162,
+      "company_name": "Birlasoft",
+      "career_page": "https://www.birlasoft.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 163,
+      "company_name": "Cyient",
+      "career_page": "https://www.cyient.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 164,
+      "company_name": "Mastek",
+      "career_page": "https://www.mastek.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 165,
+      "company_name": "Sonata Software",
+      "career_page": "https://www.sonata-software.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 166,
+      "company_name": "Synechron",
+      "career_page": "https://www.synechron.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 167,
+      "company_name": "Virtusa",
+      "career_page": "https://www.virtusa.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 168,
+      "company_name": "EPAM Systems",
+      "career_page": "https://www.epam.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 169,
+      "company_name": "Globant",
+      "career_page": "https://career.globant.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 170,
+      "company_name": "Thoughtworks",
+      "career_page": "https://www.thoughtworks.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 171,
+      "company_name": "Publicis Sapient",
+      "career_page": "https://www.publicis-sapient.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 172,
+      "company_name": "Nagarro",
+      "career_page": "https://www.nagarro.com/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 173,
+      "company_name": "Endava",
+      "career_page": "https://www.endava.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 174,
+      "company_name": "Sopra Steria",
+      "career_page": "https://www.sopra-steria.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 175,
+      "company_name": "NTT DATA",
+      "career_page": "https://careers.nttdata.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 176,
+      "company_name": "DXC Technology",
+      "career_page": "https://careers.dxc.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 177,
+      "company_name": "CGI",
+      "career_page": "https://www.cgi.com/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 178,
+      "company_name": "Fujitsu",
+      "career_page": "https://global.fujitsu/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 179,
+      "company_name": "NEC",
+      "career_page": "https://www.nec.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 180,
+      "company_name": "Hitachi Digital Services",
+      "career_page": "https://www.hitachi-digital-services.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 181,
+      "company_name": "Kyndryl",
+      "career_page": "https://www.kyndryl.com/us/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 182,
+      "company_name": "LTTS",
+      "career_page": "https://www.ltts.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 183,
+      "company_name": "Sasken",
+      "career_page": "https://www.sasken.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 184,
+      "company_name": "Newgen Software",
+      "career_page": "https://www.newgen-software.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 185,
+      "company_name": "eClerx",
+      "career_page": "https://www.eclerx.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 186,
+      "company_name": "Nucleus Software",
+      "career_page": "https://www.nucleus-software.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 187,
+      "company_name": "OFSS",
+      "career_page": "https://www.ofss.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 188,
+      "company_name": "Oracle Financial Services Software",
+      "career_page": "https://www.oracle-financial-services-software.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 189,
+      "company_name": "Ramco Systems",
+      "career_page": "https://www.ramco-systems.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 190,
+      "company_name": "Affle",
+      "career_page": "https://www.affle.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 191,
+      "company_name": "Route Mobile",
+      "career_page": "https://www.route-mobile.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 192,
+      "company_name": "Tanla Platforms",
+      "career_page": "https://www.tanla-platforms.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 193,
+      "company_name": "Intellect Design Arena",
+      "career_page": "https://www.intellect-design-arena.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 194,
+      "company_name": "3i Infotech",
+      "career_page": "https://www.3i-infotech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 195,
+      "company_name": "ITC Infotech",
+      "career_page": "https://www.itc-infotech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 196,
+      "company_name": "UST",
+      "career_page": "https://www.ust.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 197,
+      "company_name": "Marlabs",
+      "career_page": "https://www.marlabs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 198,
+      "company_name": "Searce",
+      "career_page": "https://www.searce.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 199,
+      "company_name": "Tredence",
+      "career_page": "https://www.tredence.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 200,
+      "company_name": "Tiger Analytics",
+      "career_page": "https://www.tiger-analytics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 201,
+      "company_name": "LatentView Analytics",
+      "career_page": "https://www.latentview-analytics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 202,
+      "company_name": "Fractal Analytics",
+      "career_page": "https://www.fractal-analytics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 203,
+      "company_name": "Mu Sigma",
+      "career_page": "https://www.mu-sigma.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 204,
+      "company_name": "Course5 Intelligence",
+      "career_page": "https://www.course5-intelligence.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 205,
+      "company_name": "Sigmoid",
+      "career_page": "https://www.sigmoid.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 206,
+      "company_name": "Quantiphi",
+      "career_page": "https://www.quantiphi.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 207,
+      "company_name": "ZS Associates",
+      "career_page": "https://www.zs-associates.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 208,
+      "company_name": "TigerGraph",
+      "career_page": "https://www.tigergraph.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 209,
+      "company_name": "Incedo",
+      "career_page": "https://www.incedo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 210,
+      "company_name": "Brillio",
+      "career_page": "https://www.brillio.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 211,
+      "company_name": "VirtusaPolaris",
+      "career_page": "https://www.virtusapolaris.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 212,
+      "company_name": "Hexaware Technologies",
+      "career_page": "https://www.hexaware.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 213,
+      "company_name": "Mindtree",
+      "career_page": "https://www.mindtree.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 214,
+      "company_name": "L&T Infotech",
+      "career_page": "https://www.l-t-infotech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 215,
+      "company_name": "Calsoft",
+      "career_page": "https://www.calsoft.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 216,
+      "company_name": "Cigniti",
+      "career_page": "https://www.cigniti.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 217,
+      "company_name": "QA InfoTech",
+      "career_page": "https://www.qa-infotech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 218,
+      "company_name": "TestingXperts",
+      "career_page": "https://www.testingxperts.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 219,
+      "company_name": "Qualitest",
+      "career_page": "https://www.qualitest.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 220,
+      "company_name": "ValueLabs",
+      "career_page": "https://www.valuelabs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 221,
+      "company_name": "Persistent",
+      "career_page": "https://www.persistent.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 222,
+      "company_name": "Happiest Minds",
+      "career_page": "https://www.happiest-minds.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 223,
+      "company_name": "Newgen",
+      "career_page": "https://www.newgen.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 224,
+      "company_name": "Sify Technologies",
+      "career_page": "https://www.sify.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 225,
+      "company_name": "CMS IT Services",
+      "career_page": "https://www.cms-it-services.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 226,
+      "company_name": "NucleusTeq",
+      "career_page": "https://www.nucleusteq.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 227,
+      "company_name": "Sutherland",
+      "career_page": "https://www.sutherland.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 228,
+      "company_name": "Concentrix",
+      "career_page": "https://www.concentrix.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 229,
+      "company_name": "Genpact",
+      "career_page": "https://www.genpact.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 230,
+      "company_name": "EXL",
+      "career_page": "https://www.exl.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 231,
+      "company_name": "WNS",
+      "career_page": "https://www.wns.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 232,
+      "company_name": "Firstsource",
+      "career_page": "https://www.firstsource.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 233,
+      "company_name": "Datamatics",
+      "career_page": "https://www.datamatics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 234,
+      "company_name": "eClerx Services",
+      "career_page": "https://www.eclerx-services.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 235,
+      "company_name": "Quess Corp",
+      "career_page": "https://www.quess-corp.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 236,
+      "company_name": "TeamLease Digital",
+      "career_page": "https://www.teamlease-digital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 237,
+      "company_name": "Allied Digital",
+      "career_page": "https://www.allied-digital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 238,
+      "company_name": "3SC Solutions",
+      "career_page": "https://www.3sc-solutions.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 239,
+      "company_name": "Happiest Minds Technologies",
+      "career_page": "https://www.happiest-minds.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 240,
+      "company_name": "Zensar Technologies",
+      "career_page": "https://www.zensar.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 241,
+      "company_name": "Arm",
+      "career_page": "https://careers.arm.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 242,
+      "company_name": "ASML",
+      "career_page": "https://www.asml.com/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 243,
+      "company_name": "Applied Materials",
+      "career_page": "https://www.applied-materials.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 244,
+      "company_name": "Lam Research",
+      "career_page": "https://www.lam-research.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 245,
+      "company_name": "Micron",
+      "career_page": "https://www.micron.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 246,
+      "company_name": "Marvell Technology",
+      "career_page": "https://www.marvell-technology.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 247,
+      "company_name": "MediaTek",
+      "career_page": "https://www.mediatek.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 248,
+      "company_name": "Texas Instruments",
+      "career_page": "https://www.texas-instruments.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 249,
+      "company_name": "Analog Devices",
+      "career_page": "https://www.analog-devices.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 250,
+      "company_name": "NXP Semiconductors",
+      "career_page": "https://www.nxp-semiconductors.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 251,
+      "company_name": "Synopsys",
+      "career_page": "https://www.synopsys.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 252,
+      "company_name": "Cadence Design Systems",
+      "career_page": "https://www.cadence-design-systems.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 253,
+      "company_name": "Keysight Technologies",
+      "career_page": "https://www.keysight.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 254,
+      "company_name": "Western Digital",
+      "career_page": "https://www.western-digital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 255,
+      "company_name": "Seagate",
+      "career_page": "https://www.seagate.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 256,
+      "company_name": "KLA",
+      "career_page": "https://www.kla.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 257,
+      "company_name": "Teradyne",
+      "career_page": "https://www.teradyne.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 258,
+      "company_name": "STMicroelectronics",
+      "career_page": "https://www.stmicroelectronics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 259,
+      "company_name": "Infineon",
+      "career_page": "https://www.infineon.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 260,
+      "company_name": "Renesas Electronics",
+      "career_page": "https://www.renesas-electronics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 261,
+      "company_name": "Bosch",
+      "career_page": "https://www.bosch.com/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 262,
+      "company_name": "Continental",
+      "career_page": "https://www.continental.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 263,
+      "company_name": "Siemens",
+      "career_page": "https://www.siemens.com/global/en/company/jobs.html",
+      "grade": "B"
+    },
+    {
+      "rank": 264,
+      "company_name": "Schneider Electric",
+      "career_page": "https://www.schneider-electric.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 265,
+      "company_name": "Honeywell",
+      "career_page": "https://www.honeywell.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 266,
+      "company_name": "GE Aerospace",
+      "career_page": "https://www.ge-aerospace.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 267,
+      "company_name": "GE HealthCare",
+      "career_page": "https://www.ge-healthcare.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 268,
+      "company_name": "Philips",
+      "career_page": "https://www.philips.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 269,
+      "company_name": "Ericsson",
+      "career_page": "https://www.ericsson.com/en/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 270,
+      "company_name": "Nokia",
+      "career_page": "https://www.nokia.com/about-us/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 271,
+      "company_name": "Motorola Solutions",
+      "career_page": "https://www.motorola-solutions.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 272,
+      "company_name": "Samsung Electronics",
+      "career_page": "https://www.samsung.com/global/ir/careers/",
+      "grade": "B"
+    },
+    {
+      "rank": 273,
+      "company_name": "LG Electronics",
+      "career_page": "https://www.lg-electronics.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 274,
+      "company_name": "Sony",
+      "career_page": "https://www.sony.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 275,
+      "company_name": "Panasonic",
+      "career_page": "https://www.panasonic.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 276,
+      "company_name": "Hitachi",
+      "career_page": "https://www.hitachi.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 277,
+      "company_name": "Mitsubishi Electric",
+      "career_page": "https://www.mitsubishi-electric.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 278,
+      "company_name": "Toshiba",
+      "career_page": "https://www.toshiba.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 279,
+      "company_name": "NEC Corporation",
+      "career_page": "https://www.nec-corporation.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 280,
+      "company_name": "Lenovo",
+      "career_page": "https://www.lenovo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 281,
+      "company_name": "Dell Technologies",
+      "career_page": "https://jobs.dell.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 282,
+      "company_name": "HP Inc.",
+      "career_page": "https://jobs.hp.com/",
+      "grade": "B"
+    },
+    {
+      "rank": 283,
+      "company_name": "Hewlett Packard Enterprise",
+      "career_page": "https://www.hewlett-packard-enterprise.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 284,
+      "company_name": "Red Hat",
+      "career_page": "https://www.redhat.com/en/jobs",
+      "grade": "B"
+    },
+    {
+      "rank": 285,
+      "company_name": "Canonical",
+      "career_page": "https://canonical.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 286,
+      "company_name": "SUSE",
+      "career_page": "https://www.suse.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 287,
+      "company_name": "VMware by Broadcom",
+      "career_page": "https://www.vmware-by-broadcom.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 288,
+      "company_name": "Citrix",
+      "career_page": "https://www.citrix.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 289,
+      "company_name": "Nutanix",
+      "career_page": "https://www.nutanix.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 290,
+      "company_name": "Pure Storage",
+      "career_page": "https://www.pure-storage.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 291,
+      "company_name": "NetApp",
+      "career_page": "https://www.netapp.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 292,
+      "company_name": "Arista Networks",
+      "career_page": "https://www.arista-networks.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 293,
+      "company_name": "Juniper Networks",
+      "career_page": "https://www.juniper-networks.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 294,
+      "company_name": "Commvault",
+      "career_page": "https://www.commvault.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 295,
+      "company_name": "Rubrik",
+      "career_page": "https://www.rubrik.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 296,
+      "company_name": "Veeam",
+      "career_page": "https://www.veeam.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 297,
+      "company_name": "Akamai",
+      "career_page": "https://www.akamai.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 298,
+      "company_name": "Fastly",
+      "career_page": "https://www.fastly.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 299,
+      "company_name": "Zendesk",
+      "career_page": "https://www.zendesk.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 300,
+      "company_name": "DocuSign",
+      "career_page": "https://www.docusign.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 301,
+      "company_name": "Workday",
+      "career_page": "https://workday.wd5.myworkdayjobs.com/Workday",
+      "grade": "B"
+    },
+    {
+      "rank": 302,
+      "company_name": "Splunk",
+      "career_page": "https://www.splunk.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 303,
+      "company_name": "New Relic",
+      "career_page": "https://www.new-relic.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 304,
+      "company_name": "Dynatrace",
+      "career_page": "https://www.dynatrace.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 305,
+      "company_name": "Sentry",
+      "career_page": "https://www.sentry.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 306,
+      "company_name": "PagerDuty",
+      "career_page": "https://www.pagerduty.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 307,
+      "company_name": "Bitbucket",
+      "career_page": "https://www.bitbucket.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 308,
+      "company_name": "CircleCI",
+      "career_page": "https://www.circleci.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 309,
+      "company_name": "JFrog",
+      "career_page": "https://www.jfrog.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 310,
+      "company_name": "Sonatype",
+      "career_page": "https://www.sonatype.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 311,
+      "company_name": "Docker",
+      "career_page": "https://www.docker.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 312,
+      "company_name": "Grafana Labs",
+      "career_page": "https://www.grafana-labs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 313,
+      "company_name": "Cockroach Labs",
+      "career_page": "https://www.cockroach-labs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 314,
+      "company_name": "Redis",
+      "career_page": "https://www.redis.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 315,
+      "company_name": "DigitalOcean",
+      "career_page": "https://www.digitalocean.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 316,
+      "company_name": "Vercel",
+      "career_page": "https://www.vercel.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 317,
+      "company_name": "Netlify",
+      "career_page": "https://www.netlify.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 318,
+      "company_name": "Heroku",
+      "career_page": "https://www.heroku.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 319,
+      "company_name": "Linear",
+      "career_page": "https://www.linear.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 320,
+      "company_name": "Asana",
+      "career_page": "https://www.asana.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 321,
+      "company_name": "Monday.com",
+      "career_page": "https://www.monday-com.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 322,
+      "company_name": "Smartsheet",
+      "career_page": "https://www.smartsheet.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 323,
+      "company_name": "Miro",
+      "career_page": "https://www.miro.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 324,
+      "company_name": "Slack",
+      "career_page": "https://www.slack.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 325,
+      "company_name": "Zoom",
+      "career_page": "https://www.zoom.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 326,
+      "company_name": "Box",
+      "career_page": "https://www.box.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 327,
+      "company_name": "Egnyte",
+      "career_page": "https://www.egnyte.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 328,
+      "company_name": "DocPlanner",
+      "career_page": "https://www.docplanner.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 329,
+      "company_name": "Grammarly",
+      "career_page": "https://www.grammarly.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 330,
+      "company_name": "Duolingo",
+      "career_page": "https://www.duolingo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 331,
+      "company_name": "Coursera",
+      "career_page": "https://www.coursera.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 332,
+      "company_name": "Udemy",
+      "career_page": "https://www.udemy.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 333,
+      "company_name": "Chegg",
+      "career_page": "https://www.chegg.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 334,
+      "company_name": "Khan Academy",
+      "career_page": "https://www.khan-academy.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 335,
+      "company_name": "2U",
+      "career_page": "https://www.2u.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 336,
+      "company_name": "MasterClass",
+      "career_page": "https://www.masterclass.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 337,
+      "company_name": "RazorpayX",
+      "career_page": "https://www.razorpayx.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 338,
+      "company_name": "Cashfree Payments",
+      "career_page": "https://www.cashfree-payments.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 339,
+      "company_name": "MobiKwik",
+      "career_page": "https://www.mobikwik.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 340,
+      "company_name": "BharatPe",
+      "career_page": "https://www.bharatpe.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 341,
+      "company_name": "Paytm",
+      "career_page": "https://www.paytm.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 342,
+      "company_name": "Mobikwik",
+      "career_page": "https://www.mobikwik.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 343,
+      "company_name": "Open Financial Technologies",
+      "career_page": "https://www.open-financial.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 344,
+      "company_name": "Setu",
+      "career_page": "https://www.setu.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 345,
+      "company_name": "Perfios",
+      "career_page": "https://www.perfios.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 346,
+      "company_name": "Yubi",
+      "career_page": "https://www.yubi.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 347,
+      "company_name": "CredAvenue",
+      "career_page": "https://www.credavenue.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 348,
+      "company_name": "KreditBee",
+      "career_page": "https://www.kreditbee.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 349,
+      "company_name": "Lendingkart",
+      "career_page": "https://www.lendingkart.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 350,
+      "company_name": "Moneyview",
+      "career_page": "https://www.moneyview.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 351,
+      "company_name": "ET Money",
+      "career_page": "https://www.et-money.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 352,
+      "company_name": "Upstox",
+      "career_page": "https://www.upstox.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 353,
+      "company_name": "5paisa",
+      "career_page": "https://www.5paisa.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 354,
+      "company_name": "Angel One",
+      "career_page": "https://www.angel-one.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 355,
+      "company_name": "ICICI Securities",
+      "career_page": "https://www.icici-securities.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 356,
+      "company_name": "HDFC Securities",
+      "career_page": "https://www.hdfc-securities.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 357,
+      "company_name": "Kotak Securities",
+      "career_page": "https://www.kotak-securities.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 358,
+      "company_name": "Motilal Oswal",
+      "career_page": "https://www.motilal-oswal.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 359,
+      "company_name": "IIFL Securities",
+      "career_page": "https://www.iifl-securities.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 360,
+      "company_name": "Bajaj Finserv",
+      "career_page": "https://www.bajaj-finserv.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 361,
+      "company_name": "Bajaj Finance",
+      "career_page": "https://www.bajaj-finance.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 362,
+      "company_name": "Tata Capital",
+      "career_page": "https://www.tata-capital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 363,
+      "company_name": "Axis Bank",
+      "career_page": "https://www.axis-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 364,
+      "company_name": "HDFC Bank",
+      "career_page": "https://www.hdfc-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 365,
+      "company_name": "ICICI Bank",
+      "career_page": "https://www.icici-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 366,
+      "company_name": "Kotak Mahindra Bank",
+      "career_page": "https://www.kotak-mahindra-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 367,
+      "company_name": "IndusInd Bank",
+      "career_page": "https://www.indusind-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 368,
+      "company_name": "State Bank of India",
+      "career_page": "https://www.state-bank-of.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 369,
+      "company_name": "Bank of Baroda",
+      "career_page": "https://www.bank-of-baroda.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 370,
+      "company_name": "Wells Fargo",
+      "career_page": "https://www.wells-fargo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 371,
+      "company_name": "Fidelity Investments",
+      "career_page": "https://www.fidelity-investments.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 372,
+      "company_name": "Bank of America",
+      "career_page": "https://www.bank-of-america.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 373,
+      "company_name": "Citigroup",
+      "career_page": "https://www.citigroup.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 374,
+      "company_name": "Barclays",
+      "career_page": "https://www.barclays.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 375,
+      "company_name": "HSBC",
+      "career_page": "https://www.hsbc.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 376,
+      "company_name": "Deutsche Bank",
+      "career_page": "https://www.deutsche-bank.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 377,
+      "company_name": "UBS",
+      "career_page": "https://www.ubs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 378,
+      "company_name": "BNP Paribas",
+      "career_page": "https://www.bnp-paribas.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 379,
+      "company_name": "Societe Generale",
+      "career_page": "https://www.societe-generale.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 380,
+      "company_name": "Credit Suisse",
+      "career_page": "https://www.credit-suisse.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 381,
+      "company_name": "BlackRock",
+      "career_page": "https://www.blackrock.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 382,
+      "company_name": "Blackstone",
+      "career_page": "https://www.blackstone.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 383,
+      "company_name": "Bloomberg",
+      "career_page": "https://www.bloomberg.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 384,
+      "company_name": "Reuters",
+      "career_page": "https://www.reuters.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 385,
+      "company_name": "Thomson Reuters",
+      "career_page": "https://www.thomson-reuters.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 386,
+      "company_name": "FactSet",
+      "career_page": "https://www.factset.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 387,
+      "company_name": "Morningstar",
+      "career_page": "https://www.morningstar.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 388,
+      "company_name": "S&P Global",
+      "career_page": "https://www.s-p-global.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 389,
+      "company_name": "Moody's",
+      "career_page": "https://www.moody-s.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 390,
+      "company_name": "FIS",
+      "career_page": "https://www.fis.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 391,
+      "company_name": "Fiserv",
+      "career_page": "https://www.fiserv.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 392,
+      "company_name": "ACI Worldwide",
+      "career_page": "https://www.aci-worldwide.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 393,
+      "company_name": "Mastercard Labs",
+      "career_page": "https://www.mastercard-labs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 394,
+      "company_name": "Visa Technology",
+      "career_page": "https://www.visa-technology.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 395,
+      "company_name": "American Express",
+      "career_page": "https://www.american-express.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 396,
+      "company_name": "Discover Financial Services",
+      "career_page": "https://www.discover-financial-services.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 397,
+      "company_name": "Capital One",
+      "career_page": "https://www.capital-one.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 398,
+      "company_name": "Chase",
+      "career_page": "https://www.chase.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 399,
+      "company_name": "Capital One India",
+      "career_page": "https://www.capital-one.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 400,
+      "company_name": "HSBC Technology India",
+      "career_page": "https://www.hsbc-technology.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 401,
+      "company_name": "Barclays India",
+      "career_page": "https://www.barclays.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 402,
+      "company_name": "UBS India",
+      "career_page": "https://www.ubs.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 403,
+      "company_name": "McKinsey Digital",
+      "career_page": "https://www.mckinsey-digital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 404,
+      "company_name": "BCG X",
+      "career_page": "https://www.bcg-x.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 405,
+      "company_name": "Bain & Company",
+      "career_page": "https://www.bain-company.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 406,
+      "company_name": "Deloitte",
+      "career_page": "https://www.deloitte.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 407,
+      "company_name": "PwC",
+      "career_page": "https://www.pwc.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 408,
+      "company_name": "EY",
+      "career_page": "https://www.ey.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 409,
+      "company_name": "KPMG",
+      "career_page": "https://www.kpmg.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 410,
+      "company_name": "Deloitte Digital",
+      "career_page": "https://www.deloitte-digital.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 411,
+      "company_name": "EY Technology Solutions",
+      "career_page": "https://www.ey-technology-solutions.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 412,
+      "company_name": "PwC Technology",
+      "career_page": "https://www.pwc-technology.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 413,
+      "company_name": "McKinsey & Company",
+      "career_page": "https://www.mckinsey-company.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 414,
+      "company_name": "Boston Consulting Group",
+      "career_page": "https://www.boston-consulting-group.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 415,
+      "company_name": "Oliver Wyman",
+      "career_page": "https://www.oliver-wyman.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 416,
+      "company_name": "Kearney",
+      "career_page": "https://www.kearney.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 417,
+      "company_name": "Accenture Technology",
+      "career_page": "https://www.accenture-technology.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 418,
+      "company_name": "Capgemini Engineering",
+      "career_page": "https://www.capgemini-engineering.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 419,
+      "company_name": "Cognizant Technology Solutions",
+      "career_page": "https://www.cognizant-technology-solutions.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 420,
+      "company_name": "Tata Elxsi",
+      "career_page": "https://www.tata-elxsi.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 421,
+      "company_name": "Tata Technologies",
+      "career_page": "https://www.tata.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 422,
+      "company_name": "KPIT",
+      "career_page": "https://www.kpit.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 423,
+      "company_name": "Cyient DLM",
+      "career_page": "https://www.cyient-dlm.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 424,
+      "company_name": "Quest Global",
+      "career_page": "https://www.quest-global.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 425,
+      "company_name": "Alten",
+      "career_page": "https://www.alten.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 426,
+      "company_name": "Altran",
+      "career_page": "https://www.altran.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 427,
+      "company_name": "Harman",
+      "career_page": "https://www.harman.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 428,
+      "company_name": "Visteon",
+      "career_page": "https://www.visteon.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 429,
+      "company_name": "Aptiv",
+      "career_page": "https://www.aptiv.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 430,
+      "company_name": "Valeo",
+      "career_page": "https://www.valeo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 431,
+      "company_name": "ZF Group",
+      "career_page": "https://www.zf-group.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 432,
+      "company_name": "ZF India",
+      "career_page": "https://www.zf.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 433,
+      "company_name": "Mercedes-Benz Research and Development India",
+      "career_page": "https://www.mercedes-benz-research-and-development.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 434,
+      "company_name": "BMW Group",
+      "career_page": "https://www.bmw-group.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 435,
+      "company_name": "Volkswagen Group",
+      "career_page": "https://www.volkswagen-group.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 436,
+      "company_name": "Porsche",
+      "career_page": "https://www.porsche.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 437,
+      "company_name": "General Motors",
+      "career_page": "https://www.general-motors.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 438,
+      "company_name": "Ford Motor Company",
+      "career_page": "https://www.ford-motor-company.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 439,
+      "company_name": "Toyota Connected",
+      "career_page": "https://www.toyota-connected.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 440,
+      "company_name": "Hyundai Mobis",
+      "career_page": "https://www.hyundai-mobis.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 441,
+      "company_name": "JLR",
+      "career_page": "https://www.jlr.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 442,
+      "company_name": "Jaguar Land Rover",
+      "career_page": "https://www.jaguar-land-rover.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 443,
+      "company_name": "Mahindra Tech",
+      "career_page": "https://www.mahindra-tech.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 444,
+      "company_name": "Mahindra & Mahindra",
+      "career_page": "https://www.mahindra-mahindra.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 445,
+      "company_name": "Tata Motors",
+      "career_page": "https://www.tata-motors.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 446,
+      "company_name": "Ashok Leyland",
+      "career_page": "https://www.ashok-leyland.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 447,
+      "company_name": "Bharat Forge",
+      "career_page": "https://www.bharat-forge.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 448,
+      "company_name": "TVS Motor",
+      "career_page": "https://www.tvs-motor.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 449,
+      "company_name": "Bajaj Auto",
+      "career_page": "https://www.bajaj-auto.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 450,
+      "company_name": "Hero MotoCorp",
+      "career_page": "https://www.hero-motocorp.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 451,
+      "company_name": "Swiggy Instamart",
+      "career_page": "https://www.swiggy-instamart.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 452,
+      "company_name": "Blinkit",
+      "career_page": "https://www.blinkit.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 453,
+      "company_name": "BigBasket",
+      "career_page": "https://www.bigbasket.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 454,
+      "company_name": "Dunzo",
+      "career_page": "https://www.dunzo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 455,
+      "company_name": "JioMart",
+      "career_page": "https://www.jiomart.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 456,
+      "company_name": "Reliance Jio",
+      "career_page": "https://www.reliance-jio.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 457,
+      "company_name": "Jio Platforms",
+      "career_page": "https://www.jio-platforms.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 458,
+      "company_name": "Airtel",
+      "career_page": "https://www.airtel.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 459,
+      "company_name": "Vodafone Idea",
+      "career_page": "https://www.vodafone-idea.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 460,
+      "company_name": "Network18",
+      "career_page": "https://www.network18.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 461,
+      "company_name": "Times Internet",
+      "career_page": "https://www.times-internet.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 462,
+      "company_name": "Info Edge",
+      "career_page": "https://www.info-edge.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 463,
+      "company_name": "Naukri",
+      "career_page": "https://www.naukri.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 464,
+      "company_name": "Magicbricks",
+      "career_page": "https://www.magicbricks.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 465,
+      "company_name": "99acres",
+      "career_page": "https://www.99acres.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 466,
+      "company_name": "Quikr",
+      "career_page": "https://www.quikr.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 467,
+      "company_name": "OLX",
+      "career_page": "https://www.olx.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 468,
+      "company_name": "IndiaMART",
+      "career_page": "https://www.indiamart.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 469,
+      "company_name": "Justdial",
+      "career_page": "https://www.justdial.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 470,
+      "company_name": "JioSaavn",
+      "career_page": "https://www.jiosaavn.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 471,
+      "company_name": "Gaana",
+      "career_page": "https://www.gaana.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 472,
+      "company_name": "Hotstar",
+      "career_page": "https://www.hotstar.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 473,
+      "company_name": "Disney+ Hotstar",
+      "career_page": "https://www.disney-hotstar.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 474,
+      "company_name": "Sony LIV",
+      "career_page": "https://www.sony-liv.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 475,
+      "company_name": "Zee Entertainment",
+      "career_page": "https://www.zee-entertainment.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 476,
+      "company_name": "MX Player",
+      "career_page": "https://www.mx-player.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 477,
+      "company_name": "Moj",
+      "career_page": "https://www.moj.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 478,
+      "company_name": "Josh",
+      "career_page": "https://www.josh.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 479,
+      "company_name": "Dream11 Technologies",
+      "career_page": "https://www.dream11.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 480,
+      "company_name": "Gameskraft",
+      "career_page": "https://www.gameskraft.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 481,
+      "company_name": "Nazara Technologies",
+      "career_page": "https://www.nazara.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 482,
+      "company_name": "Zupee",
+      "career_page": "https://www.zupee.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 483,
+      "company_name": "WinZO",
+      "career_page": "https://www.winzo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 484,
+      "company_name": "SuperGaming",
+      "career_page": "https://www.supergaming.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 485,
+      "company_name": "MPL Sports",
+      "career_page": "https://www.mpl-sports.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 486,
+      "company_name": "Mobile Premier League",
+      "career_page": "https://www.mobile-premier-league.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 487,
+      "company_name": "Riot Games",
+      "career_page": "https://www.riot-games.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 488,
+      "company_name": "Electronic Arts",
+      "career_page": "https://www.electronic-arts.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 489,
+      "company_name": "Ubisoft",
+      "career_page": "https://www.ubisoft.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 490,
+      "company_name": "Activision Blizzard",
+      "career_page": "https://www.activision-blizzard.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 491,
+      "company_name": "Take-Two Interactive",
+      "career_page": "https://www.take-two-interactive.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 492,
+      "company_name": "Epic Games",
+      "career_page": "https://www.epic-games.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 493,
+      "company_name": "Unity",
+      "career_page": "https://www.unity.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 494,
+      "company_name": "Roblox",
+      "career_page": "https://www.roblox.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 495,
+      "company_name": "Valve",
+      "career_page": "https://www.valve.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 496,
+      "company_name": "Nintendo",
+      "career_page": "https://www.nintendo.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 497,
+      "company_name": "ByteDance",
+      "career_page": "https://www.bytedance.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 498,
+      "company_name": "TikTok",
+      "career_page": "https://www.tiktok.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 499,
+      "company_name": "Alibaba",
+      "career_page": "https://www.alibaba.com/careers",
+      "grade": "B"
+    },
+    {
+      "rank": 500,
+      "company_name": "Tencent",
+      "career_page": "https://www.tencent.com/careers",
+      "grade": "B"
+    }
+  ]
+}

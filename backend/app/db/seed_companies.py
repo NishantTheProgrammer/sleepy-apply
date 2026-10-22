@@ -465,11 +465,44 @@ SEED_COMPANIES = [
         "name": "InMobi",
         "grade": "Tier-2",
         "career_page": "https://www.inmobi.com/company/careers",
-        "ats_type": "custom",
-        "board_token": None,
-        "api_url": None,
+        "ats_type": "greenhouse",
+        "board_token": "inmobi",
+        "api_url": "https://boards-api.greenhouse.io/v1/boards/inmobi/jobs?content=true",
         "industry": "AdTech & Artificial Intelligence",
-        "location_hq": "Bengaluru, India / San Francisco",
+        "location_hq": "Bengaluru, India",
+        "is_active": True,
+    },
+    {
+        "name": "HackerRank",
+        "grade": "Tier-2",
+        "career_page": "https://www.hackerrank.com/careers",
+        "ats_type": "greenhouse",
+        "board_token": "hackerrank",
+        "api_url": "https://boards-api.greenhouse.io/v1/boards/hackerrank/jobs?content=true",
+        "industry": "Developer Assessment & Tech Hiring",
+        "location_hq": "Bengaluru, India",
+        "is_active": True,
+    },
+    {
+        "name": "Rubrik",
+        "grade": "Tier-1",
+        "career_page": "https://www.rubrik.com/company/careers",
+        "ats_type": "greenhouse",
+        "board_token": "rubrik",
+        "api_url": "https://boards-api.greenhouse.io/v1/boards/rubrik/jobs?content=true",
+        "industry": "Zero Trust Data Security & Cloud",
+        "location_hq": "Bengaluru, India / Palo Alto, CA",
+        "is_active": True,
+    },
+    {
+        "name": "Slice",
+        "grade": "Tier-2",
+        "career_page": "https://www.sliceit.com/careers",
+        "ats_type": "greenhouse",
+        "board_token": "slice",
+        "api_url": "https://boards-api.greenhouse.io/v1/boards/slice/jobs?content=true",
+        "industry": "Fintech & Consumer Credit",
+        "location_hq": "Bengaluru, India",
         "is_active": True,
     },
 
@@ -500,11 +533,11 @@ SEED_COMPANIES = [
         "name": "Thoughtworks",
         "grade": "Tier-3",
         "career_page": "https://www.thoughtworks.com/careers",
-        "ats_type": "custom",
-        "board_token": None,
-        "api_url": None,
+        "ats_type": "greenhouse",
+        "board_token": "thoughtworks",
+        "api_url": "https://boards-api.greenhouse.io/v1/boards/thoughtworks/jobs?content=true",
         "industry": "Global Software Consultancy",
-        "location_hq": "Chicago, IL / India",
+        "location_hq": "Bengaluru / Pune, India",
         "is_active": True,
     },
     {
@@ -561,6 +594,7 @@ async def seed_target_companies(db: AsyncIOMotorDatabase, force_overwrite: bool 
         }
         if force_overwrite:
             update_doc["$set"]["is_active"] = comp.get("is_active", True)
+            update_doc["$setOnInsert"].pop("is_active", None)
 
         await db.companies.update_one(
             {"name": comp["name"]},

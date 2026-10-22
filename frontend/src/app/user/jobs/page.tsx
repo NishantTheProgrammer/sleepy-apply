@@ -72,7 +72,7 @@ function JobsPageContent() {
   // Filters & Selected Job
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "high" | "remote">("all");
+  const [filterTab, setFilterTab] = useState<"all" | "high" | "remote" | "bengaluru">("all");
   const [descExpanded, setDescExpanded] = useState(false);
 
   const load = async (p = 1) => {
@@ -148,7 +148,14 @@ function JobsPageContent() {
         return item.compatibility_score >= 75;
       }
       if (filterTab === "remote") {
-        return item.job.is_remote;
+        return item.job.is_remote || (item.job.location && item.job.location.toLowerCase().includes("remote"));
+      }
+      if (filterTab === "bengaluru") {
+        return (
+          item.job.location &&
+          (item.job.location.toLowerCase().includes("bengaluru") ||
+            item.job.location.toLowerCase().includes("bangalore"))
+        );
       }
       return true;
     });
@@ -170,16 +177,16 @@ function JobsPageContent() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <Sparkles className="w-3 h-3" /> AI Career Matcher
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              🇮🇳 India Tech Openings Only
             </span>
             <span className="text-xs text-slate-400">
-              {total} Total Matched Positions
+              {total} Verified Indian Positions
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs</h1>
+          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs (India)</h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-            Ranked by AI compatibility score against your verified technical skills & preferences.
+            Active tech openings across Bengaluru, Hyderabad, Pune, Gurugram, Mumbai, and Remote (India).
           </p>
         </div>
 
@@ -223,7 +230,7 @@ function JobsPageContent() {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
           <button
             onClick={() => setFilterTab("all")}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -232,7 +239,27 @@ function JobsPageContent() {
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
-            All ({jobs.length})
+            All India ({jobs.length})
+          </button>
+          <button
+            onClick={() => setFilterTab("bengaluru")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              filterTab === "bengaluru"
+                ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Bengaluru / Bangalore
+          </button>
+          <button
+            onClick={() => setFilterTab("remote")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              filterTab === "remote"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Remote (India)
           </button>
           <button
             onClick={() => setFilterTab("high")}
@@ -243,16 +270,6 @@ function JobsPageContent() {
             }`}
           >
             High Match (≥75%)
-          </button>
-          <button
-            onClick={() => setFilterTab("remote")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              filterTab === "remote"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            Remote Only
           </button>
         </div>
       </div>
@@ -337,7 +354,10 @@ function JobsPageContent() {
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-slate-500" /> {item.job.location || "Remote"}
+                              <MapPin className="w-3 h-3 text-slate-500" /> {item.job.location || "Bengaluru, India"}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
+                              🇮🇳 India
                             </span>
                           </div>
                         </div>
@@ -402,6 +422,9 @@ function JobsPageContent() {
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                         {selectedItem.job.company}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                        🇮🇳 India
                       </span>
                       {selectedItem.job.is_remote && (
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">

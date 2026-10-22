@@ -5,19 +5,22 @@ from app.db.client import get_db
 from app.providers.factory import AIProviderFactory
 from app.models.settings import UserSettings
 
+from app.sources.company_ats import is_indian_job, standardize_india_location
+
 logger = structlog.get_logger()
 
-MATCH_EXPLANATION_PROMPT = """You are an AI career advisor. Briefly explain (in 2 concise sentences) why the candidate's profile matches this job opening:
+MATCH_EXPLANATION_PROMPT = """You are an AI career advisor. Briefly explain (in 2 concise sentences) why the candidate's profile matches this Indian tech job opening:
 Candidate Title/Skills: {skills}
 Candidate Summary: {summary}
 Job Title: {job_title}
 Company: {company}
+Location: {location}
 Required Skills: {job_skills}
 Explanation:"""
 
 
 class JobMatcherAgent:
-    """Computes compatibility score and detailed match breakdown between a user and job."""
+    """Computes compatibility score and detailed match breakdown between a user and job (India Tech Jobs)."""
 
     async def match_user_and_job(
         self,
@@ -30,6 +33,13 @@ class JobMatcherAgent:
         job = await db.jobs.find_one({"_id": ObjectId(job_id)})
 
         if not profile or not job:
+            return None
+
+        # STRICT ENFORCEMENT: Only match Indian jobs
+        company = job.get("company", "")
+        location = job.get("location", "")
+        desc = job.get("description", "")[:400]
+        if not is_indian_job(company, location, desc):
             return None
 
         raw_skills = profile.get("skills", [])
@@ -91,6 +101,7 @@ class JobMatcherAgent:
                     summary=profile.get("summary", ""),
                     job_title=job.get("title"),
                     company=job.get("company"),
+                    location=location or "Bengaluru, India",
                     job_skills=", ".join(job.get("required_skills", [])[:8]),
                 )
                 resp = await provider.complete([{"role": "user", "content": prompt}], temperature=0.3)

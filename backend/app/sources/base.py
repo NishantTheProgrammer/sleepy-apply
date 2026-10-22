@@ -16,6 +16,7 @@ class RawJobData(BaseModel):
     company_website: str | None = None
     posted_at_raw: str | None = None
     required_skills: list[str] = Field(default_factory=list)
+    source: str = "career"
 
 
 class BaseJobSource(ABC):
@@ -28,5 +29,5 @@ class BaseJobSource(ABC):
 
     def get_content_hash(self, job: RawJobData) -> str:
         """Generate a deterministic SHA256 hash for deduplication."""
-        raw = f"{job.title.strip().lower()}|{job.company.strip().lower()}|{job.location.strip().lower()}"
+        raw = f"{job.source.strip().lower()}|{job.title.strip().lower()}|{job.company.strip().lower()}|{job.location.strip().lower()}"
         return hashlib.sha256(raw.encode()).hexdigest()

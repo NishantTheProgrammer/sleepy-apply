@@ -84,11 +84,12 @@ export const templatesApi = {
 
 // ── Jobs ──────────────────────────────────────────────────
 export const jobsApi = {
-  list: (params?: { page?: number; limit?: number; min_score?: number }) => {
+  list: (params?: { page?: number; limit?: number; min_score?: number; source?: string }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set("page", String(params.page));
     if (params?.limit) q.set("limit", String(params.limit));
     if (params?.min_score) q.set("min_score", String(params.min_score));
+    if (params?.source && params.source !== "all") q.set("source", params.source);
     return request<{ items: unknown[]; total: number }>(`/api/jobs?${q}`);
   },
   get: (id: string) => request(`/api/jobs/${id}`),
@@ -135,12 +136,13 @@ export const adminApi = {
     request<{ ok: boolean; user: Record<string, unknown> }>(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
   triggerDiscovery: () =>
     request<{ ok: boolean; message: string }>("/api/admin/trigger-discovery", { method: "POST" }),
-  allJobs: (params?: { page?: number; limit?: number; search?: string; company?: string; is_remote?: boolean }) => {
+  allJobs: (params?: { page?: number; limit?: number; search?: string; company?: string; source?: string; is_remote?: boolean }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set("page", String(params.page));
     if (params?.limit) q.set("limit", String(params.limit));
     if (params?.search) q.set("search", params.search);
     if (params?.company && params.company !== "all") q.set("company", params.company);
+    if (params?.source && params.source !== "all") q.set("source", params.source);
     if (params?.is_remote !== undefined) q.set("is_remote", String(params.is_remote));
     return request<{
       items: AdminJobRecord[];
@@ -152,14 +154,17 @@ export const adminApi = {
         total_jobs: number;
         remote_jobs: number;
         active_jobs: number;
+        career_jobs?: number;
+        linkedin_jobs?: number;
+        naukri_jobs?: number;
         companies_count: number;
       };
     }>(`/api/admin/jobs?${q}`);
   },
   seedJobs: () =>
     request<{ ok: boolean; message: string; total_jobs: number }>("/api/admin/jobs/seed", { method: "POST" }),
-  fetchLiveJobs: () =>
-    request<{ ok: boolean; message: string }>("/api/admin/jobs/fetch-live", { method: "POST" }),
+  fetchLiveJobs: (source: "all" | "career" | "linkedin" | "naukri" = "all") =>
+    request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
 };
 
 export interface AdminJobRecord {

@@ -203,6 +203,32 @@ function MarkdownRenderer({
   );
 }
 
+function renderSourceBadge(source?: string) {
+  const s = (source || "career").toLowerCase();
+  if (s === "linkedin") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+        LinkedIn
+      </span>
+    );
+  }
+  if (s === "naukri") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        Naukri
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+      Career Portal
+    </span>
+  );
+}
+
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED_SUCCESS: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
   APPLIED:          "text-blue-300 bg-blue-400/10 border-blue-400/20",
@@ -227,6 +253,7 @@ function JobsPageContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "high" | "remote" | "bengaluru">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "career" | "linkedin" | "naukri">("all");
   const [descExpanded, setDescExpanded] = useState(false);
 
   // Tailored Resume State & Modal
@@ -384,6 +411,11 @@ function JobsPageContent() {
 
       if (!matchesSearch) return false;
 
+      if (sourceFilter !== "all") {
+        const s = (item.job.source || "career").toLowerCase();
+        if (s !== sourceFilter) return false;
+      }
+
       if (filterTab === "high") {
         return item.compatibility_score >= 75;
       }
@@ -395,7 +427,7 @@ function JobsPageContent() {
       }
       return true;
     });
-  }, [jobs, searchQuery, filterTab]);
+  }, [jobs, searchQuery, filterTab, sourceFilter]);
 
   // Currently selected job object
   const selectedItem = useMemo(() => {
@@ -465,48 +497,79 @@ function JobsPageContent() {
           )}
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          <button
-            onClick={() => setFilterTab("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              filterTab === "all"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            All India ({jobs.length})
-          </button>
-          <button
-            onClick={() => setFilterTab("bengaluru")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              filterTab === "bengaluru"
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            Bengaluru / Bangalore
-          </button>
-          <button
-            onClick={() => setFilterTab("remote")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              filterTab === "remote"
-                ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            Remote (India)
-          </button>
-          <button
-            onClick={() => setFilterTab("high")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              filterTab === "high"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-                : "text-slate-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            High Match (≥75%)
-          </button>
+        {/* Source & Category Filter Pills */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Source Tabs */}
+          <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
+            {[
+              { id: "all", label: "All Sources" },
+              { id: "career", label: "Career ATS" },
+              { id: "linkedin", label: "LinkedIn" },
+              { id: "naukri", label: "Naukri" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSourceFilter(s.id as "all" | "career" | "linkedin" | "naukri")}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  sourceFilter === s.id
+                    ? s.id === "linkedin"
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : s.id === "naukri"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : s.id === "career"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Location & Match Pills */}
+          <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
+            <button
+              onClick={() => setFilterTab("all")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filterTab === "all"
+                  ? "bg-white/15 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              All India
+            </button>
+            <button
+              onClick={() => setFilterTab("bengaluru")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filterTab === "bengaluru"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Bengaluru
+            </button>
+            <button
+              onClick={() => setFilterTab("remote")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filterTab === "remote"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Remote
+            </button>
+            <button
+              onClick={() => setFilterTab("high")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filterTab === "high"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              ≥75% Match
+            </button>
+          </div>
         </div>
       </div>
 
@@ -595,6 +658,7 @@ function JobsPageContent() {
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
                               🇮🇳 India
                             </span>
+                            {renderSourceBadge(item.job.source)}
                           </div>
                         </div>
 
@@ -700,8 +764,8 @@ function JobsPageContent() {
               >
                 {/* 1. Header & Primary CTA Card */}
                 <div className="glass rounded-2xl p-5 border border-indigo-500/20 relative overflow-hidden">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                         {selectedItem.job.company}
                       </span>
@@ -713,9 +777,10 @@ function JobsPageContent() {
                           Remote
                         </span>
                       )}
+                      {renderSourceBadge(selectedItem.job.source)}
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      ATS Verified
+                      Verified
                     </span>
                   </div>
 
@@ -789,10 +854,23 @@ function JobsPageContent() {
                       href={selectedItem.job.application_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 transition-all shrink-0"
-                      title="Open official career page"
+                      className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
+                        selectedItem.job.source === "linkedin"
+                          ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                          : selectedItem.job.source === "naukri"
+                          ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
+                          : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
+                      }`}
+                      title={`Open ${selectedItem.job.source === "linkedin" ? "LinkedIn" : selectedItem.job.source === "naukri" ? "Naukri" : "career portal"} job posting`}
                     >
                       <ExternalLink className="w-4 h-4" />
+                      <span className="hidden sm:inline">
+                        {selectedItem.job.source === "linkedin"
+                          ? "Apply on LinkedIn"
+                          : selectedItem.job.source === "naukri"
+                          ? "Apply on Naukri"
+                          : "Apply on Career Portal"}
+                      </span>
                     </a>
                   </div>
                 </div>

@@ -102,7 +102,7 @@ def standardize_india_location(company: str, loc_name: str, is_remote: bool) -> 
 
 
 class CompanyATSJobSource(BaseJobSource):
-    source_type: str = "company_ats"
+    source_type: str = "career"
 
     async def fetch_jobs(self, config: dict) -> list[RawJobData]:
         """Fetch jobs concurrently from target companies ATS APIs, specifically filtering for Indian positions."""
@@ -212,6 +212,7 @@ class CompanyATSJobSource(BaseJobSource):
         return RawJobData(
             title=str(item.get("title", "Software Engineer")).strip(),
             company=company,
+            source="career",
             source_url=default_url,
             description=content[:5000],
             location=std_loc,
@@ -231,6 +232,7 @@ class CompanyATSJobSource(BaseJobSource):
         return RawJobData(
             title=str(item.get("text", "Software Engineer")).strip(),
             company=company,
+            source="career",
             source_url=default_url,
             description=desc[:5000],
             location=std_loc,
@@ -249,6 +251,7 @@ class CompanyATSJobSource(BaseJobSource):
         return RawJobData(
             title=str(item.get("title", "Software Engineer")).strip(),
             company=company,
+            source="career",
             source_url=default_url,
             description=desc[:5000],
             location=std_loc,

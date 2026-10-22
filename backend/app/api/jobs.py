@@ -31,9 +31,10 @@ async def list_jobs(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     min_score: int = Query(0, ge=0, le=100),
+    source: str | None = None,
     status: str | None = None,
 ):
-    """Return jobs matched to the user, sorted by compatibility score."""
+    """Return jobs matched to the user, sorted by compatibility score and optionally filtered by source."""
     user_id = get_current_user_id(request)
     db = get_db()
     skip = (page - 1) * limit
@@ -41,6 +42,9 @@ async def list_jobs(
     match_filter: dict = {"user_id": ObjectId(user_id)}
     if min_score > 0:
         match_filter["compatibility_score"] = {"$gte": min_score}
+    if source and source != "all":
+        source_job_ids = await db.jobs.distinct("_id", {"source": source})
+        match_filter["job_id"] = {"$in": source_job_ids}
 
     # Join matches with jobs and applications
     pipeline = [

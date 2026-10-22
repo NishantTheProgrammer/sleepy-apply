@@ -189,16 +189,19 @@ async def list_all_jobs_admin(
     limit: int = Query(25, ge=1, le=100),
     search: str | None = None,
     company: str | None = None,
+    source: str | None = None,
     is_remote: bool | None = None,
     admin_id: str = Depends(require_admin),
 ):
-    """List all ingested jobs in MongoDB with search, filters, and company grade metadata."""
+    """List all ingested jobs in MongoDB with search, source filters, and company grade metadata."""
     db = get_db()
     skip = (page - 1) * limit
     filter_query: dict = {}
 
     if company and company != "all":
         filter_query["company"] = company
+    if source and source != "all":
+        filter_query["source"] = source
     if is_remote is not None:
         filter_query["is_remote"] = is_remote
     if search:
@@ -254,6 +257,9 @@ async def list_all_jobs_admin(
     total_all = await db.jobs.count_documents({})
     remote_all = await db.jobs.count_documents({"is_remote": True})
     active_all = await db.jobs.count_documents({"is_active": True})
+    career_all = await db.jobs.count_documents({"source": "career"})
+    linkedin_all = await db.jobs.count_documents({"source": "linkedin"})
+    naukri_all = await db.jobs.count_documents({"source": "naukri"})
 
     return {
         "items": items,
@@ -265,6 +271,9 @@ async def list_all_jobs_admin(
             "total_jobs": total_all,
             "remote_jobs": remote_all,
             "active_jobs": active_all,
+            "career_jobs": career_all,
+            "linkedin_jobs": linkedin_all,
+            "naukri_jobs": naukri_all,
             "companies_count": len(distinct_companies),
         },
     }
@@ -284,18 +293,29 @@ async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
 
 
 @router.post("/jobs/fetch-live")
-async def admin_fetch_live_jobs(background_tasks: BackgroundTasks, admin_id: str = Depends(require_admin)):
-    """Trigger live ATS job fetching across all active target companies."""
+async def admin_fetch_live_jobs(
+    background_tasks: BackgroundTasks,
+    source: str = Query("all", description="Source to fetch: 'all', 'career', 'linkedin', or 'naukri'"),
+    admin_id: str = Depends(require_admin),
+):
+    """Trigger live job fetching across target sources (career ATS, LinkedIn, Naukri, or all)."""
     fetcher = JobFetcherAgent()
 
     async def run():
         try:
-            logger.info("Admin triggered live ATS scraper")
-            res = await fetcher.fetch_and_store_jobs()
-            logger.info("Live ATS scraper completed", count=len(res))
+            logger.info("Admin triggered live job fetcher", source=source)
+            res = await fetcher.fetch_and_store_jobs(source=source)
+            logger.info("Live job fetcher completed", source=source, count=len(res))
         except Exception as e:
-            logger.error("Live ATS scraper failed", error=str(e))
+            logger.error("Live job fetcher failed", source=source, error=str(e))
 
     background_tasks.add_task(run)
-    return {"ok": True, "message": "Live job ingestion triggered across active target companies"}
+    source_labels = {
+        "all": "all sources (Career ATS, LinkedIn, Naukri)",
+        "career": "Company Career Portals (Greenhouse, Lever, Ashby)",
+        "linkedin": "LinkedIn Jobs (India tech)",
+        "naukri": "Naukri Jobs (India tech)",
+    }
+    label = source_labels.get(source, source)
+    return {"ok": True, "message": f"Live job fetching triggered for {label}"}
 

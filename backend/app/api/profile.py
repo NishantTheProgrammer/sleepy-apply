@@ -36,6 +36,7 @@ async def update_profile(request: Request):
         "personal", "summary", "skills", "experience", "education",
         "projects", "certifications", "job_preferences", "jobPreferences",
         "achievements", "additionalInformation", "additional_information",
+        "selected_template",
     }
     update = {k: v for k, v in body.items() if k in allowed}
     if not update:

@@ -74,13 +74,27 @@ class ResumeBuilderAgent:
             logger.error("Failed to render resume PDF", error=str(e))
             pdf_path = None
 
+        # DOCX output using candidate's selected template
+        selected_template_id = profile.get("selected_template") or "default"
+        docx_path = os.path.join(storage_dir, f"resume_{job_id}_{selected_template_id}.docx")
+        try:
+            from app.templates.manager import render_docx_for_profile
+            os.makedirs(storage_dir, exist_ok=True)
+            docx_stream = render_docx_for_profile(selected_template_id, {**profile, "summary": tailored_summary})
+            with open(docx_path, "wb") as f:
+                f.write(docx_stream.getvalue())
+        except Exception as e:
+            logger.error("Failed to render resume DOCX", error=str(e))
+            docx_path = None
+
         now = datetime.now(timezone.utc)
         resume_doc = {
             "user_id": ObjectId(user_id),
             "job_id": ObjectId(job_id),
-            "template": self.template.name,
+            "template": selected_template_id,
             "content": resume_content,
             "pdf_path": pdf_path,
+            "docx_path": docx_path,
             "generated_at": now,
         }
 

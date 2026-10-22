@@ -7,7 +7,7 @@ from app.core.config import get_settings
 from app.db.client import connect_db, close_db
 from app.db.indexes import create_indexes
 from app.db.client import get_db
-from app.api import auth, profile, jobs, settings, admin, pipeline, companies
+from app.api import auth, profile, jobs, settings, admin, pipeline, companies, templates
 from app.db.seed_companies import seed_target_companies
 from app.db.seed_jobs import seed_jobs_collection
 
@@ -65,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(pipeline.router, prefix="/api")
+    app.include_router(templates.router, prefix="/api")
 
     @app.get("/health")
     async def health():

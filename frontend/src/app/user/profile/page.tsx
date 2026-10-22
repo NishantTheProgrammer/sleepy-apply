@@ -6,7 +6,8 @@ import {
   Briefcase, GraduationCap, Award, Globe, Save, Sparkles, X, ChevronDown, ChevronUp, MapPin,
   FileText, FileUp, AlertCircle
 } from "lucide-react";
-import { profileApi } from "@/lib/api";
+import { profileApi, templatesApi } from "@/lib/api";
+import ResumeTemplateSelector from "@/components/ResumeTemplateSelector";
 
 interface Question { id: string; question: string; field: string }
 
@@ -125,6 +126,7 @@ export default function ProfilePage() {
     yearsOfExperience: "",
     totalProjects: "",
   });
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("default");
 
   // Collapsible section toggles
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
@@ -234,6 +236,9 @@ export default function ProfilePage() {
       yearsOfExperience: (rawAdd.yearsOfExperience as number | string) ?? "",
       totalProjects: (rawAdd.totalProjects as string) ?? "",
     });
+
+    // Selected Resume Template
+    setSelectedTemplate(String(p.selected_template || p.selectedTemplate || "default"));
   };
 
   const load = async () => {
@@ -329,6 +334,7 @@ export default function ProfilePage() {
         jobPreferences,
         job_preferences: jobPreferences,
         additionalInformation: additionalInfo,
+        selected_template: selectedTemplate,
       };
 
       const res = await profileApi.patch(payload);
@@ -339,6 +345,15 @@ export default function ProfilePage() {
       console.error("Save error:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSelectTemplate = async (templateId: string) => {
+    setSelectedTemplate(templateId);
+    try {
+      await templatesApi.select(templateId);
+    } catch (err) {
+      console.error("Failed to select template:", err);
     }
   };
 
@@ -589,6 +604,19 @@ export default function ProfilePage() {
           </div>
         </motion.div>
       </div>
+
+      {/* ── Resume Template Selector & Live Preview ── */}
+      <ResumeTemplateSelector
+        personal={personal}
+        summary={summary}
+        skills={skills}
+        experience={experience}
+        projects={projects}
+        education={education}
+        achievements={achievements}
+        currentTemplate={selectedTemplate}
+        onSelectTemplate={handleSelectTemplate}
+      />
 
       {/* ── AI Questions ── */}
       <AnimatePresence>

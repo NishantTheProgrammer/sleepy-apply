@@ -55,6 +55,33 @@ export const profileApi = {
     request("/api/profile/answers", { method: "POST", body: JSON.stringify(answers) }),
 };
 
+// ── Templates ─────────────────────────────────────────────
+export interface ResumeTemplateItem {
+  id: string;
+  name: string;
+  tagline: string;
+  badge: string;
+  badge_color: string;
+  ats_score: number;
+  style: string;
+  primary_color: string;
+  secondary_color: string;
+  font_family: string;
+  layout: string;
+  ideal_for: string;
+  features: string[];
+}
+
+export const templatesApi = {
+  list: () => request<{ templates: ResumeTemplateItem[] }>("/api/templates"),
+  select: (template_id: string) =>
+    request<{ ok: boolean; selected_template: string }>("/api/templates/select", {
+      method: "POST",
+      body: JSON.stringify({ template_id }),
+    }),
+  getDownloadUrl: (template_id: string) => `${API_URL}/api/templates/${template_id}/download`,
+};
+
 // ── Jobs ──────────────────────────────────────────────────
 export const jobsApi = {
   list: (params?: { page?: number; limit?: number; min_score?: number }) => {

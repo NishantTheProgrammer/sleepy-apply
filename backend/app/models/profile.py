@@ -114,6 +114,7 @@ class Profile(MongoBaseModel):
     jobPreferences: dict[str, Any] = Field(default_factory=dict)
     job_preferences: dict[str, Any] = Field(default_factory=dict)
     additionalInformation: dict[str, Any] = Field(default_factory=dict)
+    selected_template: str = "default"
     completion_score: int = 0
     missing_fields: list[str] = Field(default_factory=list)
     pending_questions: list[ProfileQuestion] = Field(default_factory=list)

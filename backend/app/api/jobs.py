@@ -158,13 +158,21 @@ async def trigger_apply(request: Request, job_id: str):
 
 
 @router.post("/{job_id}/generate-resume")
-async def generate_tailored_resume(request: Request, job_id: str):
+async def generate_tailored_resume(request: Request, job_id: str, template: str | None = None):
     """Generate tailored resume JSON against user profile and JD, and store against job-user match."""
     user_id = get_current_user_id(request)
+    tpl = template
+    if not tpl:
+        try:
+            body = await request.json()
+            tpl = body.get("template")
+        except Exception:
+            pass
+
     from app.agents.resume_builder import ResumeBuilderAgent
 
     agent = ResumeBuilderAgent()
-    result = await agent.build_tailored_resume(user_id=user_id, job_id=job_id)
+    result = await agent.build_tailored_resume(user_id=user_id, job_id=job_id, template=tpl)
     if not result:
         raise HTTPException(status_code=400, detail="Could not generate tailored resume. Check if profile and job exist.")
 
@@ -216,7 +224,7 @@ async def get_tailored_resume(request: Request, job_id: str):
 
 
 @router.get("/{job_id}/resume/download")
-async def download_tailored_resume_docx(request: Request, job_id: str):
+async def download_tailored_resume_docx(request: Request, job_id: str, template: str | None = None):
     """Download the tailored .docx resume for this job and user."""
     user_id = get_current_user_id(request)
     db = get_db()
@@ -239,7 +247,7 @@ async def download_tailored_resume_docx(request: Request, job_id: str):
     if not tailored:
         from app.agents.resume_builder import ResumeBuilderAgent
         agent = ResumeBuilderAgent()
-        res = await agent.build_tailored_resume(user_id=user_id, job_id=job_id)
+        res = await agent.build_tailored_resume(user_id=user_id, job_id=job_id, template=template)
         if res:
             tailored = res.get("content")
 
@@ -248,7 +256,7 @@ async def download_tailored_resume_docx(request: Request, job_id: str):
 
     from app.templates.manager import render_docx_for_profile
     profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
-    template_id = tailored.get("template") or profile.get("selected_template") or "default"
+    template_id = template or tailored.get("template") or profile.get("selected_template") or "default"
 
     tailored_context = {
         **profile,

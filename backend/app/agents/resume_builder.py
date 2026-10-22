@@ -29,6 +29,7 @@ class ResumeBuilderAgent:
         user_id: str,
         job_id: str,
         user_settings: UserSettings | None = None,
+        template: str | None = None,
     ) -> dict | None:
         db = get_db()
         profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
@@ -106,7 +107,7 @@ class ResumeBuilderAgent:
             tailored_skills = boosted + others
 
         # Selected template
-        selected_template_id = profile.get("selected_template") or "default"
+        selected_template_id = template or profile.get("selected_template") or "default"
 
         now = datetime.now(timezone.utc)
         resume_content = {

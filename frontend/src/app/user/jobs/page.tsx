@@ -6,7 +6,7 @@ import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
-  Eye, Download, RefreshCw, Copy, FileCode
+  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
 
@@ -148,6 +148,7 @@ function JobsPageContent() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<JobItem | null>(null);
   const [previewTab, setPreviewTab] = useState<"doc" | "json">("doc");
+  const [previewTemplate, setPreviewTemplate] = useState<string>("default");
   const [copiedJson, setCopiedJson] = useState(false);
 
   const load = async (p = 1) => {
@@ -207,10 +208,11 @@ function JobsPageContent() {
     }
   };
 
-  const handleGenerateResume = async (jobId: string, openPreview = false) => {
+  const handleGenerateResume = async (jobId: string, openPreview = false, templateOverride?: string) => {
     setGeneratingResumeId(jobId);
     try {
-      const res = await jobsApi.generateResume(jobId);
+      const chosenTemplate = templateOverride || previewTemplate || "default";
+      const res = await jobsApi.generateResume(jobId, chosenTemplate);
       if (res.ok && res.tailored_resume) {
         setJobs((prev) =>
           prev.map((item) => {
@@ -222,6 +224,7 @@ function JobsPageContent() {
               };
               if (openPreview) {
                 setPreviewItem(updatedItem);
+                setPreviewTemplate(chosenTemplate);
                 setPreviewModalOpen(true);
               }
               return updatedItem;
@@ -242,6 +245,7 @@ function JobsPageContent() {
       await handleGenerateResume(item.job._id, true);
     } else {
       setPreviewItem(item);
+      setPreviewTemplate(item.tailored_resume.template || "default");
       setPreviewModalOpen(true);
       setPreviewTab("doc");
     }
@@ -926,11 +930,58 @@ function JobsPageContent() {
               {/* Modal Header */}
               <div className="p-4 sm:p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                      {previewItem.tailored_resume?.template === "classic_ats" ? "Classic ATS Template" : "Default Template (Google Doc)"}
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    {/* Interactive Template Selector */}
+                    <div className="flex items-center p-0.5 rounded-lg bg-white/5 border border-white/10">
+                      <button
+                        onClick={() => {
+                          setPreviewTemplate("default");
+                          if (previewItem?.tailored_resume) {
+                            setPreviewItem({
+                              ...previewItem,
+                              tailored_resume: {
+                                ...previewItem.tailored_resume,
+                                template: "default",
+                              },
+                            });
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          (previewTemplate || previewItem.tailored_resume?.template || "default") === "default"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                        title="Google Doc style template with dual-side header & section divider"
+                      >
+                        <LayoutTemplate className="w-3 h-3" />
+                        <span>Default (Google Doc)</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPreviewTemplate("classic_ats");
+                          if (previewItem?.tailored_resume) {
+                            setPreviewItem({
+                              ...previewItem,
+                              tailored_resume: {
+                                ...previewItem.tailored_resume,
+                                template: "classic_ats",
+                              },
+                            });
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          (previewTemplate || previewItem.tailored_resume?.template) === "classic_ats"
+                            ? "bg-slate-700 text-white shadow-sm"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                        title="Traditional monochrome serif ATS template"
+                      >
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Classic ATS</span>
+                      </button>
+                    </div>
+
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       Tailored for {previewItem.job.company}
                     </span>
                   </div>
@@ -978,192 +1029,363 @@ function JobsPageContent() {
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-slate-900/50">
                 {previewTab === "doc" ? (
-                  /* ── DOCUMENT PREVIEW TAB ── */
-                  <div className="max-w-2xl mx-auto bg-slate-950 text-slate-200 border border-white/15 rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
-                    {/* Header: Candidate Info */}
-                    <div className="text-center border-b border-white/10 pb-5">
-                      <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">
-                        {previewItem.tailored_resume?.personal?.name ||
-                          previewItem.tailored_resume?.personal?.full_name ||
-                          previewItem.tailored_resume?.personal?.fullName ||
-                          "Candidate Name"}
-                      </h1>
-                      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-2 text-xs text-slate-400">
-                        {previewItem.tailored_resume?.personal?.email && (
-                          <span>{previewItem.tailored_resume.personal.email}</span>
-                        )}
-                        {previewItem.tailored_resume?.personal?.phone && (
-                          <>
-                            <span>•</span>
-                            <span>{previewItem.tailored_resume.personal.phone}</span>
-                          </>
-                        )}
-                        {formatLocation(previewItem.tailored_resume?.personal?.location) && (
-                          <>
-                            <span>•</span>
-                            <span>{formatLocation(previewItem.tailored_resume?.personal?.location)}</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-1 text-xs text-indigo-400">
-                        {previewItem.tailored_resume?.personal?.linkedin && (
-                          <span>{previewItem.tailored_resume.personal.linkedin}</span>
-                        )}
-                        {previewItem.tailored_resume?.personal?.github && (
-                          <>
-                            <span>•</span>
-                            <span>{previewItem.tailored_resume.personal.github}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                  /* ── DOCUMENT PREVIEW TAB (LIVE TEMPLATE PAPER SHEET) ── */
+                  <div className="bg-slate-950/70 p-3 sm:p-6 rounded-xl flex justify-center shadow-inner overflow-x-auto">
+                    {(() => {
+                      const tpl = previewTemplate || previewItem.tailored_resume?.template || "default";
+                      const isDefault = tpl === "default";
+                      const personal = previewItem.tailored_resume?.personal || {};
+                      const candidateName =
+                        personal.fullName || personal.full_name || personal.name || "Candidate Name";
+                      const locationStr = formatLocation(personal.location);
+                      const email = personal.email || "";
+                      const phone = personal.phone || "";
+                      const linkedin = personal.linkedin || "";
+                      const github = personal.github || "";
+                      const portfolio = personal.portfolio || "";
 
-                    {/* Tailored Professional Summary */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                          Professional Summary
-                        </h2>
-                        <span className="text-[10px] text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                          AI-Tailored for {previewItem.job.company}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5">
-                        {previewItem.tailored_resume?.tailored_summary || previewItem.tailored_resume?.summary || "Experienced software engineer dedicated to building robust and performant systems."}
-                      </p>
-                    </div>
+                      const contactParts = [
+                        email,
+                        phone,
+                        locationStr,
+                        linkedin ? "linkedin.com/in/" + linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\/?/i, "") : null,
+                        github ? "github.com/" + github.replace(/https?:\/\/(www\.)?github\.com\/?/i, "") : null,
+                        portfolio ? portfolio.replace(/https?:\/\//i, "") : null,
+                      ].filter(Boolean);
 
-                    {/* Technical Skills & Core Competencies */}
-                    <div>
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
-                        Core Competencies & Skills
-                      </h2>
-                      {previewItem.tailored_resume?.skills && typeof previewItem.tailored_resume.skills === "object" && !Array.isArray(previewItem.tailored_resume.skills) ? (
-                        <div className="space-y-2 text-xs">
-                          {Object.entries(previewItem.tailored_resume.skills).map(([category, skillList]) => (
-                            <div key={category} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                              <span className="font-semibold text-slate-300 sm:w-28 shrink-0 capitalize">{category}:</span>
-                              <div className="flex flex-wrap gap-1 flex-1">
-                                {(skillList as string[]).map((sk) => {
-                                  const isMatching = (previewItem.tailored_resume?.matching_skills || []).some(
-                                    (m) => m.toLowerCase() === sk.toLowerCase()
-                                  );
+                      const summaryText =
+                        previewItem.tailored_resume?.tailored_summary ||
+                        previewItem.tailored_resume?.summary ||
+                        "";
+                      const skillsData = previewItem.tailored_resume?.skills;
+                      const experienceList = previewItem.tailored_resume?.experience || [];
+                      const projectsList = previewItem.tailored_resume?.projects || [];
+                      const educationList = previewItem.tailored_resume?.education || [];
+                      const achievementsList = previewItem.tailored_resume?.achievements || [];
+
+                      const themeStyles = isDefault
+                        ? {
+                            fontFamily: "Calibri, Arial, sans-serif",
+                            paperClass: "bg-white text-slate-800 font-sans",
+                            sectionHeader: "font-sans tracking-normal text-slate-900 uppercase text-xs font-black border-b border-slate-300 pb-1 mb-2.5",
+                            subText: "text-slate-700",
+                          }
+                        : {
+                            fontFamily: "Times New Roman, serif",
+                            paperClass: "bg-white text-black font-serif",
+                            sectionHeader: "font-serif text-black uppercase text-xs font-bold border-b border-black pb-0.5 mb-2.5 tracking-wide",
+                            subText: "text-black",
+                          };
+
+                      return (
+                        <div
+                          className={`w-full max-w-3xl rounded-lg p-6 sm:p-10 shadow-2xl transition-all duration-300 ${themeStyles.paperClass}`}
+                          style={{ fontFamily: themeStyles.fontFamily }}
+                        >
+                          {/* ── HEADER ── */}
+                          {isDefault ? (
+                            /* Default Template (Google Doc): Dual-Side Header */
+                            <div className="pb-2 mb-4">
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                <div>
+                                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                                    {candidateName}
+                                  </h1>
+                                  {locationStr && (
+                                    <p className="text-xs text-slate-600 mt-1 font-medium">{locationStr}</p>
+                                  )}
+                                </div>
+                                <div className="text-left sm:text-right text-xs text-slate-600 space-y-1 font-medium">
+                                  <p>
+                                    {email}
+                                    {linkedin && (
+                                      <span>
+                                        {" "} |{" "}
+                                        <a
+                                          href={linkedin.startsWith("http") ? linkedin : `https://${linkedin}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-600 underline"
+                                        >
+                                          LinkedIn®
+                                        </a>
+                                      </span>
+                                    )}
+                                    {phone && <span> | {phone}</span>}
+                                  </p>
+                                  <p>
+                                    {github && (
+                                      <a
+                                        href={github.startsWith("http") ? github : `https://${github}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 underline"
+                                      >
+                                        GitHub
+                                      </a>
+                                    )}
+                                    {github && portfolio && <span> | </span>}
+                                    {portfolio && (
+                                      <a
+                                        href={portfolio.startsWith("http") ? portfolio : `https://${portfolio}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 underline"
+                                      >
+                                        {portfolio.replace(/https?:\/\//, "")}
+                                      </a>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              {/* Horizontal divider rule matching Google Doc template */}
+                              <div className="w-full h-[1.5px] bg-slate-400 mt-3" />
+                            </div>
+                          ) : (
+                            /* Classic ATS: Centered Header */
+                            <div className="text-center pb-3 mb-4 border-b border-black">
+                              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-black font-serif">
+                                {candidateName}
+                              </h1>
+                              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-xs text-black mt-2 font-medium font-serif">
+                                {contactParts.map((c, i) => (
+                                  <span key={i} className="flex items-center">
+                                    {i > 0 && <span className="mx-1.5 text-black">•</span>}
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* ── PROFESSIONAL SUMMARY ── */}
+                          {summaryText && (
+                            <div className="mb-4">
+                              <h2 className={themeStyles.sectionHeader}>
+                                {isDefault ? "PROFESSIONAL SUMMARY" : "SUMMARY"}
+                              </h2>
+                              <p className={`text-xs sm:text-[13px] leading-relaxed ${themeStyles.subText}`}>
+                                {summaryText}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* ── TECHNICAL SKILLS / CORE COMPETENCIES ── */}
+                          {skillsData && (
+                            <div className="mb-4">
+                              <h2 className={themeStyles.sectionHeader}>
+                                {isDefault ? "CORE COMPETENCIES & SKILLS" : "TECHNICAL SKILLS"}
+                              </h2>
+                              {typeof skillsData === "object" && !Array.isArray(skillsData) ? (
+                                <div className="space-y-1.5 text-xs sm:text-[13px]">
+                                  {Object.entries(skillsData).map(([cat, tags]) => {
+                                    if (!tags || (Array.isArray(tags) && tags.length === 0)) return null;
+                                    const items = Array.isArray(tags) ? tags : [String(tags)];
+                                    return (
+                                      <div key={cat} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                                        <span className="font-bold text-slate-900 shrink-0 sm:w-28 capitalize text-xs">
+                                          {cat}:
+                                        </span>
+                                        <span className={`text-xs leading-normal ${themeStyles.subText}`}>
+                                          {items.join(", ")}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-xs">
+                                  <span className="font-bold text-slate-900 sm:w-28 shrink-0">Skills: </span>
+                                  <span className={themeStyles.subText}>
+                                    {Array.isArray(skillsData) ? skillsData.join(", ") : String(skillsData)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ── PROFESSIONAL EXPERIENCE ── */}
+                          {experienceList.length > 0 && (
+                            <div className="mb-4">
+                              <h2 className={themeStyles.sectionHeader}>
+                                {isDefault ? "PROFESSIONAL EXPERIENCE" : "PROFESSIONAL EXPERIENCE"}
+                              </h2>
+                              <div className="space-y-3.5">
+                                {experienceList.map((exp, idx) => {
+                                  const expRecord = exp as Record<string, unknown>;
+                                  const title = exp.title || expRecord.jobTitle || "Software Engineer";
+                                  const company = exp.company || "";
+                                  const start = exp.start_date || expRecord.startDate || "";
+                                  const isCurr = exp.current || expRecord.is_current;
+                                  const end = isCurr ? "Present" : (exp.end_date || expRecord.endDate || "");
+                                  const dateStr = [start, end].filter(Boolean).join(" – ");
+                                  const bullets = exp.highlights || expRecord.responsibilities || [];
+                                  const rawBullets = Array.isArray(bullets) ? bullets : [];
+                                  const subProjects = (expRecord.projects as Array<Record<string, unknown>>) || [];
+
                                   return (
-                                    <span
-                                      key={sk}
-                                      className={`px-1.5 py-0.5 rounded text-[11px] ${
-                                        isMatching
-                                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium"
-                                          : "bg-white/5 text-slate-400 border border-white/5"
-                                      }`}
-                                    >
-                                      {sk}
-                                    </span>
+                                    <div key={idx} className="text-xs sm:text-[13px]">
+                                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between font-bold text-slate-900">
+                                        <span>
+                                          {String(title)}{" "}
+                                          <span className="font-normal text-slate-700">
+                                            — {String(company)}
+                                            {formatLocation(exp.location) && `, ${formatLocation(exp.location)}`}
+                                          </span>
+                                        </span>
+                                        {dateStr && (
+                                          <span className="text-slate-600 font-normal text-[11px] sm:text-xs">
+                                            {String(dateStr)}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {exp.description && (
+                                        <p className="text-slate-700 mt-0.5 text-xs italic">
+                                          {exp.description}
+                                        </p>
+                                      )}
+
+                                      {rawBullets.length > 0 && (
+                                        <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
+                                          {rawBullets.map((r, ri) => (
+                                            <li key={ri}>{String(r)}</li>
+                                          ))}
+                                        </ul>
+                                      )}
+
+                                      {subProjects.length > 0 && (
+                                        <div className="mt-1.5 pl-3 border-l-2 border-slate-200 space-y-1">
+                                          {subProjects.map((sp, spi) => {
+                                            const spTech = Array.isArray(sp.technologies) ? sp.technologies : [];
+                                            const spAchs = Array.isArray(sp.achievements) ? sp.achievements : [];
+                                            return (
+                                              <div key={spi} className="text-[11px]">
+                                                <span className="font-semibold text-slate-900">
+                                                  {String(sp.name || sp.title || "Project")}
+                                                </span>{" "}
+                                                {spTech.length > 0 && (
+                                                  <span className="text-slate-500">
+                                                    ({spTech.join(", ")})
+                                                  </span>
+                                                )}
+                                                {spAchs.length > 0 && (
+                                                  <ul className="list-disc pl-3 text-slate-600">
+                                                    {spAchs.map((ach, achi) => (
+                                                      <li key={achi}>{String(ach)}</li>
+                                                    ))}
+                                                  </ul>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
                                   );
                                 })}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {((previewItem.tailored_resume?.skills as string[]) || []).map((sk) => (
-                            <span key={sk} className="px-2 py-0.5 rounded text-xs bg-white/5 text-slate-300 border border-white/10">
-                              {sk}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          )}
 
-                    {/* Work Experience */}
-                    {previewItem.tailored_resume?.experience && previewItem.tailored_resume.experience.length > 0 && (
-                      <div>
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3">
-                          Professional Experience
-                        </h2>
-                        <div className="space-y-4">
-                          {previewItem.tailored_resume.experience.map((exp, idx) => (
-                            <div key={idx} className="border-l-2 border-purple-500/40 pl-3">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-                                <span className="font-bold text-white text-sm">{exp.title}</span>
-                                <span className="text-slate-400 text-[11px]">
-                                  {exp.start_date} – {exp.current ? "Present" : exp.end_date}
-                                </span>
-                              </div>
-                              <div className="text-xs text-indigo-300 font-medium">
-                                {exp.company} {formatLocation(exp.location) && `• ${formatLocation(exp.location)}`}
-                              </div>
-                              {exp.description && (
-                                <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">{exp.description}</p>
-                              )}
-                              {exp.highlights && exp.highlights.length > 0 && (
-                                <ul className="mt-1.5 space-y-1 list-disc list-inside text-xs text-slate-400">
-                                  {exp.highlights.map((h, hidx) => (
-                                    <li key={hidx} className="leading-relaxed">{h}</li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          {/* ── FEATURED PROJECTS ── */}
+                          {projectsList.length > 0 && (
+                            <div className="mb-4">
+                              <h2 className={themeStyles.sectionHeader}>
+                                {isDefault ? "FEATURED PROJECTS" : "PROJECTS"}
+                              </h2>
+                              <div className="space-y-2.5">
+                                {projectsList.map((proj, idx) => {
+                                  const projRecord = proj as Record<string, unknown>;
+                                  const title = proj.title || projRecord.name || "Project";
+                                  const tech = proj.tech_stack || projRecord.technologies || [];
+                                  const techArray = Array.isArray(tech) ? tech : [];
+                                  const link = proj.link || (typeof projRecord.url === "string" ? projRecord.url : undefined);
 
-                    {/* Projects */}
-                    {previewItem.tailored_resume?.projects && previewItem.tailored_resume.projects.length > 0 && (
-                      <div>
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
-                          Featured Projects
-                        </h2>
-                        <div className="space-y-3">
-                          {previewItem.tailored_resume.projects.map((proj, pidx) => (
-                            <div key={pidx} className="bg-white/[0.02] p-3 rounded-lg border border-white/5 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-white">{proj.title}</span>
-                                {proj.link && (
-                                  <a href={proj.link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 text-[11px]">
-                                    View <ExternalLink className="w-2.5 h-2.5" />
-                                  </a>
-                                )}
+                                  return (
+                                    <div key={idx} className="text-xs sm:text-[13px]">
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="font-bold text-slate-900">{String(title)}</span>
+                                        {techArray.length > 0 && (
+                                          <span className="text-slate-600 text-[11px]">
+                                            ({techArray.join(", ")})
+                                          </span>
+                                        )}
+                                        {link ? (
+                                          <a
+                                            href={String(link)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 underline text-[11px] flex items-center gap-0.5 ml-auto"
+                                          >
+                                            Link <ExternalLink className="w-2.5 h-2.5" />
+                                          </a>
+                                        ) : null}
+                                      </div>
+                                      {proj.description && (
+                                        <p className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
+                                          {proj.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
-                              {proj.description && (
-                                <p className="text-slate-300 text-xs mt-1 leading-relaxed">{proj.description}</p>
-                              )}
-                              {proj.tech_stack && proj.tech_stack.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {proj.tech_stack.map((t) => (
-                                    <span key={t} className="px-1.5 py-0.2 rounded text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                                      {t}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          )}
 
-                    {/* Education */}
-                    {previewItem.tailored_resume?.education && previewItem.tailored_resume.education.length > 0 && (
-                      <div>
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
-                          Education
-                        </h2>
-                        <div className="space-y-2">
-                          {previewItem.tailored_resume.education.map((edu, eidx) => (
-                            <div key={eidx} className="flex items-center justify-between text-xs">
-                              <div>
-                                <span className="font-semibold text-white">{edu.degree} {edu.field && `in ${edu.field}`}</span>
-                                <div className="text-slate-400 text-[11px]">{edu.institution}</div>
+                          {/* ── EDUCATION ── */}
+                          {educationList.length > 0 && (
+                            <div className="mb-2">
+                              <h2 className={themeStyles.sectionHeader}>
+                                {isDefault ? "EDUCATION" : "EDUCATION"}
+                              </h2>
+                              <div className="space-y-1.5">
+                                {educationList.map((edu, idx) => {
+                                  const eduRecord = edu as Record<string, unknown>;
+                                  const degree = edu.degree || "";
+                                  const field = edu.field ? ` in ${edu.field}` : "";
+                                  const inst = edu.institution || "";
+                                  const year = edu.year || eduRecord.graduation_year || "";
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="flex flex-col sm:flex-row sm:items-baseline justify-between text-xs sm:text-[13px]"
+                                    >
+                                      <span className="font-bold text-slate-900">
+                                        {degree}{field}{" "}
+                                        <span className="font-normal text-slate-700">
+                                          — {inst}
+                                        </span>
+                                      </span>
+                                      {year && (
+                                        <span className="text-slate-600 text-[11px] sm:text-xs">
+                                          {String(year)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
-                              <span className="text-slate-400 text-[11px]">{edu.year}</span>
                             </div>
-                          ))}
+                          )}
+
+                          {/* ── ACHIEVEMENTS (Optional) ── */}
+                          {achievementsList.length > 0 && (
+                            <div className="mb-2">
+                              <h2 className={themeStyles.sectionHeader}>ACHIEVEMENTS</h2>
+                              <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
+                                {achievementsList.map((ach, idx) => {
+                                  const text = typeof ach === "string" ? ach : (ach as Record<string, unknown>).title || JSON.stringify(ach);
+                                  return <li key={idx}>{String(text)}</li>;
+                                })}
+                              </ul>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 ) : (
                   /* ── TAILORED JSON TAB ── */
@@ -1202,7 +1424,7 @@ function JobsPageContent() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => handleGenerateResume(previewItem.job._id, true)}
+                    onClick={() => handleGenerateResume(previewItem.job._id, true, previewTemplate)}
                     disabled={generatingResumeId === previewItem.job._id}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                   >
@@ -1215,7 +1437,7 @@ function JobsPageContent() {
                   </button>
 
                   <a
-                    href={jobsApi.getResumeDownloadUrl(previewItem.job._id)}
+                    href={jobsApi.getResumeDownloadUrl(previewItem.job._id, previewTemplate)}
                     download
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all"
                   >

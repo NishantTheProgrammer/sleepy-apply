@@ -6,7 +6,7 @@ import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
-  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate
+  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
 
@@ -264,6 +264,30 @@ function JobsPageContent() {
       setPreviewTemplate(item.tailored_resume.template || "default");
       setPreviewModalOpen(true);
       setPreviewTab("doc");
+    }
+  };
+
+  const handleDeleteResume = async (jobId: string) => {
+    if (!confirm("Are you sure you want to delete this tailored resume variant? You can generate a new one anytime.")) {
+      return;
+    }
+    try {
+      await jobsApi.deleteResume(jobId);
+      setJobs((prev) =>
+        prev.map((item) => {
+          if (item.job._id === jobId || item._id === jobId || item.job_id === jobId) {
+            const updated = { ...item };
+            delete updated.tailored_resume;
+            delete updated.resume_generated_at;
+            return updated;
+          }
+          return item;
+        })
+      );
+      setPreviewModalOpen(false);
+      setPreviewItem(null);
+    } catch (err) {
+      console.error("Failed to delete tailored resume:", err);
     }
   };
 
@@ -863,6 +887,14 @@ function JobsPageContent() {
                         >
                           <Download className="w-4 h-4" />
                         </a>
+
+                        <button
+                          onClick={() => handleDeleteResume(selectedItem.job._id)}
+                          className="p-2 rounded-xl border border-rose-500/20 hover:border-rose-500/40 text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                          title="Delete tailored resume"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ) : (
@@ -1497,6 +1529,15 @@ function JobsPageContent() {
                     <Download className="w-3.5 h-3.5" />
                     <span>Download .docx</span>
                   </a>
+
+                  <button
+                    onClick={() => handleDeleteResume(previewItem.job._id)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/20 hover:border-rose-500/40 text-rose-400 hover:bg-rose-500/10 text-xs font-semibold transition-all cursor-pointer"
+                    title="Delete tailored resume"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
 
                   <button
                     onClick={() => {

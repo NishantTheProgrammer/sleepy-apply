@@ -111,6 +111,8 @@ export const jobsApi = {
     }>(`/api/jobs/${jobId}/resume`),
   getResumeDownloadUrl: (jobId: string, template?: string) =>
     `${API_URL}/api/jobs/${jobId}/resume/download${template ? `?template=${template}` : ""}`,
+  deleteResume: (jobId: string) =>
+    request<{ ok: boolean; message: string; job_id: string }>(`/api/jobs/${jobId}/resume`, { method: "DELETE" }),
 };
 
 // ── Settings ──────────────────────────────────────────────

@@ -223,6 +223,44 @@ async def get_tailored_resume(request: Request, job_id: str):
     return {"ok": False, "tailored_resume": None}
 
 
+@router.delete("/{job_id}/resume")
+async def delete_tailored_resume(request: Request, job_id: str):
+    """Delete a tailored resume for this job and user, cleaning up MongoDB records and files."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    import os
+
+    # 1. Clear tailored resume from db.job_matches
+    await db.job_matches.update_one(
+        {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)},
+        {
+            "$unset": {
+                "tailored_resume": "",
+                "resume_generated_at": "",
+                "resume_docx_path": "",
+            }
+        },
+    )
+
+    # 2. Find and delete from db.resumes
+    resume = await db.resumes.find_one(
+        {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
+    )
+    if resume:
+        # Clean up files on disk if present
+        for fpath_key in ("docx_path", "pdf_path"):
+            fpath = resume.get(fpath_key)
+            if fpath and os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                except Exception as e:
+                    logger.warning("Could not delete resume file on disk", path=fpath, error=str(e))
+        await db.resumes.delete_one({"_id": resume["_id"]})
+
+    logger.info("Tailored resume deleted", user_id=user_id, job_id=job_id)
+    return {"ok": True, "message": "Tailored resume deleted successfully", "job_id": job_id}
+
+
 @router.get("/{job_id}/resume/download")
 async def download_tailored_resume_docx(request: Request, job_id: str, template: str | None = None):
     """Download the tailored .docx resume for this job and user."""

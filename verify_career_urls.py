@@ -93,8 +93,8 @@ def check_url_urllib(url: str, timeout: float = 8.0) -> dict:
                 "final_url": resp.url if resp.url != url else None,
             }
     except urllib.error.HTTPError as e:
-        # Cloudflare / WAF returns 400 / 401 / 403 / 429 to automated scrapers even though domain & career portal exist
-        if e.code in [400, 401, 403, 429]:
+        # Cloudflare / WAF returns 400 / 401 / 403 / 429 / 502 / 503 to automated scrapers even though domain & career portal exist
+        if e.code in [400, 401, 403, 429, 502, 503]:
             return {"verified": True, "http_status": e.code, "note": "WAF / Bot Protected (Page Exists)"}
         return {"verified": False, "http_status": e.code, "error": f"HTTP {e.code}"}
     except urllib.error.URLError as e:
@@ -124,7 +124,7 @@ async def check_all_httpx(companies: list[dict], timeout: float = 8.0, concurren
                     status = res.status_code
                     if status < 400:
                         return idx, {"verified": True, "http_status": status, "final_url": str(res.url)}
-                    elif status in [400, 401, 403, 429]:
+                    elif status in [400, 401, 403, 429, 502, 503]:
                         return idx, {"verified": True, "http_status": status, "note": "WAF/Bot Protected"}
                     else:
                         return idx, {"verified": False, "http_status": status, "error": f"HTTP {status}"}

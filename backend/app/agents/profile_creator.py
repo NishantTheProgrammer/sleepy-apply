@@ -106,7 +106,12 @@ class ProfileCreatorAgent:
         # 1. Try LLM extraction if settings are provided
         if user_settings:
             try:
-                provider = AIProviderFactory.resolve(user_settings)
+                # For maximum extraction quality with Ollama, prefer qwen2.5-coder:14b
+                extraction_settings = user_settings
+                if user_settings.ai_provider == "ollama":
+                    extraction_settings = user_settings.model_copy(update={"ai_model": "qwen2.5-coder:14b"})
+
+                provider = AIProviderFactory.resolve(extraction_settings)
                 prompt = EXTRACTION_PROMPT + resume_text[:12000]
                 resp = await provider.complete([{"role": "user", "content": prompt}], temperature=0.1)
 
@@ -114,7 +119,16 @@ class ProfileCreatorAgent:
                 if json_match:
                     extracted_data = json.loads(json_match.group(0))
             except Exception as e:
-                logger.warning("AI extraction failed, falling back to heuristic parsing", error=str(e))
+                logger.warning("Primary AI extraction failed, trying default settings model", error=str(e))
+                try:
+                    provider = AIProviderFactory.resolve(user_settings)
+                    prompt = EXTRACTION_PROMPT + resume_text[:12000]
+                    resp = await provider.complete([{"role": "user", "content": prompt}], temperature=0.1)
+                    json_match = re.search(r"\{[\s\S]*\}", resp)
+                    if json_match:
+                        extracted_data = json.loads(json_match.group(0))
+                except Exception as fallback_err:
+                    logger.warning("AI extraction failed, falling back to heuristic parsing", error=str(fallback_err))
 
         # 2. Heuristic fallback
         if not extracted_data:

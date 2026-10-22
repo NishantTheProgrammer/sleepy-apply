@@ -62,7 +62,7 @@ class ResumeBuilderAgent:
         # Tailor summary: try AI first if configured, else use rule-based synthesis
         tailored_summary = profile.get("summary", "")
         if not user_settings:
-            settings_doc = await db.settings.find_one({"user_id": ObjectId(user_id)})
+            settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
             if settings_doc:
                 try:
                     user_settings = UserSettings(**settings_doc)

@@ -153,7 +153,12 @@ class JobMatcherAgent:
         reasoning = default_reason
         if user_settings:
             try:
-                provider = AIProviderFactory.resolve(user_settings)
+                # For high-throughput scoring speed with Ollama, prefer fast 3B model
+                scoring_settings = user_settings
+                if user_settings.ai_provider == "ollama" and "14b" in (user_settings.ai_model or ""):
+                    scoring_settings = user_settings.model_copy(update={"ai_model": "llama3.2:latest"})
+
+                provider = AIProviderFactory.resolve(scoring_settings)
                 prompt = MATCH_EXPLANATION_PROMPT.format(
                     skills=", ".join(user_skills_clean[:10]),
                     summary=profile.get("summary", ""),

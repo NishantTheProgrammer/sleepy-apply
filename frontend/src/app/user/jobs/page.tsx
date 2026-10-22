@@ -117,20 +117,90 @@ function formatLocation(loc: unknown): string {
   return "";
 }
 
-function renderFormattedText(text: unknown) {
+function renderFormattedText(text: unknown, customBoldClass?: string) {
   if (!text) return null;
   const str = String(text);
   const parts = str.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       return (
-        <strong key={i} className="font-bold text-slate-950 font-black">
+        <strong key={i} className={customBoldClass || "font-bold text-slate-950 font-black"}>
           {part.slice(2, -2)}
         </strong>
       );
     }
     return part;
   });
+}
+
+function formatJobDescription(raw: string | undefined): React.ReactNode {
+  if (!raw) return null;
+
+  let text = String(raw);
+
+  // 1. Unescape HTML entities (handling single and double escaping from scraped sources)
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  // 2. Normalize HTML tags to markdown and structured line breaks
+  text = text
+    .replace(/<\/?(h[1-6]|div|p|tr|section|article)[^>]*>/gi, "\n\n")
+    .replace(/<li[^>]*>/gi, "\n• ")
+    .replace(/<\/li>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<(strong|b)[^>]*>(.*?)<\/\1>/gi, "**$2**")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+
+  // 3. Render cleanly structured paragraphs and bullet lists
+  const paragraphs = text.split(/\n\s*\n/);
+  return (
+    <div className="space-y-3">
+      {paragraphs.map((p, idx) => {
+        const trimmed = p.trim();
+        if (!trimmed) return null;
+        if (trimmed.startsWith("•") || trimmed.includes("\n•")) {
+          const lines = trimmed.split("\n");
+          return (
+            <ul key={idx} className="space-y-1.5 my-1.5">
+              {lines.map((l, li) => {
+                const lineTrim = l.trim();
+                const isBullet = lineTrim.startsWith("•") || lineTrim.startsWith("- ");
+                const content = isBullet ? lineTrim.replace(/^[•\-]\s*/, "") : lineTrim;
+                if (!content) return null;
+                return (
+                  <li key={li} className="flex items-start gap-2 text-slate-300">
+                    <span className="text-indigo-400 font-bold select-none leading-none mt-1">•</span>
+                    <span className="flex-1 leading-relaxed">
+                      {renderFormattedText(content, "font-bold text-slate-100")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          );
+        }
+        return (
+          <p key={idx} className="leading-relaxed text-slate-300">
+            {renderFormattedText(trimmed, "font-bold text-slate-100")}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -832,10 +902,15 @@ function JobsPageContent() {
                       </div>
 
                       <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-xs text-slate-300 leading-relaxed">
-                        <p className="font-semibold text-purple-300 text-[11px] mb-1 flex items-center gap-1.5">
+                        <p className="font-semibold text-purple-300 text-[11px] mb-1.5 flex items-center gap-1.5">
                           <Sparkles className="w-3 h-3 text-purple-400" /> Tailored Profile Pitch:
                         </p>
-                        {selectedItem.tailored_resume.tailored_summary || selectedItem.tailored_resume.summary}
+                        <p className="leading-relaxed">
+                          {renderFormattedText(
+                            selectedItem.tailored_resume.tailored_summary || selectedItem.tailored_resume.summary,
+                            "font-bold text-purple-200"
+                          )}
+                        </p>
                       </div>
 
                       {/* Matching Skills Prioritized */}
@@ -932,11 +1007,11 @@ function JobsPageContent() {
                     </div>
 
                     <div
-                      className={`text-xs text-slate-300 whitespace-pre-wrap leading-relaxed overflow-hidden transition-all ${
+                      className={`text-xs text-slate-300 leading-relaxed overflow-hidden transition-all ${
                         descExpanded ? "max-h-none" : "max-h-52 relative"
                       }`}
                     >
-                      {selectedItem.job.description}
+                      {formatJobDescription(selectedItem.job.description)}
                       {!descExpanded && (
                         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
                       )}

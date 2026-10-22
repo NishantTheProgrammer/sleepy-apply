@@ -1,5 +1,6 @@
 import httpx
 import re
+import html
 from typing import Any
 import asyncio
 import structlog
@@ -182,8 +183,17 @@ class CompanyATSJobSource(BaseJobSource):
     def _clean_html(self, html_str: str) -> str:
         if not html_str:
             return ""
-        text = re.sub(r"<[^>]+>", " ", html_str)
-        return re.sub(r"\s+", " ", text).strip()
+        text = html.unescape(html_str)
+        text = html.unescape(text)
+        text = re.sub(r"</?(h[1-6]|div|p|tr|section|article)[^>]*>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<(strong|b)[^>]*>(.*?)</\1>", r"**\2**", text, flags=re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n\s*\n+", "\n\n", text)
+        return text.strip()
 
     def _parse_greenhouse_job(self, item: dict, company: str, default_url: str) -> RawJobData:
         loc = item.get("location", {})

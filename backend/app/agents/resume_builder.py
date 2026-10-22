@@ -109,6 +109,11 @@ class ResumeBuilderAgent:
         tailored_experience = None
         ai_tailored = False
 
+        app_prefs = user_settings.application_preferences if user_settings else None
+        tailor_temp = float(getattr(app_prefs, "tailoring_temperature", 0.2) if app_prefs else 0.2)
+        max_bullets = int(getattr(app_prefs, "max_bullets_per_role", 5) if app_prefs else 5)
+        bold_enabled = bool(getattr(app_prefs, "bold_matching_keywords", True) if app_prefs else True)
+
         if user_settings and user_settings.ai_provider:
             try:
                 provider = AIProviderFactory.resolve(user_settings)
@@ -116,11 +121,11 @@ class ResumeBuilderAgent:
                 # Format candidate experience summary for prompt
                 raw_exp = profile.get("experience", [])
                 exp_summary_lines = []
-                for exp in raw_exp[:4]:
+                for exp in raw_exp[:6]:
                     co = exp.get("company", "Company")
                     ti = exp.get("jobTitle") or exp.get("title", "Role")
                     bullets = exp.get("responsibilities") or exp.get("highlights") or []
-                    b_str = "; ".join(bullets[:3]) if bullets else exp.get("description", "")
+                    b_str = "; ".join(bullets[:max_bullets]) if bullets else exp.get("description", "")
                     exp_summary_lines.append(f"- {ti} at {co}: {b_str}")
                 exp_summary_text = "\n".join(exp_summary_lines) or "Software engineering experience building web applications and REST APIs."
 
@@ -138,7 +143,7 @@ class ResumeBuilderAgent:
                     experience_summary=exp_summary_text,
                 )
 
-                resp = await provider.complete([{"role": "user", "content": prompt}], temperature=0.2)
+                resp = await provider.complete([{"role": "user", "content": prompt}], temperature=tailor_temp)
 
                 # Try parsing JSON response
                 json_match = re.search(r"\{[\s\S]*\}", resp)

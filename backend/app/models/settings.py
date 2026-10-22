@@ -19,9 +19,14 @@ class NotificationPreferences(MongoBaseModel):
 
 class ApplicationPreferences(MongoBaseModel):
     auto_apply: bool = False
+    auto_apply_threshold: int = 70
+    min_compatibility_score: int = 70
+    tailoring_temperature: float = 0.2
+    extraction_temperature: float = 0.1
+    bold_matching_keywords: bool = True
+    max_bullets_per_role: int = 5
     require_confirmation: bool = True
     daily_apply_limit: int = 5
-    min_compatibility_score: int = 70
 
 
 AIProvider = Literal["ollama", "openai", "gemini", "anthropic"]

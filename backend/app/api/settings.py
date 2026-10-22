@@ -77,7 +77,30 @@ async def update_settings(request: Request, body: UpdateSettingsRequest):
     if body.notification_preferences is not None:
         update["notification_preferences"] = body.notification_preferences
     if body.application_preferences is not None:
-        update["application_preferences"] = body.application_preferences
+        prefs = dict(body.application_preferences)
+        if "auto_apply_threshold" in prefs:
+            try:
+                prefs["auto_apply_threshold"] = int(prefs["auto_apply_threshold"])
+                prefs["min_compatibility_score"] = prefs["auto_apply_threshold"]
+            except (ValueError, TypeError):
+                pass
+        elif "min_compatibility_score" in prefs:
+            try:
+                prefs["min_compatibility_score"] = int(prefs["min_compatibility_score"])
+                prefs["auto_apply_threshold"] = prefs["min_compatibility_score"]
+            except (ValueError, TypeError):
+                pass
+        if "tailoring_temperature" in prefs:
+            try:
+                prefs["tailoring_temperature"] = float(prefs["tailoring_temperature"])
+            except (ValueError, TypeError):
+                pass
+        if "extraction_temperature" in prefs:
+            try:
+                prefs["extraction_temperature"] = float(prefs["extraction_temperature"])
+            except (ValueError, TypeError):
+                pass
+        update["application_preferences"] = prefs
 
     await db.user_settings.update_one(
         {"user_id": ObjectId(user_id)},

@@ -251,8 +251,9 @@ export default function ProfilePage() {
 
   // ── Upload Resume & Dropzone Handlers ────────────────────────
   const processResumeFile = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setUploadError("Please upload a PDF document (.pdf)");
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith(".pdf") && !fileName.endsWith(".docx")) {
+      setUploadError("Please upload a PDF or DOCX document (.pdf, .docx)");
       setUploadMsg("");
       return;
     }
@@ -264,16 +265,42 @@ export default function ProfilePage() {
 
     setUploading(true);
     setUploadError("");
-    setUploadMsg("");
+    setUploadMsg("Reading document and analyzing with AI...");
+
     try {
-      const res = await profileApi.uploadResume(file);
-      setUploadMsg(res.message || "Resume uploaded! AI is analyzing your profile…");
-      // Wait for AI extraction pipeline to finish and reload
-      setTimeout(load, 2500);
-      setTimeout(load, 5500);
+      await profileApi.uploadResume(file);
+      setUploadMsg("AI is parsing your resume: extracting all work experiences, projects, skills & education... (takes ~30-60s)");
+
+      // Robust polling loop until analysis is complete
+      let attempts = 0;
+      const maxAttempts = 60; // 60 * 2.5s = 150 seconds max
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const updated = await profileApi.get();
+          const p = updated?.profile;
+          if (p) {
+            // Check if analysis is completed
+            if (!p.is_analyzing || (Array.isArray(p.experience) && p.experience.length >= 2)) {
+              clearInterval(pollInterval);
+              populateForm(p);
+              setUploading(false);
+              setUploadMsg("✓ Resume parsed successfully! Extracted all work experiences, skills, and projects.");
+              return;
+            }
+          }
+          if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            if (p) populateForm(p);
+            setUploading(false);
+            setUploadMsg("Analysis complete. Review your extracted profile below.");
+          }
+        } catch {
+          // Keep polling
+        }
+      }, 2500);
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
       setUploading(false);
     }
   };
@@ -503,7 +530,7 @@ export default function ProfilePage() {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.docx"
             className="hidden"
             onChange={handleFileInputChange}
           />
@@ -557,7 +584,7 @@ export default function ProfilePage() {
                     )}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    PDF up to 10MB · Automatically pre-fills your profile form
+                    PDF or DOCX up to 10MB · Automatically pre-fills your profile form
                   </p>
                 </div>
               </div>

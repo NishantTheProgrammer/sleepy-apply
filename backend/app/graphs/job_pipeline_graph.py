@@ -74,12 +74,31 @@ async def match_jobs_node(state: JobPipelineState) -> JobPipelineState:
         settings_doc = await db.user_settings.find_one({"user_id": ObjectId(uid)})
         user_settings = UserSettings(**settings_doc) if settings_doc else None
 
+        app_prefs = user_settings.application_preferences if user_settings else None
+        threshold = int(getattr(app_prefs, "auto_apply_threshold", getattr(app_prefs, "min_compatibility_score", 60)) if app_prefs else 60)
+
         # Find active jobs to match
         job_cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(50)
         async for j in job_cursor:
             m = await matcher.match_user_and_job(uid, str(j["_id"]), user_settings=user_settings)
-            if m and m.get("compatibility_score", 0) >= 60:
+            if m and m.get("compatibility_score", 0) >= threshold:
                 matches.append(m)
+
+                # Auto-apply if enabled in application preferences
+                if app_prefs and getattr(app_prefs, "auto_apply", False):
+                    try:
+                        from app.graphs.application_graph import application_pipeline
+                        import asyncio
+                        asyncio.create_task(
+                            application_pipeline.ainvoke({
+                                "user_id": uid,
+                                "job_id": str(j["_id"]),
+                                "match_id": str(m.get("_id", "")),
+                            })
+                        )
+                        logger.info("Auto-apply triggered for qualified match", user_id=uid, job_id=str(j["_id"]), score=m.get("compatibility_score"))
+                    except Exception as apply_err:
+                        logger.error("Failed to trigger auto-apply", error=str(apply_err), user_id=uid, job_id=str(j["_id"]))
 
     return {"matches": matches}
 

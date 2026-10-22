@@ -1,5 +1,5 @@
 import json
-from typing import TypeVar, Type
+from typing import TypeVar, Type, Any
 import httpx
 from pydantic import BaseModel
 from .base import BaseAIProvider
@@ -29,17 +29,33 @@ class OllamaProvider(BaseAIProvider):
     async def complete(self, messages: list[dict], **kwargs) -> str:
         candidates = self._candidate_urls()
         last_err: Exception | None = None
+        timeout = httpx.Timeout(connect=3.0, read=360.0, write=60.0, pool=60.0)
+
+        # Separate Ollama options from top-level body keys
+        options: dict[str, Any] = {
+            "num_ctx": kwargs.pop("num_ctx", 8192),
+            "temperature": kwargs.pop("temperature", 0.1),
+        }
+        if "options" in kwargs and isinstance(kwargs["options"], dict):
+            options.update(kwargs.pop("options"))
+        for opt_key in ("top_p", "top_k", "num_predict", "repeat_penalty"):
+            if opt_key in kwargs:
+                options[opt_key] = kwargs.pop(opt_key)
+
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": options,
+            **kwargs,
+        }
+
         for base in candidates:
             try:
-                async with httpx.AsyncClient(timeout=180) as client:
+                async with httpx.AsyncClient(timeout=timeout) as client:
                     response = await client.post(
                         f"{base}/api/chat",
-                        json={
-                            "model": self.model,
-                            "messages": messages,
-                            "stream": False,
-                            **kwargs,
-                        },
+                        json=body,
                     )
                     response.raise_for_status()
                     self.base_url = base

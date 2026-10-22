@@ -63,26 +63,58 @@ async def update_profile(request: Request):
 
 @router.post("/resume")
 async def upload_resume(request: Request, file: UploadFile = File(...)):
-    """Upload a resume PDF — triggers the Profile Creator Agent."""
+    """Upload a resume (PDF or DOCX) — triggers the Profile Creator Agent."""
     user_id = get_current_user_id(request)
 
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    filename_lower = (file.filename or "").lower()
+    if not (filename_lower.endswith(".pdf") or filename_lower.endswith(".docx")):
+        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are accepted")
 
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:  # 10MB limit
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
-    # Extract text from PDF
-    from pypdf import PdfReader
+    text = ""
     import io
-    reader = PdfReader(io.BytesIO(content))
-    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    if filename_lower.endswith(".pdf"):
+        from pypdf import PdfReader
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            # Extract text preserving visual column layout
+            pages_text = []
+            for page in reader.pages:
+                try:
+                    p_txt = page.extract_text(extraction_mode="layout")
+                except Exception:
+                    p_txt = page.extract_text()
+                if p_txt:
+                    pages_text.append(p_txt)
+            text = "\n".join(pages_text)
+            if not text.strip():
+                # Fallback to plain extraction
+                text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        except Exception as e:
+            logger.error("Failed to extract PDF text", error=str(e), filename=file.filename)
+            raise HTTPException(status_code=400, detail=f"Failed to read PDF: {str(e)}")
+    elif filename_lower.endswith(".docx"):
+        import docx
+        try:
+            doc = docx.Document(io.BytesIO(content))
+            paras = [p.text for p in doc.paragraphs if p.text.strip()]
+            table_cells = [cell.text for t in doc.tables for row in t.rows for cell in row.cells if cell.text.strip()]
+            text = "\n".join(paras + table_cells)
+        except Exception as e:
+            logger.error("Failed to extract DOCX text", error=str(e), filename=file.filename)
+            raise HTTPException(status_code=400, detail=f"Failed to read DOCX: {str(e)}")
 
     if not text.strip():
-        raise HTTPException(status_code=400, detail="Could not extract text from PDF")
+        raise HTTPException(status_code=400, detail="Could not extract any readable text from uploaded file")
 
-    # Store raw text, trigger profile creation agent
+    # Clean excessive whitespace while preserving section layout
+    import re
+    cleaned_text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    # Store raw text and set is_analyzing flag
     db = get_db()
     now = datetime.now(timezone.utc)
     await db.profiles.update_one(
@@ -90,7 +122,10 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
         {
             "$set": {
                 "resume_filename": file.filename,
-                "resume_raw_text": text,
+                "resume_raw_text": cleaned_text,
+                "is_analyzing": True,
+                "analysis_started_at": now,
+                "analysis_error": None,
                 "updated_at": now,
             },
             "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now},
@@ -100,11 +135,12 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
 
     import asyncio
     from app.graphs.profile_graph import profile_pipeline
-    asyncio.create_task(profile_pipeline.ainvoke({"user_id": user_id, "resume_text": text}))
-    logger.info("Resume uploaded and profile pipeline triggered", user_id=user_id, filename=file.filename, chars=len(text))
+    asyncio.create_task(profile_pipeline.ainvoke({"user_id": user_id, "resume_text": cleaned_text}))
+    logger.info("Resume uploaded and profile pipeline triggered", user_id=user_id, filename=file.filename, chars=len(cleaned_text))
 
     return {
         "ok": True,
+        "is_analyzing": True,
         "message": "Resume uploaded. AI is analyzing your profile...",
         "filename": file.filename,
     }

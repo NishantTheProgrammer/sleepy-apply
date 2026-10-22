@@ -37,13 +37,18 @@ async def parse_resume_node(state: ProfileState) -> ProfileState:
 
 
 async def save_profile_node(state: ProfileState) -> ProfileState:
-    if state.get("error") or not state.get("parsed_data"):
-        return state
-
     user_id = state["user_id"]
-    parsed = state["parsed_data"]
     db = get_db()
     now = datetime.now(timezone.utc)
+
+    if state.get("error") or not state.get("parsed_data"):
+        await db.profiles.update_one(
+            {"user_id": ObjectId(user_id)},
+            {"$set": {"is_analyzing": False, "analysis_error": state.get("error", "Unknown error"), "updated_at": now}},
+        )
+        return state
+
+    parsed = state["parsed_data"]
 
     update_fields = {
         "personal": parsed.get("personal", {}),
@@ -59,6 +64,9 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         "completion_score": parsed.get("completion_score", 0),
         "missing_fields": parsed.get("missing_fields", []),
         "pending_questions": parsed.get("pending_questions", []),
+        "is_analyzing": False,
+        "analysis_error": None,
+        "analyzed_at": now,
         "updated_at": now,
     }
 
@@ -67,7 +75,12 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         {"$set": update_fields, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},
         upsert=True,
     )
-    logger.info("Profile successfully saved from resume", user_id=user_id, score=update_fields["completion_score"])
+    logger.info(
+        "Profile successfully saved from resume",
+        user_id=user_id,
+        score=update_fields["completion_score"],
+        experiences=len(update_fields["experience"]),
+    )
     return state
 
 

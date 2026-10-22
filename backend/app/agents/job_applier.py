@@ -37,7 +37,7 @@ class JobApplierAgent:
             raise ValueError("User, profile, or job not found")
 
         app_prefs = (settings_doc or {}).get("application_preferences", {})
-        min_score = app_prefs.get("min_compatibility_score", 60)
+        min_score = int(app_prefs.get("auto_apply_threshold", app_prefs.get("min_compatibility_score", 70)))
         require_confirmation = app_prefs.get("require_confirmation", False)
 
         # Check match score

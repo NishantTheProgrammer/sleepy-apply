@@ -5,9 +5,58 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
-  SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X
+  SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
+  Eye, Download, RefreshCw, Copy, FileCode
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
+
+export interface TailoredResumeContent {
+  job_id?: string;
+  job_title?: string;
+  company?: string;
+  tailored_summary?: string;
+  matching_skills?: string[];
+  required_skills?: string[];
+  personal?: {
+    name?: string;
+    full_name?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: unknown;
+    linkedin?: string;
+    github?: string;
+    portfolio?: string;
+  };
+  summary?: string;
+  skills?: Record<string, string[]> | string[];
+  experience?: Array<{
+    title?: string;
+    company?: string;
+    location?: unknown;
+    start_date?: string;
+    end_date?: string;
+    current?: boolean;
+    description?: string;
+    highlights?: string[];
+  }>;
+  education?: Array<{
+    degree?: string;
+    field?: string;
+    institution?: string;
+    year?: string;
+    grade?: string;
+  }>;
+  projects?: Array<{
+    title?: string;
+    description?: string;
+    tech_stack?: string[];
+    link?: string;
+  }>;
+  achievements?: string[];
+  template?: string;
+  generated_at?: string;
+}
 
 interface JobItem {
   _id: string;
@@ -23,11 +72,14 @@ interface JobItem {
     title?: number;
     experience?: number;
   };
+  tailored_resume?: TailoredResumeContent;
+  resume_generated_at?: string;
+  resume_docx_path?: string;
   job: {
     _id: string;
     title: string;
     company: string;
-    location: string;
+    location: string | Record<string, unknown>;
     is_remote: boolean;
     application_url: string;
     source?: string;
@@ -47,6 +99,22 @@ interface JobItem {
     created_at?: string;
     updated_at?: string;
   };
+}
+
+function formatLocation(loc: unknown): string {
+  if (!loc) return "";
+  if (typeof loc === "string") return loc;
+  if (typeof loc === "object" && loc !== null) {
+    const l = loc as Record<string, unknown>;
+    const city = typeof l.city === "string" ? l.city.trim() : "";
+    const country = typeof l.country === "string" ? l.country.trim() : "";
+    const address = typeof l.address === "string" ? l.address.trim() : "";
+    if (city && country) return `${city}, ${country}`;
+    if (city) return city;
+    if (country) return country;
+    if (address) return address;
+  }
+  return "";
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -74,6 +142,13 @@ function JobsPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "high" | "remote" | "bengaluru">("all");
   const [descExpanded, setDescExpanded] = useState(false);
+
+  // Tailored Resume State & Modal
+  const [generatingResumeId, setGeneratingResumeId] = useState<string | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<JobItem | null>(null);
+  const [previewTab, setPreviewTab] = useState<"doc" | "json">("doc");
+  const [copiedJson, setCopiedJson] = useState(false);
 
   const load = async (p = 1) => {
     setLoading(true);
@@ -132,15 +207,66 @@ function JobsPageContent() {
     }
   };
 
+  const handleGenerateResume = async (jobId: string, openPreview = false) => {
+    setGeneratingResumeId(jobId);
+    try {
+      const res = await jobsApi.generateResume(jobId);
+      if (res.ok && res.tailored_resume) {
+        setJobs((prev) =>
+          prev.map((item) => {
+            if (item.job._id === jobId || item._id === jobId || item.job_id === jobId) {
+              const updatedItem: JobItem = {
+                ...item,
+                tailored_resume: res.tailored_resume as TailoredResumeContent,
+                resume_generated_at: res.generated_at,
+              };
+              if (openPreview) {
+                setPreviewItem(updatedItem);
+                setPreviewModalOpen(true);
+              }
+              return updatedItem;
+            }
+            return item;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Failed to generate tailored resume:", err);
+    } finally {
+      setGeneratingResumeId(null);
+    }
+  };
+
+  const handleOpenPreview = async (item: JobItem) => {
+    if (!item.tailored_resume) {
+      await handleGenerateResume(item.job._id, true);
+    } else {
+      setPreviewItem(item);
+      setPreviewModalOpen(true);
+      setPreviewTab("doc");
+    }
+  };
+
+  const handleCopyJson = (data: unknown) => {
+    try {
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Filtered jobs list
   const filteredJobs = useMemo(() => {
     return jobs.filter((item) => {
       const q = searchQuery.toLowerCase().trim();
+      const jobLoc = formatLocation(item.job.location).toLowerCase();
       const matchesSearch =
         !q ||
         item.job.title.toLowerCase().includes(q) ||
         item.job.company.toLowerCase().includes(q) ||
-        (item.job.location && item.job.location.toLowerCase().includes(q));
+        jobLoc.includes(q);
 
       if (!matchesSearch) return false;
 
@@ -148,14 +274,10 @@ function JobsPageContent() {
         return item.compatibility_score >= 75;
       }
       if (filterTab === "remote") {
-        return item.job.is_remote || (item.job.location && item.job.location.toLowerCase().includes("remote"));
+        return item.job.is_remote || jobLoc.includes("remote");
       }
       if (filterTab === "bengaluru") {
-        return (
-          item.job.location &&
-          (item.job.location.toLowerCase().includes("bengaluru") ||
-            item.job.location.toLowerCase().includes("bangalore"))
-        );
+        return jobLoc.includes("bengaluru") || jobLoc.includes("bangalore");
       }
       return true;
     });
@@ -354,7 +476,7 @@ function JobsPageContent() {
                             </span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-slate-500" /> {item.job.location || "Bengaluru, India"}
+                              <MapPin className="w-3 h-3 text-slate-500" /> {formatLocation(item.job.location) || "Bengaluru, India"}
                             </span>
                             <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
                               🇮🇳 India
@@ -395,6 +517,52 @@ function JobsPageContent() {
                             {s}
                           </span>
                         ))}
+                      </div>
+
+                      {/* Tailored Resume Status & Quick Action */}
+                      <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
+                        {item.tailored_resume ? (
+                          <div className="flex items-center gap-1.5 text-purple-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                            <span className="text-[10px] font-semibold">Tailored Resume Ready</span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-500">
+                            No tailored resume yet
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          {item.tailored_resume ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenPreview(item);
+                              }}
+                              className="px-2 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/20 text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Preview tailored resume and JSON"
+                            >
+                              <Eye className="w-3 h-3" /> Preview
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateResume(item.job._id, true);
+                              }}
+                              disabled={generatingResumeId === item.job._id}
+                              className="px-2 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                              title="Generate tailored resume"
+                            >
+                              {generatingResumeId === item.job._id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-3 h-3" />
+                              )}
+                              Tailor Resume
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -447,7 +615,7 @@ function JobsPageContent() {
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500" /> {selectedItem.job.location || "Remote"}
+                      <MapPin className="w-3.5 h-3.5 text-slate-500" /> {formatLocation(selectedItem.job.location) || "Remote"}
                     </span>
                     {selectedItem.job.employment_type && (
                       <>
@@ -477,6 +645,31 @@ function JobsPageContent() {
                         ? "Applied with AI"
                         : "One-Click Auto-Apply with AI"}
                     </button>
+
+                    {selectedItem.tailored_resume ? (
+                      <button
+                        onClick={() => handleOpenPreview(selectedItem)}
+                        className="px-3 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        title="Preview tailored resume & JSON"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Preview</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerateResume(selectedItem.job._id, true)}
+                        disabled={generatingResumeId === selectedItem.job._id}
+                        className="px-3 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                        title="Generate tailored resume"
+                      >
+                        {generatingResumeId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span className="hidden sm:inline">Tailor Resume</span>
+                      </button>
+                    )}
 
                     <a
                       href={selectedItem.job.application_url}
@@ -561,26 +754,116 @@ function JobsPageContent() {
                 </div>
 
                 {/* 3. Tailored Resume & Materials Preview */}
-                <div className="glass rounded-2xl p-5">
+                <div className="glass rounded-2xl p-5 border border-purple-500/20 relative overflow-hidden">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-purple-400" />
                       <h3 className="text-sm font-bold text-white">AI Tailored Resume Variant</h3>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      ATS Score: 94
-                    </span>
+                    {selectedItem.tailored_resume ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" /> Stored in Match Listing
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10">
+                        Not Generated Yet
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                    Targeted keywords prioritized:{" "}
-                    <span className="text-slate-200 font-medium">
-                      {selectedItem.matching_skills.slice(0, 5).join(", ")}
-                    </span>
-                  </p>
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-slate-400 font-mono">
-                    <p className="text-indigo-300 font-semibold mb-1">Tailored Profile Summary:</p>
-                    Candidate profile structured for {selectedItem.job.company}'s engineering standards with emphasis on distributed backend reliability and full-stack performance.
-                  </div>
+
+                  {selectedItem.tailored_resume ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>
+                          Template:{" "}
+                          <strong className="text-slate-200">
+                            {selectedItem.tailored_resume.template === "classic_ats" ? "Classic ATS" : "Default Template (Google Doc)"}
+                          </strong>
+                        </span>
+                        {selectedItem.resume_generated_at && (
+                          <span className="text-[11px] text-slate-500">
+                            {new Date(selectedItem.resume_generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-xs text-slate-300 leading-relaxed">
+                        <p className="font-semibold text-purple-300 text-[11px] mb-1 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-purple-400" /> Tailored Profile Pitch:
+                        </p>
+                        {selectedItem.tailored_resume.tailored_summary || selectedItem.tailored_resume.summary}
+                      </div>
+
+                      {/* Matching Skills Prioritized */}
+                      {selectedItem.tailored_resume.matching_skills && selectedItem.tailored_resume.matching_skills.length > 0 && (
+                        <div className="text-xs">
+                          <p className="text-[10px] uppercase tracking-wider font-semibold text-purple-300 mb-1.5">
+                            Prioritized JD Skills ({selectedItem.tailored_resume.matching_skills.length})
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedItem.tailored_resume.matching_skills.map((s) => (
+                              <span
+                                key={s}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="pt-2 border-t border-white/5 flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenPreview(selectedItem)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 transition-all cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Preview Resume & JSON
+                        </button>
+
+                        <button
+                          onClick={() => handleGenerateResume(selectedItem.job._id)}
+                          disabled={generatingResumeId === selectedItem.job._id}
+                          className="p-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 transition-all cursor-pointer disabled:opacity-50"
+                          title="Regenerate tailored resume"
+                        >
+                          {generatingResumeId === selectedItem.job._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        <a
+                          href={jobsApi.getResumeDownloadUrl(selectedItem.job._id)}
+                          download
+                          className="p-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+                          title="Download tailored Word document (.docx)"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 space-y-3">
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                        Synthesize your candidate profile JSON directly with {selectedItem.job.company}'s requirements to generate an ATS-optimized resume stored against this job match listing.
+                      </p>
+                      <button
+                        onClick={() => handleGenerateResume(selectedItem.job._id, true)}
+                        disabled={generatingResumeId === selectedItem.job._id}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {generatingResumeId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        {generatingResumeId === selectedItem.job._id ? "Synthesizing Resume with AI…" : "Generate Tailored Resume"}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 4. Job Description & Responsibilities */}
@@ -628,6 +911,335 @@ function JobsPageContent() {
           )}
         </div>
       </div>
+
+      {/* ── TAILORED RESUME PREVIEW MODAL ── */}
+      <AnimatePresence>
+        {previewModalOpen && previewItem && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl glass border border-white/10 shadow-2xl overflow-hidden bg-slate-950/95 my-auto"
+            >
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      {previewItem.tailored_resume?.template === "classic_ats" ? "Classic ATS Template" : "Default Template (Google Doc)"}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Tailored for {previewItem.job.company}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white truncate">
+                    Tailored Resume: {previewItem.job.title}
+                  </h3>
+                </div>
+
+                {/* Tabs & Controls */}
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
+                    <button
+                      onClick={() => setPreviewTab("doc")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        previewTab === "doc"
+                          ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Document Preview</span>
+                    </button>
+                    <button
+                      onClick={() => setPreviewTab("json")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        previewTab === "json"
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <FileCode className="w-3.5 h-3.5" />
+                      <span>Tailored JSON</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setPreviewModalOpen(false)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar bg-slate-900/50">
+                {previewTab === "doc" ? (
+                  /* ── DOCUMENT PREVIEW TAB ── */
+                  <div className="max-w-2xl mx-auto bg-slate-950 text-slate-200 border border-white/15 rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
+                    {/* Header: Candidate Info */}
+                    <div className="text-center border-b border-white/10 pb-5">
+                      <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+                        {previewItem.tailored_resume?.personal?.name ||
+                          previewItem.tailored_resume?.personal?.full_name ||
+                          previewItem.tailored_resume?.personal?.fullName ||
+                          "Candidate Name"}
+                      </h1>
+                      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-2 text-xs text-slate-400">
+                        {previewItem.tailored_resume?.personal?.email && (
+                          <span>{previewItem.tailored_resume.personal.email}</span>
+                        )}
+                        {previewItem.tailored_resume?.personal?.phone && (
+                          <>
+                            <span>•</span>
+                            <span>{previewItem.tailored_resume.personal.phone}</span>
+                          </>
+                        )}
+                        {formatLocation(previewItem.tailored_resume?.personal?.location) && (
+                          <>
+                            <span>•</span>
+                            <span>{formatLocation(previewItem.tailored_resume?.personal?.location)}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-1 text-xs text-indigo-400">
+                        {previewItem.tailored_resume?.personal?.linkedin && (
+                          <span>{previewItem.tailored_resume.personal.linkedin}</span>
+                        )}
+                        {previewItem.tailored_resume?.personal?.github && (
+                          <>
+                            <span>•</span>
+                            <span>{previewItem.tailored_resume.personal.github}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tailored Professional Summary */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400">
+                          Professional Summary
+                        </h2>
+                        <span className="text-[10px] text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                          AI-Tailored for {previewItem.job.company}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed bg-white/[0.02] p-3 rounded-lg border border-white/5">
+                        {previewItem.tailored_resume?.tailored_summary || previewItem.tailored_resume?.summary || "Experienced software engineer dedicated to building robust and performant systems."}
+                      </p>
+                    </div>
+
+                    {/* Technical Skills & Core Competencies */}
+                    <div>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
+                        Core Competencies & Skills
+                      </h2>
+                      {previewItem.tailored_resume?.skills && typeof previewItem.tailored_resume.skills === "object" && !Array.isArray(previewItem.tailored_resume.skills) ? (
+                        <div className="space-y-2 text-xs">
+                          {Object.entries(previewItem.tailored_resume.skills).map(([category, skillList]) => (
+                            <div key={category} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                              <span className="font-semibold text-slate-300 sm:w-28 shrink-0 capitalize">{category}:</span>
+                              <div className="flex flex-wrap gap-1 flex-1">
+                                {(skillList as string[]).map((sk) => {
+                                  const isMatching = (previewItem.tailored_resume?.matching_skills || []).some(
+                                    (m) => m.toLowerCase() === sk.toLowerCase()
+                                  );
+                                  return (
+                                    <span
+                                      key={sk}
+                                      className={`px-1.5 py-0.5 rounded text-[11px] ${
+                                        isMatching
+                                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium"
+                                          : "bg-white/5 text-slate-400 border border-white/5"
+                                      }`}
+                                    >
+                                      {sk}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {((previewItem.tailored_resume?.skills as string[]) || []).map((sk) => (
+                            <span key={sk} className="px-2 py-0.5 rounded text-xs bg-white/5 text-slate-300 border border-white/10">
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Work Experience */}
+                    {previewItem.tailored_resume?.experience && previewItem.tailored_resume.experience.length > 0 && (
+                      <div>
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3">
+                          Professional Experience
+                        </h2>
+                        <div className="space-y-4">
+                          {previewItem.tailored_resume.experience.map((exp, idx) => (
+                            <div key={idx} className="border-l-2 border-purple-500/40 pl-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                                <span className="font-bold text-white text-sm">{exp.title}</span>
+                                <span className="text-slate-400 text-[11px]">
+                                  {exp.start_date} – {exp.current ? "Present" : exp.end_date}
+                                </span>
+                              </div>
+                              <div className="text-xs text-indigo-300 font-medium">
+                                {exp.company} {formatLocation(exp.location) && `• ${formatLocation(exp.location)}`}
+                              </div>
+                              {exp.description && (
+                                <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">{exp.description}</p>
+                              )}
+                              {exp.highlights && exp.highlights.length > 0 && (
+                                <ul className="mt-1.5 space-y-1 list-disc list-inside text-xs text-slate-400">
+                                  {exp.highlights.map((h, hidx) => (
+                                    <li key={hidx} className="leading-relaxed">{h}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Projects */}
+                    {previewItem.tailored_resume?.projects && previewItem.tailored_resume.projects.length > 0 && (
+                      <div>
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
+                          Featured Projects
+                        </h2>
+                        <div className="space-y-3">
+                          {previewItem.tailored_resume.projects.map((proj, pidx) => (
+                            <div key={pidx} className="bg-white/[0.02] p-3 rounded-lg border border-white/5 text-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-white">{proj.title}</span>
+                                {proj.link && (
+                                  <a href={proj.link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 text-[11px]">
+                                    View <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                )}
+                              </div>
+                              {proj.description && (
+                                <p className="text-slate-300 text-xs mt-1 leading-relaxed">{proj.description}</p>
+                              )}
+                              {proj.tech_stack && proj.tech_stack.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {proj.tech_stack.map((t) => (
+                                    <span key={t} className="px-1.5 py-0.2 rounded text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Education */}
+                    {previewItem.tailored_resume?.education && previewItem.tailored_resume.education.length > 0 && (
+                      <div>
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-2">
+                          Education
+                        </h2>
+                        <div className="space-y-2">
+                          {previewItem.tailored_resume.education.map((edu, eidx) => (
+                            <div key={eidx} className="flex items-center justify-between text-xs">
+                              <div>
+                                <span className="font-semibold text-white">{edu.degree} {edu.field && `in ${edu.field}`}</span>
+                                <div className="text-slate-400 text-[11px]">{edu.institution}</div>
+                              </div>
+                              <span className="text-slate-400 text-[11px]">{edu.year}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* ── TAILORED JSON TAB ── */
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-indigo-300">
+                      <div>
+                        <p className="font-semibold text-white">Stored against Job-User Match Listing</p>
+                        <p className="text-[11px] text-slate-400">
+                          MongoDB collection: <code className="text-indigo-300">db.job_matches.tailored_resume</code>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyJson(previewItem.tailored_resume)}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all cursor-pointer self-start sm:self-auto"
+                      >
+                        {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedJson ? "Copied JSON!" : "Copy JSON"}</span>
+                      </button>
+                    </div>
+
+                    <pre className="p-4 rounded-xl bg-black/80 border border-white/10 text-emerald-400 font-mono text-xs overflow-x-auto leading-relaxed max-h-[60vh] custom-scrollbar selection:bg-emerald-500/30">
+                      {JSON.stringify(previewItem.tailored_resume, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/[0.02]">
+                <button
+                  onClick={() => setPreviewModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-400 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleGenerateResume(previewItem.job._id, true)}
+                    disabled={generatingResumeId === previewItem.job._id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingResumeId === previewItem.job._id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    <span>Regenerate</span>
+                  </button>
+
+                  <a
+                    href={jobsApi.getResumeDownloadUrl(previewItem.job._id)}
+                    download
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download .docx</span>
+                  </a>
+
+                  <button
+                    onClick={() => {
+                      handleApply(previewItem.job._id);
+                      setPreviewModalOpen(false);
+                    }}
+                    disabled={applying === previewItem.job._id || ["APPLIED", "VERIFIED_SUCCESS"].includes(previewItem.application?.status || "")}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Auto-Apply with this Resume</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

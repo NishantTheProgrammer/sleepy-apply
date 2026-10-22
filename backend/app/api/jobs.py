@@ -88,6 +88,8 @@ async def list_jobs(
         doc["job"]["_id"] = str(doc["job"]["_id"])
         if doc.get("application"):
             doc["application"]["_id"] = str(doc["application"]["_id"])
+        if hasattr(doc.get("resume_generated_at"), "isoformat"):
+            doc["resume_generated_at"] = doc["resume_generated_at"].isoformat()
         results.append(doc)
 
     total = await db.job_matches.count_documents(match_filter)
@@ -113,6 +115,8 @@ async def get_job(request: Request, job_id: str):
         match["_id"] = str(match["_id"])
         match["user_id"] = str(match["user_id"])
         match["job_id"] = str(match["job_id"])
+        if hasattr(match.get("resume_generated_at"), "isoformat"):
+            match["resume_generated_at"] = match["resume_generated_at"].isoformat()
 
     application = await db.applications.find_one(
         {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
@@ -151,3 +155,119 @@ async def trigger_apply(request: Request, job_id: str):
     from app.graphs.application_graph import application_pipeline
     asyncio.create_task(application_pipeline.ainvoke({"user_id": user_id, "job_id": job_id}))
     return {"ok": True, "message": "Application pipeline triggered", "job_id": job_id}
+
+
+@router.post("/{job_id}/generate-resume")
+async def generate_tailored_resume(request: Request, job_id: str):
+    """Generate tailored resume JSON against user profile and JD, and store against job-user match."""
+    user_id = get_current_user_id(request)
+    from app.agents.resume_builder import ResumeBuilderAgent
+
+    agent = ResumeBuilderAgent()
+    result = await agent.build_tailored_resume(user_id=user_id, job_id=job_id)
+    if not result:
+        raise HTTPException(status_code=400, detail="Could not generate tailored resume. Check if profile and job exist.")
+
+    return {
+        "ok": True,
+        "job_id": job_id,
+        "tailored_resume": result.get("content"),
+        "generated_at": result.get("generated_at"),
+        "docx_path": result.get("docx_path"),
+    }
+
+
+@router.get("/{job_id}/resume")
+async def get_tailored_resume(request: Request, job_id: str):
+    """Get the stored tailored resume JSON for this job and user."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+
+    match = await db.job_matches.find_one(
+        {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
+    )
+    if match and match.get("tailored_resume"):
+        gen_at = match.get("resume_generated_at")
+        if hasattr(gen_at, "isoformat"):
+            gen_at = gen_at.isoformat()
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "tailored_resume": match.get("tailored_resume"),
+            "generated_at": gen_at,
+        }
+
+    # Fallback check in db.resumes
+    resume = await db.resumes.find_one(
+        {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
+    )
+    if resume and resume.get("content"):
+        gen_at = resume.get("generated_at")
+        if hasattr(gen_at, "isoformat"):
+            gen_at = gen_at.isoformat()
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "tailored_resume": resume.get("content"),
+            "generated_at": gen_at,
+        }
+
+    return {"ok": False, "tailored_resume": None}
+
+
+@router.get("/{job_id}/resume/download")
+async def download_tailored_resume_docx(request: Request, job_id: str):
+    """Download the tailored .docx resume for this job and user."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    from fastapi.responses import StreamingResponse
+
+    # Check match or resume document
+    match = await db.job_matches.find_one(
+        {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
+    )
+    tailored = match.get("tailored_resume") if match else None
+
+    if not tailored:
+        resume = await db.resumes.find_one(
+            {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
+        )
+        if resume:
+            tailored = resume.get("content")
+
+    # If still not generated, generate on the fly
+    if not tailored:
+        from app.agents.resume_builder import ResumeBuilderAgent
+        agent = ResumeBuilderAgent()
+        res = await agent.build_tailored_resume(user_id=user_id, job_id=job_id)
+        if res:
+            tailored = res.get("content")
+
+    if not tailored:
+        raise HTTPException(status_code=404, detail="Tailored resume not found")
+
+    from app.templates.manager import render_docx_for_profile
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
+    template_id = tailored.get("template") or profile.get("selected_template") or "default"
+
+    tailored_context = {
+        **profile,
+        "summary": tailored.get("tailored_summary") or tailored.get("summary") or profile.get("summary", ""),
+        "skills": tailored.get("skills") or profile.get("skills", {}),
+    }
+
+    try:
+        stream = render_docx_for_profile(template_id, tailored_context)
+    except Exception as e:
+        logger.error("Failed to render docx", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to render document")
+
+    company = tailored.get("company", "Job").replace(" ", "_")
+    title = tailored.get("job_title", "Role").replace(" ", "_")
+    filename = f"Resume_{company}_{title}.docx"
+
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

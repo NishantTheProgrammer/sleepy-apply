@@ -94,6 +94,22 @@ export const jobsApi = {
   get: (id: string) => request(`/api/jobs/${id}`),
   apply: (id: string) => request(`/api/jobs/${id}/apply`, { method: "POST" }),
   fetchNow: () => request<{ ok: boolean; message: string }>("/api/jobs/fetch-now", { method: "POST" }),
+  generateResume: (jobId: string) =>
+    request<{
+      ok: boolean;
+      job_id: string;
+      tailored_resume: Record<string, unknown>;
+      generated_at: string;
+      docx_path?: string;
+    }>(`/api/jobs/${jobId}/generate-resume`, { method: "POST" }),
+  getResume: (jobId: string) =>
+    request<{
+      ok: boolean;
+      job_id: string;
+      tailored_resume: Record<string, unknown> | null;
+      generated_at?: string;
+    }>(`/api/jobs/${jobId}/resume`),
+  getResumeDownloadUrl: (jobId: string) => `${API_URL}/api/jobs/${jobId}/resume/download`,
 };
 
 // ── Settings ──────────────────────────────────────────────

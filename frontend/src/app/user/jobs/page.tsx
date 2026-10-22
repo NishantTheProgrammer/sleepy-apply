@@ -1032,6 +1032,11 @@ function JobsPageContent() {
                     <span className="text-[10px] font-semibold px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       Tailored for {previewItem.job.company}
                     </span>
+                    {Array.isArray(previewItem.tailored_resume?.projects) && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                        {previewItem.tailored_resume.projects.length} relevant projects kept
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white truncate">
                     Tailored Resume: {previewItem.job.title}

@@ -301,6 +301,7 @@ async def download_tailored_resume_docx(request: Request, job_id: str, template:
         "summary": tailored.get("tailored_summary") or tailored.get("summary") or profile.get("summary", ""),
         "skills": tailored.get("skills") or profile.get("skills", {}),
         "experience": tailored.get("experience") or profile.get("experience", []),
+        "projects": tailored.get("projects") if tailored.get("projects") is not None else profile.get("projects", []),
         "matching_skills": tailored.get("matching_skills", []),
     }
 

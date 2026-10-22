@@ -25,6 +25,8 @@ class ApplicationPreferences(MongoBaseModel):
     extraction_temperature: float = 0.1
     bold_matching_keywords: bool = True
     max_bullets_per_role: int = 5
+    filter_irrelevant_projects: bool = True
+    max_tailored_projects: int = 3
     require_confirmation: bool = True
     daily_apply_limit: int = 5
 

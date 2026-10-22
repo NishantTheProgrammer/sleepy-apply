@@ -25,6 +25,8 @@ interface AppPreferences {
   extraction_temperature?: number;
   bold_matching_keywords?: boolean;
   max_bullets_per_role?: number;
+  filter_irrelevant_projects?: boolean;
+  max_tailored_projects?: number;
   require_confirmation?: boolean;
   daily_apply_limit?: number;
 }
@@ -41,6 +43,8 @@ export default function SettingsPage() {
       extraction_temperature: 0.1,
       bold_matching_keywords: true,
       max_bullets_per_role: 5,
+      filter_irrelevant_projects: true,
+      max_tailored_projects: 3,
       require_confirmation: true,
       daily_apply_limit: 5,
     },
@@ -70,6 +74,8 @@ export default function SettingsPage() {
           extraction_temperature: Number(existingPrefs.extraction_temperature ?? 0.1),
           bold_matching_keywords: existingPrefs.bold_matching_keywords !== false,
           max_bullets_per_role: Number(existingPrefs.max_bullets_per_role ?? 5),
+          filter_irrelevant_projects: existingPrefs.filter_irrelevant_projects !== false,
+          max_tailored_projects: Number(existingPrefs.max_tailored_projects ?? 3),
           require_confirmation: existingPrefs.require_confirmation !== false,
           daily_apply_limit: Number(existingPrefs.daily_apply_limit ?? 5),
         },
@@ -415,6 +421,36 @@ export default function SettingsPage() {
               </button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Increases ATS recruiter scannability</p>
+          </div>
+        </div>
+
+        {/* Project Relevance Filtering & Max Projects */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/5 mt-4">
+          <div>
+            <label className="text-xs text-slate-300 font-medium block mb-1.5">Filter Irrelevant Projects</label>
+            <div className="flex items-center justify-between h-10 px-3 bg-white/5 border border-white/10 rounded-xl">
+              <span className="text-xs text-slate-300">Keep only matching projects</span>
+              <button
+                onClick={() => updateAppPref("filter_irrelevant_projects", !appPrefs.filter_irrelevant_projects)}
+                className={`relative w-10 h-5.5 rounded-full transition-colors ${appPrefs.filter_irrelevant_projects !== false ? "bg-indigo-600" : "bg-white/10"}`}
+              >
+                <span className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${appPrefs.filter_irrelevant_projects !== false ? "left-5" : "left-0.5"}`} />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Omits outdated, academic, or non-matching stack projects</p>
+          </div>
+
+          <div>
+            <label className="text-xs text-slate-300 font-medium block mb-1.5">Max Tailored Projects</label>
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={appPrefs.max_tailored_projects ?? 3}
+              onChange={(e) => updateAppPref("max_tailored_projects", parseInt(e.target.value) || 3)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">Top relevant projects to highlight (2-3 recommended)</p>
           </div>
         </div>
       </motion.div>

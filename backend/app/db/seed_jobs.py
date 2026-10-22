@@ -397,7 +397,7 @@ async def seed_jobs_collection(db: AsyncIOMotorDatabase, force_overwrite: bool =
         job_doc = {
             "source": job_data.get("source", "company_ats"),
             "source_url": job_data["source_url"],
-            "external_id": None,
+            "external_id": f"seed-{content_hash[:16]}",
             "title": job_data["title"],
             "company": job_data["company"],
             "company_info": job_data.get("company_info", {}),

@@ -117,6 +117,22 @@ function formatLocation(loc: unknown): string {
   return "";
 }
 
+function renderFormattedText(text: unknown) {
+  if (!text) return null;
+  const str = String(text);
+  const parts = str.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={i} className="font-bold text-slate-950 font-black">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED_SUCCESS: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
   APPLIED:          "text-blue-300 bg-blue-400/10 border-blue-400/20",
@@ -1165,7 +1181,7 @@ function JobsPageContent() {
                                 {isDefault ? "PROFESSIONAL SUMMARY" : "SUMMARY"}
                               </h2>
                               <p className={`text-xs sm:text-[13px] leading-relaxed ${themeStyles.subText}`}>
-                                {summaryText}
+                                {renderFormattedText(summaryText)}
                               </p>
                             </div>
                           )}
@@ -1187,7 +1203,26 @@ function JobsPageContent() {
                                           {cat}:
                                         </span>
                                         <span className={`text-xs leading-normal ${themeStyles.subText}`}>
-                                          {items.join(", ")}
+                                          {items.map((sk, sIdx) => {
+                                            const cleanSk = sk.replace(/\*\*/g, "").trim();
+                                            const isMatching =
+                                              (previewItem.tailored_resume?.matching_skills || []).some(
+                                                (m) => m.toLowerCase() === cleanSk.toLowerCase()
+                                              ) || sk.startsWith("**");
+
+                                            return (
+                                              <span key={sIdx}>
+                                                {sIdx > 0 && ", "}
+                                                {isMatching ? (
+                                                  <strong className="font-bold text-slate-950 font-black">
+                                                    {cleanSk}
+                                                  </strong>
+                                                ) : (
+                                                  cleanSk
+                                                )}
+                                              </span>
+                                            );
+                                          })}
                                         </span>
                                       </div>
                                     );
@@ -1197,7 +1232,25 @@ function JobsPageContent() {
                                 <div className="text-xs">
                                   <span className="font-bold text-slate-900 sm:w-28 shrink-0">Skills: </span>
                                   <span className={themeStyles.subText}>
-                                    {Array.isArray(skillsData) ? skillsData.join(", ") : String(skillsData)}
+                                    {(Array.isArray(skillsData) ? skillsData : [String(skillsData)]).map((sk, sIdx) => {
+                                      const cleanSk = sk.replace(/\*\*/g, "").trim();
+                                      const isMatching =
+                                        (previewItem.tailored_resume?.matching_skills || []).some(
+                                          (m) => m.toLowerCase() === cleanSk.toLowerCase()
+                                        ) || sk.startsWith("**");
+                                      return (
+                                        <span key={sIdx}>
+                                          {sIdx > 0 && ", "}
+                                          {isMatching ? (
+                                            <strong className="font-bold text-slate-950 font-black">
+                                              {cleanSk}
+                                            </strong>
+                                          ) : (
+                                            cleanSk
+                                          )}
+                                        </span>
+                                      );
+                                    })}
                                   </span>
                                 </div>
                               )}
@@ -1242,14 +1295,14 @@ function JobsPageContent() {
 
                                       {exp.description && (
                                         <p className="text-slate-700 mt-0.5 text-xs italic">
-                                          {exp.description}
+                                          {renderFormattedText(exp.description)}
                                         </p>
                                       )}
 
                                       {rawBullets.length > 0 && (
                                         <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
                                           {rawBullets.map((r, ri) => (
-                                            <li key={ri}>{String(r)}</li>
+                                            <li key={ri}>{renderFormattedText(r)}</li>
                                           ))}
                                         </ul>
                                       )}
@@ -1272,7 +1325,7 @@ function JobsPageContent() {
                                                 {spAchs.length > 0 && (
                                                   <ul className="list-disc pl-3 text-slate-600">
                                                     {spAchs.map((ach, achi) => (
-                                                      <li key={achi}>{String(ach)}</li>
+                                                      <li key={achi}>{renderFormattedText(ach)}</li>
                                                     ))}
                                                   </ul>
                                                 )}
@@ -1324,7 +1377,7 @@ function JobsPageContent() {
                                       </div>
                                       {proj.description && (
                                         <p className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
-                                          {proj.description}
+                                          {renderFormattedText(proj.description)}
                                         </p>
                                       )}
                                     </div>

@@ -1,12 +1,13 @@
 import os
 import io
+import re
 from pathlib import Path
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docxtpl import DocxTemplate
+from docxtpl import DocxTemplate, RichText
 import structlog
 
 logger = structlog.get_logger()
@@ -139,6 +140,36 @@ def ensure_templates_exist():
         shutil.copyfile(TEMPLATES_DIR / "default_backup.docx", path_default)
 
 
+def markdown_to_richtext(text: str) -> RichText:
+    """Convert string with markdown **bold** tokens into a docxtpl RichText object."""
+    if not text:
+        return RichText()
+    rt = RichText()
+    parts = re.split(r'(\*\*[^*]+\*\*)', str(text))
+    for part in parts:
+        if part.startswith("**") and part.endswith("**") and len(part) > 4:
+            rt.add(part[2:-2], bold=True)
+        else:
+            rt.add(part)
+    return rt
+
+
+def format_skills_rich(items: list[str], matching_skills: list[str]) -> RichText:
+    """Format skills list into a RichText object with matching skills in bold."""
+    rt = RichText()
+    for idx, item in enumerate(items):
+        clean_item = str(item).replace("**", "").strip()
+        is_match = (
+            clean_item.lower() in matching_skills
+            or any(m in clean_item.lower() for m in matching_skills if len(m) > 3)
+            or str(item).startswith("**")
+        )
+        if idx > 0:
+            rt.add(", ")
+        rt.add(clean_item, bold=is_match)
+    return rt
+
+
 def format_profile_for_rendering(profile: dict) -> dict:
     """Transform candidate profile dictionary into standard template rendering context."""
     personal = profile.get("personal", {})
@@ -168,31 +199,36 @@ def format_profile_for_rendering(profile: dict) -> dict:
 
     contact_line = " • ".join(contact_parts)
 
-    # Skills categories and lines
+    # Skills categories and lines with bold matching skills
     skills_raw = profile.get("skills", {})
+    matching_skills = [str(m).lower().strip() for m in profile.get("matching_skills", []) if m]
     skills_categories = []
     skills_lines = []
 
     if isinstance(skills_raw, dict):
         for cat, items in skills_raw.items():
             if items:
+                items_rich = format_skills_rich(items, matching_skills)
                 skills_categories.append({
                     "name": cat.capitalize(),
                     "items": items,
-                    "items_str": ", ".join(items)
+                    "items_str": items_rich,
                 })
                 for i in range(0, len(items), 3):
-                    skills_lines.append(", ".join(items[i:i + 3]))
+                    chunk = items[i:i + 3]
+                    skills_lines.append(format_skills_rich(chunk, matching_skills))
     elif isinstance(skills_raw, list):
+        items_rich = format_skills_rich(skills_raw, matching_skills)
         skills_categories.append({
             "name": "Technical Skills",
             "items": skills_raw,
-            "items_str": ", ".join(skills_raw)
+            "items_str": items_rich,
         })
         for i in range(0, len(skills_raw), 3):
-            skills_lines.append(", ".join(skills_raw[i:i + 3]))
+            chunk = skills_raw[i:i + 3]
+            skills_lines.append(format_skills_rich(chunk, matching_skills))
 
-    # Experience
+    # Experience with bold keywords in responsibilities
     raw_exp = profile.get("experience", [])
     experience = []
     for exp in raw_exp:
@@ -203,7 +239,8 @@ def format_profile_for_rendering(profile: dict) -> dict:
         end = "Present" if is_curr else (exp.get("endDate") or exp.get("end_date", ""))
         dates = f"{start} – {end}".strip(" –")
 
-        resps = exp.get("responsibilities", [])
+        resps = exp.get("responsibilities") or exp.get("highlights") or []
+        resps_rich = [markdown_to_richtext(r) for r in resps]
         achs = exp.get("achievements", [])
 
         # Sub-projects achievements and formatted project items
@@ -216,15 +253,15 @@ def format_profile_for_rendering(profile: dict) -> dict:
                 p_desc = " ".join(sub.get("achievements"))
             projects_formatted.append({
                 "title": sub.get("name", "Project"),
-                "description": p_desc
+                "description": markdown_to_richtext(p_desc),
             })
 
         experience.append({
             "title": title,
             "company": company,
             "dates": dates,
-            "description": exp.get("description", ""),
-            "responsibilities": resps,
+            "description": markdown_to_richtext(exp.get("description", "")),
+            "responsibilities": resps_rich,
             "achievements": achs,
             "projects_formatted": projects_formatted,
         })
@@ -233,10 +270,10 @@ def format_profile_for_rendering(profile: dict) -> dict:
     raw_proj = profile.get("projects", [])
     projects = []
     for p in raw_proj:
-        tech = p.get("technologies", [])
+        tech = p.get("technologies") or p.get("tech_stack") or []
         projects.append({
-            "name": p.get("name", ""),
-            "description": p.get("description", ""),
+            "name": p.get("name") or p.get("title", ""),
+            "description": markdown_to_richtext(p.get("description", "")),
             "tech": tech,
             "tech_str": ", ".join(tech),
         })
@@ -269,7 +306,7 @@ def format_profile_for_rendering(profile: dict) -> dict:
             "portfolio": personal.get("portfolio", ""),
             "portfolio_label": personal.get("portfolio", "") or "portfolio",
         },
-        "summary": profile.get("summary", ""),
+        "summary": markdown_to_richtext(profile.get("summary", "")),
         "skills_categories": skills_categories,
         "skills_lines": skills_lines,
         "experience": experience,

@@ -84,19 +84,21 @@ async def discord_callback(request: Request, response: Response):
         "updated_at": now,
         "is_active": True,
     }
+    set_on_insert: dict = {
+        "created_at": now,
+    }
+
     if is_admin:
         update_set["role"] = "admin"
+    else:
+        set_on_insert["role"] = "user"
 
-    # Upsert user
+    # Upsert user without duplicate keys across $set and $setOnInsert
     await db.users.update_one(
         {"discord_id": discord_user["id"]},
         {
             "$set": update_set,
-            "$setOnInsert": {
-                "discord_id": discord_user["id"],
-                "role": "admin" if is_admin else "user",
-                "created_at": now,
-            },
+            "$setOnInsert": set_on_insert,
         },
         upsert=True,
     )
@@ -115,11 +117,13 @@ async def discord_callback(request: Request, response: Response):
         "access_token", access_token,
         httponly=True, secure=is_prod, samesite="lax",
         max_age=settings.jwt_access_token_expire_minutes * 60,
+        path="/",
     )
     response.set_cookie(
         "refresh_token", refresh_token,
         httponly=True, secure=is_prod, samesite="lax",
         max_age=settings.jwt_refresh_token_expire_days * 86400,
+        path="/",
     )
 
     return {
@@ -151,14 +155,15 @@ async def refresh_token(request: Request, response: Response):
         "access_token", new_access,
         httponly=True, secure=settings.is_production, samesite="lax",
         max_age=settings.jwt_access_token_expire_minutes * 60,
+        path="/",
     )
     return {"ok": True}
 
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
     return {"ok": True}
 
 
@@ -190,3 +195,40 @@ async def get_me(request: Request):
     # Never expose sensitive fields
     user.pop("__v", None)
     return user
+
+
+@router.post("/dev-login")
+async def dev_login(response: Response):
+    """Dev-only: Log in as admin user directly for easy development."""
+    settings = get_settings()
+    if settings.is_production:
+        raise HTTPException(status_code=403, detail="Not available in production")
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    user_email = settings.admin_emails[0] if settings.admin_emails else "knishant113@gmail.com"
+    user_doc = await db.users.find_one({"email": user_email})
+    if not user_doc:
+        user_doc = {
+            "discord_id": "dev_admin_12345",
+            "discord_username": "Nishant (Admin)",
+            "email": user_email,
+            "role": "admin",
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
+            "last_login": now,
+        }
+        res = await db.users.insert_one(user_doc)
+        user_doc["_id"] = res.inserted_id
+    else:
+        await db.users.update_one({"_id": user_doc["_id"]}, {"$set": {"role": "admin", "is_active": True, "last_login": now}})
+
+    user_id = str(user_doc["_id"])
+    token_data = {"sub": user_id, "discord_id": user_doc.get("discord_id", "dev_admin_12345")}
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    response.set_cookie("access_token", access_token, httponly=True, samesite="lax", max_age=3600 * 24)
+    response.set_cookie("refresh_token", refresh_token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
+    return {"ok": True, "user": {"id": user_id, "_id": user_id, "email": user_email, "role": "admin", "discord_username": "Nishant (Admin)"}}
+

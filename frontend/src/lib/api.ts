@@ -28,6 +28,7 @@ export const authApi = {
   me: () => request("/api/auth/me"),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   refresh: () => request("/api/auth/refresh", { method: "POST" }),
+  devLogin: () => request<{ ok: boolean; user: Record<string, unknown> }>("/api/auth/dev-login", { method: "POST" }),
 };
 
 // ── Profile ───────────────────────────────────────────────
@@ -88,7 +89,54 @@ export const adminApi = {
     request<{ ok: boolean; user: Record<string, unknown> }>(`/api/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(data) }),
   triggerDiscovery: () =>
     request<{ ok: boolean; message: string }>("/api/admin/trigger-discovery", { method: "POST" }),
+  allJobs: (params?: { page?: number; limit?: number; search?: string; company?: string; is_remote?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.search) q.set("search", params.search);
+    if (params?.company && params.company !== "all") q.set("company", params.company);
+    if (params?.is_remote !== undefined) q.set("is_remote", String(params.is_remote));
+    return request<{
+      items: AdminJobRecord[];
+      total: number;
+      page: number;
+      limit: number;
+      companies: string[];
+      stats: {
+        total_jobs: number;
+        remote_jobs: number;
+        active_jobs: number;
+        companies_count: number;
+      };
+    }>(`/api/admin/jobs?${q}`);
+  },
+  seedJobs: () =>
+    request<{ ok: boolean; message: string; total_jobs: number }>("/api/admin/jobs/seed", { method: "POST" }),
+  fetchLiveJobs: () =>
+    request<{ ok: boolean; message: string }>("/api/admin/jobs/fetch-live", { method: "POST" }),
 };
+
+export interface AdminJobRecord {
+  _id: string;
+  title: string;
+  company: string;
+  location?: string;
+  is_remote?: boolean;
+  employment_type?: string;
+  source?: string;
+  source_url?: string;
+  application_url?: string;
+  description?: string;
+  requirements?: string[];
+  responsibilities?: string[];
+  required_skills?: string[];
+  salary_range?: { min?: number; max?: number; currency?: string };
+  grade?: string;
+  is_active?: boolean;
+  enriched?: boolean;
+  discovered_at?: string;
+  company_meta?: TargetCompany;
+}
 
 // ── Companies ─────────────────────────────────────────────
 export interface TargetCompany {

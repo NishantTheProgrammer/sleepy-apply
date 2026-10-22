@@ -14,6 +14,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: () => Promise<void>;
+  devLogin: () => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -29,7 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = (await authApi.me()) as User;
       setUser(me);
     } catch {
-      setUser(null);
+      // Attempt token refresh if access token expired
+      try {
+        await authApi.refresh();
+        const me = (await authApi.me()) as User;
+        setUser(me);
+      } catch {
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -42,6 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = url;
   };
 
+  const devLogin = async () => {
+    setLoading(true);
+    try {
+      await authApi.devLogin();
+      await refresh();
+      window.location.href = "/user/dashboard";
+    } catch (e) {
+      console.error("Dev login failed", e);
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     await authApi.logout();
     setUser(null);
@@ -49,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, devLogin, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

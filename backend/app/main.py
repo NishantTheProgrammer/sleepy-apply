@@ -9,6 +9,7 @@ from app.db.indexes import create_indexes
 from app.db.client import get_db
 from app.api import auth, profile, jobs, settings, admin, pipeline, companies
 from app.db.seed_companies import seed_target_companies
+from app.db.seed_jobs import seed_jobs_collection
 
 logger = structlog.get_logger()
 
@@ -24,6 +25,10 @@ async def lifespan(app: FastAPI):
     # Auto-seed verified target companies if empty
     if await db.companies.count_documents({}) == 0:
         await seed_target_companies(db)
+
+    # Auto-seed verified jobs if empty
+    if await db.jobs.count_documents({}) == 0:
+        await seed_jobs_collection(db)
 
     logger.info("Sleepy Apply backend started", env=settings_cfg.environment)
     yield

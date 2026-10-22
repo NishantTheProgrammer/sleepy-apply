@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks, Query
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
 from app.core.config import get_settings
+from app.db.seed_jobs import seed_jobs_collection
+from app.agents.job_fetcher import JobFetcherAgent
 import structlog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -179,3 +181,121 @@ async def list_workflows(admin_id: str = Depends(require_admin)):
             r["user_id"] = str(r["user_id"])
         runs.append(r)
     return {"runs": runs}
+
+
+@router.get("/jobs")
+async def list_all_jobs_admin(
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    search: str | None = None,
+    company: str | None = None,
+    is_remote: bool | None = None,
+    admin_id: str = Depends(require_admin),
+):
+    """List all ingested jobs in MongoDB with search, filters, and company grade metadata."""
+    db = get_db()
+    skip = (page - 1) * limit
+    filter_query: dict = {}
+
+    if company and company != "all":
+        filter_query["company"] = company
+    if is_remote is not None:
+        filter_query["is_remote"] = is_remote
+    if search:
+        filter_query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"company": {"$regex": search, "$options": "i"}},
+            {"location": {"$regex": search, "$options": "i"}},
+            {"required_skills": {"$in": [search]}},
+        ]
+
+    total = await db.jobs.count_documents(filter_query)
+
+    # Aggregate with company grade
+    pipeline = [
+        {"$match": filter_query},
+        {"$sort": {"discovered_at": -1}},
+        {"$skip": skip},
+        {"$limit": limit},
+        {
+            "$lookup": {
+                "from": "companies",
+                "localField": "company",
+                "foreignField": "name",
+                "as": "company_meta",
+            }
+        },
+        {"$unwind": {"path": "$company_meta", "preserveNullAndEmptyArrays": True}},
+    ]
+
+    items = []
+    async for j in db.jobs.aggregate(pipeline):
+        j["_id"] = str(j["_id"])
+        if j.get("discovered_at") and hasattr(j["discovered_at"], "isoformat"):
+            j["discovered_at"] = j["discovered_at"].isoformat()
+        if j.get("enriched_at") and hasattr(j["enriched_at"], "isoformat"):
+            j["enriched_at"] = j["enriched_at"].isoformat()
+        if j.get("posted_at") and hasattr(j["posted_at"], "isoformat"):
+            j["posted_at"] = j["posted_at"].isoformat()
+
+        # Extract grade
+        if j.get("company_meta"):
+            j["grade"] = j["company_meta"].get("grade", "Tier-1")
+            j["company_meta"]["_id"] = str(j["company_meta"]["_id"])
+        else:
+            j["grade"] = "Tier-1"
+
+        items.append(j)
+
+    # Distinct companies for filter dropdown
+    distinct_companies = await db.jobs.distinct("company")
+    distinct_companies = sorted([c for c in distinct_companies if c])
+
+    total_all = await db.jobs.count_documents({})
+    remote_all = await db.jobs.count_documents({"is_remote": True})
+    active_all = await db.jobs.count_documents({"is_active": True})
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "companies": distinct_companies,
+        "stats": {
+            "total_jobs": total_all,
+            "remote_jobs": remote_all,
+            "active_jobs": active_all,
+            "companies_count": len(distinct_companies),
+        },
+    }
+
+
+@router.post("/jobs/seed")
+async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
+    """Seed or re-populate MongoDB jobs collection with verified target company listings."""
+    db = get_db()
+    count = await seed_jobs_collection(db, force_overwrite=True)
+    total = await db.jobs.count_documents({})
+    return {
+        "ok": True,
+        "message": f"Successfully seeded {count} verified job postings in MongoDB",
+        "total_jobs": total,
+    }
+
+
+@router.post("/jobs/fetch-live")
+async def admin_fetch_live_jobs(background_tasks: BackgroundTasks, admin_id: str = Depends(require_admin)):
+    """Trigger live ATS job fetching across all active target companies."""
+    fetcher = JobFetcherAgent()
+
+    async def run():
+        try:
+            logger.info("Admin triggered live ATS scraper")
+            res = await fetcher.fetch_and_store_jobs()
+            logger.info("Live ATS scraper completed", count=len(res))
+        except Exception as e:
+            logger.error("Live ATS scraper failed", error=str(e))
+
+    background_tasks.add_task(run)
+    return {"ok": True, "message": "Live job ingestion triggered across active target companies"}
+

@@ -397,8 +397,11 @@ export default function AdminPage() {
               : "text-slate-400 hover:text-white hover:bg-white/5"
           }`}
         >
-          Recent Ingested Jobs
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">{recentJobs.length}</span>
+          <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
+          All Jobs (DB)
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-bold">
+            {String(stats?.active_jobs ?? recentJobs.length)}
+          </span>
         </button>
         <button
           onClick={() => setTab("matches")}
@@ -607,9 +610,25 @@ export default function AdminPage() {
             exit={{ opacity: 0 }}
             className="glass rounded-2xl overflow-hidden"
           >
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h2 className="font-bold text-sm text-white">Recent Ingested Postings</h2>
-              <span className="text-xs text-slate-400">Latest 10 jobs in database</span>
+            <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-sm text-white flex items-center gap-2">
+                  <span>Ingested Job Postings</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+                    {String(stats?.active_jobs ?? recentJobs.length)} In Database
+                  </span>
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Live jobs scraped from target company career boards and stored in MongoDB `db.jobs`
+                </p>
+              </div>
+              <Link
+                href="/admin/jobs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md shadow-purple-600/30 transition-all shrink-0"
+              >
+                <span>Open All Jobs Explorer</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
             <div className="divide-y divide-white/5">

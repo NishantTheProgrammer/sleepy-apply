@@ -52,13 +52,13 @@ export default function Sidebar() {
       })}
 
       {user?.role === "admin" && (
-        <div className="pt-2 mt-2 border-t border-white/5">
+        <div className="pt-2 mt-2 border-t border-white/5 space-y-1">
           <Link
             href="/admin"
             onClick={() => setOpen(false)}
             className={clsx(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-              pathname.startsWith("/admin")
+              "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              pathname === "/admin"
                 ? "bg-purple-500/20 text-purple-200 border border-purple-500/30"
                 : "text-purple-300/70 hover:text-purple-200 hover:bg-purple-500/10"
             )}
@@ -68,6 +68,19 @@ export default function Sidebar() {
             <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 ml-auto border border-purple-500/30">
               Admin
             </span>
+          </Link>
+          <Link
+            href="/admin/jobs"
+            onClick={() => setOpen(false)}
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              pathname.startsWith("/admin/jobs")
+                ? "bg-purple-500/20 text-purple-200 border border-purple-500/30"
+                : "text-purple-300/70 hover:text-purple-200 hover:bg-purple-500/10"
+            )}
+          >
+            <Briefcase className="w-4 h-4 shrink-0 text-purple-400" />
+            All Jobs (DB)
           </Link>
         </div>
       )}

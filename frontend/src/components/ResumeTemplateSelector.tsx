@@ -168,36 +168,6 @@ export default function ResumeTemplateSelector({
   // Template specific theme classes for the live resume paper preview
   const getTemplateTheme = (id: string) => {
     switch (id) {
-      case "default":
-        return {
-          fontFamily: "Calibri, Arial, sans-serif",
-          headerColor: "#1e293b",
-          nameColor: "#0f172a",
-          titleBorder: "1px solid #94a3b8",
-          sectionHeader: "font-sans tracking-normal text-slate-900 uppercase text-xs font-black border-b border-slate-300 pb-1 mb-2",
-          badgeBg: "bg-emerald-50 text-emerald-900 border-emerald-200",
-          paperClass: "bg-white text-slate-800",
-        };
-      case "minimal_executive":
-        return {
-          fontFamily: "Georgia, serif",
-          headerColor: "#0f766e",
-          nameColor: "#0f766e",
-          titleBorder: "1px solid #0f766e",
-          sectionHeader: "font-serif tracking-wide text-teal-800 uppercase text-xs font-bold border-b border-teal-700/30 pb-1 mb-2",
-          badgeBg: "bg-teal-50 text-teal-900 border-teal-200",
-          paperClass: "bg-[#fafaf9] text-stone-800",
-        };
-      case "compact_developer":
-        return {
-          fontFamily: "ui-monospace, monospace",
-          headerColor: "#7c3aed",
-          nameColor: "#7c3aed",
-          titleBorder: "1px solid #7c3aed",
-          sectionHeader: "font-mono tracking-tight text-purple-700 uppercase text-xs font-black border-b border-purple-500/30 pb-1 mb-2 flex items-center gap-1.5",
-          badgeBg: "bg-purple-50 text-purple-900 border-purple-200",
-          paperClass: "bg-slate-50 text-slate-900 text-xs",
-        };
       case "classic_ats":
         return {
           fontFamily: "Times New Roman, serif",
@@ -208,15 +178,15 @@ export default function ResumeTemplateSelector({
           badgeBg: "bg-gray-100 text-gray-900 border-gray-300",
           paperClass: "bg-white text-black",
         };
-      case "modern_tech":
+      case "default":
       default:
         return {
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          headerColor: "#4f46e5",
+          fontFamily: "Calibri, Arial, sans-serif",
+          headerColor: "#1e293b",
           nameColor: "#0f172a",
-          titleBorder: "2px solid #4f46e5",
-          sectionHeader: "font-sans tracking-wider text-indigo-600 uppercase text-xs font-black border-b border-indigo-500/20 pb-1 mb-2.5",
-          badgeBg: "bg-indigo-50 text-indigo-800 border-indigo-200",
+          titleBorder: "1px solid #94a3b8",
+          sectionHeader: "font-sans tracking-normal text-slate-900 uppercase text-xs font-black border-b border-slate-300 pb-1 mb-2",
+          badgeBg: "bg-emerald-50 text-emerald-900 border-emerald-200",
           paperClass: "bg-white text-slate-800",
         };
     }
@@ -266,7 +236,7 @@ export default function ResumeTemplateSelector({
       </div>
 
       {/* Template Card Selection Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-8 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 relative z-10 max-w-3xl">
         {templates.map((tpl) => {
           const isSelected = tpl.id === activeTemplateId;
           const isSaving = savingId === tpl.id;

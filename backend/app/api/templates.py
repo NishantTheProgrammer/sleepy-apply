@@ -50,7 +50,7 @@ async def download_template_docx(template_id: str, request: Request):
 
     valid_ids = {t["id"] for t in TEMPLATE_CATALOG}
     if template_id not in valid_ids:
-        template_id = "modern_tech"
+        template_id = "default"
 
     try:
         stream = render_docx_for_profile(template_id, profile)

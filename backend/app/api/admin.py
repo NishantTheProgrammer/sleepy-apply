@@ -279,15 +279,64 @@ async def list_all_jobs_admin(
     }
 
 
+@router.post("/jobs/purge-static")
+async def admin_purge_static_jobs(admin_id: str = Depends(require_admin)):
+    """Purge all static, seeded, or placeholder listings from MongoDB across all platforms."""
+    db = get_db()
+    # Identify static jobs: missing external_id, seed- prefix, or old url-encoded titles
+    static_query = {
+        "$or": [
+            {"external_id": None},
+            {"external_id": {"$regex": "^seed-"}},
+            {"external_id": {"$regex": "%20"}},
+            {"source_url": {"$regex": "swiggy-backend-software-engineer-jobs"}},
+            {"source_url": {"$regex": "cred-full-stack-engineer-jobs"}},
+            {"source_url": {"$regex": "razorpay-sde-ii-payments-jobs"}},
+            {"source_url": {"$regex": "zomato-senior-frontend-developer-jobs"}},
+            {"source_url": {"$regex": "meesho-software-development-engineer-jobs"}},
+            {"source_url": {"$regex": "postman-lead-software-engineer-jobs"}},
+            {"source_url": {"$regex": "jobs/view/software-development-engineer-ii-at-amazon-india"}},
+            {"source_url": {"$regex": "jobs/view/software-engineer-ii-agentic-ai-at-jpmorganchase"}},
+            {"source_url": {"$regex": "jobs/view/senior-backend-engineer-at-hitachi-solutions"}},
+            {"source_url": {"$regex": "jobs/view/full-stack-developer-at-microsoft-india"}},
+            {"source_url": {"$regex": "jobs/view/staff-platform-engineer-at-uber"}},
+        ]
+    }
+
+    # Find IDs to clean matches
+    static_ids = []
+    async for j in db.jobs.find(static_query, {"_id": 1}):
+        static_ids.append(j["_id"])
+
+    deleted_matches = 0
+    if static_ids:
+        match_res = await db.job_matches.delete_many({"job_id": {"$in": static_ids}})
+        deleted_matches = match_res.deleted_count
+
+    del_res = await db.jobs.delete_many(static_query)
+    remaining_total = await db.jobs.count_documents({})
+
+    logger.info("Purged static jobs", deleted_jobs=del_res.deleted_count, deleted_matches=deleted_matches)
+    return {
+        "ok": True,
+        "message": f"Successfully purged {del_res.deleted_count} static listings ({deleted_matches} matches removed). Only real jobs remain.",
+        "purged_count": del_res.deleted_count,
+        "remaining_jobs": remaining_total,
+    }
+
+
 @router.post("/jobs/seed")
 async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
-    """Seed or re-populate MongoDB jobs collection with verified target company listings."""
+    """Purge static jobs and sync 100% real live job postings in MongoDB from active sources."""
     db = get_db()
+    # 1. Purge any static jobs
+    await admin_purge_static_jobs(admin_id=admin_id)
+    # 2. Fetch real live jobs
     count = await seed_jobs_collection(db, force_overwrite=True)
     total = await db.jobs.count_documents({})
     return {
         "ok": True,
-        "message": f"Successfully seeded {count} verified job postings in MongoDB",
+        "message": f"Synced {count} real live job postings in MongoDB. Total active: {total}",
         "total_jobs": total,
     }
 

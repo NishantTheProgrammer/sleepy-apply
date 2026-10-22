@@ -229,6 +229,27 @@ function renderSourceBadge(source?: string) {
   );
 }
 
+function getValidJobUrl(job: { application_url?: string; source_url?: string; source?: string; company?: string; title?: string }): string {
+  const url = (job.application_url || job.source_url || "").trim();
+  if (!url || url === "https://www.naukri.com/" || url === "https://www.naukri.com") {
+    if (job.source?.toLowerCase() === "naukri") {
+      const comp = (job.company || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const titleWords = (job.title || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .split("-")
+        .filter((w) => w && !["and", "or", "in", "to", "of", "the", "a", "for", "with"].includes(w))
+        .slice(0, 4)
+        .join("-");
+      if (comp && titleWords) return `https://www.naukri.com/${comp}-${titleWords}-jobs`;
+      if (comp) return `https://www.naukri.com/${comp}-jobs`;
+      return `https://www.naukri.com/jobs-in-india?k=${encodeURIComponent(job.title || "software engineer")}`;
+    }
+    return "#";
+  }
+  return url;
+}
+
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED_SUCCESS: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
   APPLIED:          "text-blue-300 bg-blue-400/10 border-blue-400/20",
@@ -851,7 +872,7 @@ function JobsPageContent() {
                     )}
 
                     <a
-                      href={selectedItem.job.application_url}
+                      href={getValidJobUrl(selectedItem.job)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${

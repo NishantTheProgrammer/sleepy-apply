@@ -1,3 +1,4 @@
+import asyncio
 import re
 import urllib.parse
 from datetime import datetime, timezone
@@ -21,54 +22,6 @@ COMMON_TECH_SKILLS = [
     "TailwindCSS", "Elasticsearch", "CI/CD", "Git"
 ]
 
-FALLBACK_LINKEDIN_JOBS = [
-    {
-        "title": "Software Development Engineer II - Cloud Platforms",
-        "company": "Amazon",
-        "location": "Bengaluru, Karnataka, India",
-        "is_remote": False,
-        "url": "https://www.linkedin.com/jobs/view/software-development-engineer-ii-at-amazon-india",
-        "skills": ["Java", "AWS", "Distributed Systems", "Microservices", "Docker"],
-        "description": "Amazon is seeking an experienced Software Development Engineer II to build next-generation distributed cloud services. You will design, implement, and operate highly scalable microservices handling millions of daily customer transactions.",
-    },
-    {
-        "title": "Software Engineer II - Agentic AI & Systems",
-        "company": "JPMorganChase",
-        "location": "Mumbai, Maharashtra, India",
-        "is_remote": True,
-        "url": "https://www.linkedin.com/jobs/view/software-engineer-ii-agentic-ai-at-jpmorganchase",
-        "skills": ["Java", "Spring Boot", "Kafka", "AWS", "Python", "Microservices"],
-        "description": "Join JPMorganChase's Core Engineering & Architecture division to develop resilient transaction platforms and intelligent automated microservices. Work with cutting-edge cloud infrastructure and real-time event streaming systems.",
-    },
-    {
-        "title": "Senior Backend Engineer - Python / FastAPI",
-        "company": "Hitachi Solutions",
-        "location": "Pune, Maharashtra, India",
-        "is_remote": True,
-        "url": "https://www.linkedin.com/jobs/view/senior-backend-engineer-at-hitachi-solutions",
-        "skills": ["Python", "FastAPI", "PostgreSQL", "Docker", "REST APIs"],
-        "description": "Hitachi Solutions India is hiring a Senior Backend Engineer to architect enterprise RESTful APIs, high-throughput database queries, and microservices on cloud-native container platforms.",
-    },
-    {
-        "title": "Full Stack Developer - React & Node.js",
-        "company": "Microsoft",
-        "location": "Hyderabad, Telangana, India",
-        "is_remote": False,
-        "url": "https://www.linkedin.com/jobs/view/full-stack-developer-at-microsoft-india",
-        "skills": ["React", "TypeScript", "Node.js", "Azure", "GraphQL"],
-        "description": "Microsoft India is looking for a versatile Full Stack Developer to build modern collaboration experiences. You will develop responsive user interfaces in React and robust backend microservices powered by Node.js and Azure.",
-    },
-    {
-        "title": "Staff Platform Engineer - Distributed Infrastructure",
-        "company": "Uber",
-        "location": "Bengaluru, Karnataka, India",
-        "is_remote": False,
-        "url": "https://www.linkedin.com/jobs/view/staff-platform-engineer-at-uber",
-        "skills": ["Go", "Kubernetes", "Kafka", "Distributed Systems", "PostgreSQL"],
-        "description": "Uber's Core Infrastructure team in Bengaluru manages the global dispatch and telemetry infrastructure. You will architect high-scale, low-latency microservices with 99.999% uptime guarantees.",
-    },
-]
-
 
 def extract_skills_from_text(text: str) -> list[str]:
     found = []
@@ -84,6 +37,7 @@ class LinkedInJobSource(BaseJobSource):
     source_type: str = "linkedin"
 
     async def fetch_jobs(self, config: dict | None = None) -> list[RawJobData]:
+        """Fetch 100% real live tech jobs from LinkedIn guest API without static fallback."""
         config = config or {}
         keywords_list = config.get("keywords") or [
             "software engineer",
@@ -91,6 +45,8 @@ class LinkedInJobSource(BaseJobSource):
             "full stack developer",
             "frontend engineer",
             "python developer",
+            "cloud engineer",
+            "devops engineer",
         ]
         if isinstance(keywords_list, str):
             keywords_list = [keywords_list]
@@ -173,9 +129,15 @@ class LinkedInJobSource(BaseJobSource):
 
                         if not description or len(description) < 40:
                             description = (
-                                f"**{title}** at **{company}** ({loc_str}).\n\n"
-                                f"Explore this active opening posted on LinkedIn. "
-                                f"View complete qualification requirements and apply directly on LinkedIn."
+                                f"### {title}\n\n"
+                                f"**Company**: {company}\n"
+                                f"**Location**: {loc_str}\n"
+                                f"**Work Arrangement**: {'Remote' if is_remote else 'On-site / Hybrid'}\n\n"
+                                f"#### Overview\n"
+                                f"{company} has posted an active opening for **{title}** in {loc_str}. "
+                                f"This live posting is listed on LinkedIn with Job ID `{jid}`.\n\n"
+                                f"#### Application\n"
+                                f"View qualification requirements and submit your application on LinkedIn using the job link."
                             )
 
                         skills = extract_skills_from_text(f"{title} {description}")
@@ -194,29 +156,12 @@ class LinkedInJobSource(BaseJobSource):
                                 source="linkedin",
                             )
                         )
+
+                    # Polite delay between keyword queries to prevent rate-limiting
+                    await asyncio.sleep(0.5)
+
                 except Exception as e:
                     logger.warning("LinkedIn search iteration failed", error=str(e), kw=kw)
 
-        # If live scraping was restricted or returned few results, backfill with verified listings
-        if len(collected_jobs) < 3:
-            logger.info("Using verified LinkedIn India tech jobs for backfill")
-            for fallback in FALLBACK_LINKEDIN_JOBS:
-                if len(collected_jobs) >= max_jobs:
-                    break
-                collected_jobs.append(
-                    RawJobData(
-                        title=fallback["title"],
-                        company=fallback["company"],
-                        location=fallback["location"],
-                        is_remote=fallback["is_remote"],
-                        source_url=fallback["url"],
-                        application_url=fallback["url"],
-                        description=fallback["description"],
-                        external_id=f"linkedin_{urllib.parse.quote(fallback['title'])}",
-                        required_skills=fallback["skills"],
-                        source="linkedin",
-                    )
-                )
-
-        logger.info("LinkedIn job fetch complete", total=len(collected_jobs))
+        logger.info("LinkedIn real live job fetch complete", total=len(collected_jobs))
         return collected_jobs

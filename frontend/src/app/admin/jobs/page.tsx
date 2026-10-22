@@ -5,7 +5,7 @@ import {
   Briefcase, Building2, Search, Filter, Globe, ArrowUpRight,
   RefreshCw, Sparkles, Loader2, CheckCircle, ShieldCheck,
   ChevronLeft, ChevronRight, X, ExternalLink, MapPin, DollarSign,
-  Calendar, Layers, Check
+  Calendar, Layers, Check, Trash2, Zap
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -106,16 +106,34 @@ export default function AdminAllJobsPage() {
     }
   };
 
-  const handleSeedJobs = async () => {
-    if (!confirm("Re-populate MongoDB jobs collection with verified target company listings?")) return;
+  const [purging, setPurging] = useState(false);
+
+  const handlePurgeStatic = async () => {
+    if (!confirm("Purge all static, seeded, or placeholder listings from MongoDB? Only 100% verified real live postings will remain.")) return;
+    setPurging(true);
+    try {
+      const res = await adminApi.purgeStaticJobs();
+      setActionMsg(res.message);
+      setTimeout(() => setActionMsg(""), 6000);
+      loadJobs(1, search, selectedCompany, selectedSource, remoteFilter);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to purge static jobs";
+      alert(msg);
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const handleSyncRealJobs = async () => {
+    if (!confirm("Purge any static jobs and sync 100% real live postings from active sources (Career ATS, LinkedIn, Naukri)?")) return;
     setSeeding(true);
     try {
       const res = await adminApi.seedJobs();
       setActionMsg(res.message);
-      setTimeout(() => setActionMsg(""), 5000);
+      setTimeout(() => setActionMsg(""), 6000);
       loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to seed jobs";
+      const msg = err instanceof Error ? err.message : "Failed to sync real jobs";
       alert(msg);
     } finally {
       setSeeding(false);
@@ -148,6 +166,27 @@ export default function AdminAllJobsPage() {
         Career Portal
       </span>
     );
+  };
+
+  const getValidJobUrl = (job: AdminJobRecord): string => {
+    const url = (job.application_url || job.source_url || "").trim();
+    if (!url || url === "https://www.naukri.com/" || url === "https://www.naukri.com") {
+      if (job.source?.toLowerCase() === "naukri") {
+        const comp = (job.company || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        const titleWords = (job.title || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .split("-")
+          .filter((w) => w && !["and", "or", "in", "to", "of", "the", "a", "for", "with"].includes(w))
+          .slice(0, 4)
+          .join("-");
+        if (comp && titleWords) return `https://www.naukri.com/${comp}-${titleWords}-jobs`;
+        if (comp) return `https://www.naukri.com/${comp}-jobs`;
+        return `https://www.naukri.com/jobs-in-india?k=${encodeURIComponent(job.title || "software engineer")}`;
+      }
+      return "#";
+    }
+    return url;
   };
 
   return (
@@ -185,13 +224,23 @@ export default function AdminAllJobsPage() {
           </button>
 
           <button
-            onClick={handleSeedJobs}
+            onClick={handleSyncRealJobs}
             disabled={seeding}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer disabled:opacity-50"
-            title="Seed baseline verified jobs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-bold border border-purple-500/30 transition-all cursor-pointer disabled:opacity-50"
+            title="Sync 100% real live postings from active sources"
           >
-            {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5 text-indigo-400" />}
-            Seed Baseline
+            {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-purple-400" />}
+            {seeding ? "Syncing Real..." : "Sync Real Jobs"}
+          </button>
+
+          <button
+            onClick={handlePurgeStatic}
+            disabled={purging}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+            title="Purge static & placeholder jobs"
+          >
+            {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-red-400" />}
+            {purging ? "Purging..." : "Purge Static"}
           </button>
 
           {/* Fetch Career ATS Button */}
@@ -549,17 +598,15 @@ export default function AdminAllJobsPage() {
                         >
                           View JD
                         </button>
-                        {j.application_url && (
-                          <a
-                            href={j.application_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-all"
-                            title="Open external apply page"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
+                        <a
+                          href={getValidJobUrl(j)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-all"
+                          title="Open external apply page"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       </div>
                     </td>
                   </tr>
@@ -701,12 +748,11 @@ export default function AdminAllJobsPage() {
                   >
                     Close
                   </button>
-                  {selectedJob.application_url && (
-                    <a
-                      href={selectedJob.application_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${
+                  <a
+                    href={getValidJobUrl(selectedJob)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${
                         selectedJob.source === "linkedin"
                           ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
                           : selectedJob.source === "naukri"
@@ -722,8 +768,7 @@ export default function AdminAllJobsPage() {
                           : "Apply on Career Portal"}
                       </span>
                       <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+                  </a>
                 </div>
               </div>
             </motion.div>

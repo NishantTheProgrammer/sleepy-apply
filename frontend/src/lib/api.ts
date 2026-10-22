@@ -163,6 +163,8 @@ export const adminApi = {
   },
   seedJobs: () =>
     request<{ ok: boolean; message: string; total_jobs: number }>("/api/admin/jobs/seed", { method: "POST" }),
+  purgeStaticJobs: () =>
+    request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number }>("/api/admin/jobs/purge-static", { method: "POST" }),
   fetchLiveJobs: (source: "all" | "career" | "linkedin" | "naukri" = "all") =>
     request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
 };

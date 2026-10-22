@@ -18,11 +18,6 @@ class JobFetcherAgent:
 
     async def fetch_and_store_jobs(self, custom_urls: list[str] | None = None) -> list[dict]:
         db = get_db()
-
-        # If jobs collection is completely empty, ensure base seed is present
-        if await db.jobs.count_documents({}) == 0:
-            await seed_jobs_collection(db)
-
         all_raw_jobs: list[RawJobData] = []
 
         if custom_urls:

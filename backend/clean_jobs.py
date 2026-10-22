@@ -1,22 +1,16 @@
 import asyncio
 import html
 import re
+import html2text
 from app.db.client import connect_db, get_db
 
-def clean_html(html_str: str) -> str:
-    if not html_str:
-        return ""
-    text = html.unescape(html_str)
-    text = html.unescape(text)
-    text = re.sub(r"</?(h[1-6]|div|p|tr|section|article)[^>]*>", "\n\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<(strong|b)[^>]*>(.*?)</\1>", r"**\2**", text, flags=re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", " ", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n\s*\n+", "\n\n", text)
-    return text.strip()
+h = html2text.HTML2Text()
+h.ignore_links = False
+h.ignore_images = True
+h.body_width = 0
+h.protect_links = True
+h.unicode_snob = True
+h.skip_internal_links = True
 
 async def migrate():
     await connect_db()
@@ -25,11 +19,16 @@ async def migrate():
     count = 0
     async for j in cursor:
         desc = j.get("description", "")
-        if "&lt;" in desc or "<div" in desc or "<p" in desc or "&quot;" in desc or "&#39;" in desc:
-            cleaned = clean_html(desc)
-            await db.jobs.update_one({"_id": j["_id"]}, {"$set": {"description": cleaned}})
-            count += 1
-    print(f"Successfully cleaned {count} job descriptions in MongoDB!")
+        if not desc:
+            continue
+        if "<" in desc or "&" in desc:
+            unescaped = html.unescape(html.unescape(desc))
+            converted = h.handle(unescaped)
+            cleaned = re.sub(r"\n\s*\n\s*\n+", "\n\n", converted).strip()
+            if cleaned and cleaned != desc:
+                await db.jobs.update_one({"_id": j["_id"]}, {"$set": {"description": cleaned}})
+                count += 1
+    print(f"Successfully processed jobs with html2text! Updated {count} jobs.")
 
 if __name__ == "__main__":
     asyncio.run(migrate())

@@ -1,12 +1,21 @@
 import httpx
 import re
 import html
+import html2text
 from typing import Any
 import asyncio
 import structlog
 from app.sources.base import BaseJobSource, RawJobData
 
 logger = structlog.get_logger()
+
+_html2text_converter = html2text.HTML2Text()
+_html2text_converter.ignore_links = False
+_html2text_converter.ignore_images = True
+_html2text_converter.body_width = 0
+_html2text_converter.protect_links = True
+_html2text_converter.unicode_snob = True
+_html2text_converter.skip_internal_links = True
 
 INDIA_LOCATION_REGEX = re.compile(
     r"\b(india|bengaluru|bangalore|hyderabad|pune|mumbai|delhi|gurgaon|gurugram|noida|chennai|kolkata|ahmedabad|kochi|cochin|trivandrum|chandigarh|jaipur|indore)\b",
@@ -185,15 +194,13 @@ class CompanyATSJobSource(BaseJobSource):
             return ""
         text = html.unescape(html_str)
         text = html.unescape(text)
-        text = re.sub(r"</?(h[1-6]|div|p|tr|section|article)[^>]*>", "\n\n", text, flags=re.IGNORECASE)
-        text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
-        text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-        text = re.sub(r"<(strong|b)[^>]*>(.*?)</\1>", r"**\2**", text, flags=re.IGNORECASE)
-        text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"[ \t]+", " ", text)
-        text = re.sub(r"\n\s*\n+", "\n\n", text)
-        return text.strip()
+        try:
+            converted = _html2text_converter.handle(text)
+            return re.sub(r"\n\s*\n\s*\n+", "\n\n", converted).strip()
+        except Exception as e:
+            logger.warning("html2text parsing failed, falling back to basic strip", error=str(e))
+            clean = re.sub(r"<[^>]+>", " ", text)
+            return re.sub(r"\s+", " ", clean).strip()
 
     def _parse_greenhouse_job(self, item: dict, company: str, default_url: str) -> RawJobData:
         loc = item.get("location", {})

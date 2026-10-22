@@ -9,6 +9,7 @@ import {
   Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
 
 export interface TailoredResumeContent {
   job_id?: string;
@@ -119,86 +120,85 @@ function formatLocation(loc: unknown): string {
 
 function renderFormattedText(text: unknown, customBoldClass?: string) {
   if (!text) return null;
-  const str = String(text);
-  const parts = str.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-      return (
-        <strong key={i} className={customBoldClass || "font-bold text-slate-950 font-black"}>
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    return part;
-  });
+  return (
+    <ReactMarkdown
+      components={{
+        strong: ({ children }) => (
+          <strong className={customBoldClass || "font-bold text-slate-950 font-black"}>
+            {children}
+          </strong>
+        ),
+        b: ({ children }) => (
+          <strong className={customBoldClass || "font-bold text-slate-950 font-black"}>
+            {children}
+          </strong>
+        ),
+        p: ({ children }) => <span className="inline">{children}</span>,
+      }}
+    >
+      {String(text)}
+    </ReactMarkdown>
+  );
 }
 
-function formatJobDescription(raw: string | undefined): React.ReactNode {
-  if (!raw) return null;
-
-  let text = String(raw);
-
-  // 1. Unescape HTML entities (handling single and double escaping from scraped sources)
-  text = text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-
-  // 2. Normalize HTML tags to markdown and structured line breaks
-  text = text
-    .replace(/<\/?(h[1-6]|div|p|tr|section|article)[^>]*>/gi, "\n\n")
-    .replace(/<li[^>]*>/gi, "\n• ")
-    .replace(/<\/li>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<(strong|b)[^>]*>(.*?)<\/\1>/gi, "**$2**")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n\s*\n\s*\n+/g, "\n\n")
-    .trim();
-
-  // 3. Render cleanly structured paragraphs and bullet lists
-  const paragraphs = text.split(/\n\s*\n/);
+function MarkdownRenderer({
+  content,
+  className = "",
+  boldClassName = "font-bold text-slate-100",
+}: {
+  content: unknown;
+  className?: string;
+  boldClassName?: string;
+}) {
+  if (!content) return null;
   return (
-    <div className="space-y-3">
-      {paragraphs.map((p, idx) => {
-        const trimmed = p.trim();
-        if (!trimmed) return null;
-        if (trimmed.startsWith("•") || trimmed.includes("\n•")) {
-          const lines = trimmed.split("\n");
-          return (
-            <ul key={idx} className="space-y-1.5 my-1.5">
-              {lines.map((l, li) => {
-                const lineTrim = l.trim();
-                const isBullet = lineTrim.startsWith("•") || lineTrim.startsWith("- ");
-                const content = isBullet ? lineTrim.replace(/^[•\-]\s*/, "") : lineTrim;
-                if (!content) return null;
-                return (
-                  <li key={li} className="flex items-start gap-2 text-slate-300">
-                    <span className="text-indigo-400 font-bold select-none leading-none mt-1">•</span>
-                    <span className="flex-1 leading-relaxed">
-                      {renderFormattedText(content, "font-bold text-slate-100")}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          );
-        }
-        return (
-          <p key={idx} className="leading-relaxed text-slate-300">
-            {renderFormattedText(trimmed, "font-bold text-slate-100")}
-          </p>
-        );
-      })}
+    <div className={`text-xs ${className}`}>
+      <ReactMarkdown
+        components={{
+          strong: ({ children }) => (
+            <strong className={boldClassName}>{children}</strong>
+          ),
+          b: ({ children }) => (
+            <strong className={boldClassName}>{children}</strong>
+          ),
+          p: ({ children }) => (
+            <p className="leading-relaxed mb-3 last:mb-0 text-slate-300">{children}</p>
+          ),
+          h1: ({ children }) => (
+            <h1 className="text-sm font-bold text-white mt-3.5 mb-1.5">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-xs font-bold text-white mt-3 mb-1 uppercase tracking-wider">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-xs font-semibold text-indigo-300 mt-2.5 mb-1">{children}</h3>
+          ),
+          ul: ({ children }) => (
+            <ul className="space-y-1.5 my-2.5 list-none">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="space-y-1.5 my-2.5 list-decimal list-inside text-slate-300">{children}</ol>
+          ),
+          li: ({ children }) => (
+            <li className="flex items-start gap-2 text-slate-300 leading-relaxed">
+              <span className="text-indigo-400 font-bold select-none leading-none mt-1 shrink-0">•</span>
+              <span className="flex-1">{children}</span>
+            </li>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 underline hover:text-indigo-300 transition-colors"
+            >
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {String(content)}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -1008,10 +1008,10 @@ function JobsPageContent() {
 
                     <div
                       className={`text-xs text-slate-300 leading-relaxed overflow-hidden transition-all ${
-                        descExpanded ? "max-h-none" : "max-h-52 relative"
+                        descExpanded ? "max-h-none" : "max-h-56 relative"
                       }`}
                     >
-                      {formatJobDescription(selectedItem.job.description)}
+                      <MarkdownRenderer content={selectedItem.job.description} />
                       {!descExpanded && (
                         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
                       )}

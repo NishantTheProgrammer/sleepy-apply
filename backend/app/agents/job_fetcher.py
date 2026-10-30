@@ -86,6 +86,7 @@ class JobFetcherAgent:
                 linkedin_jobs = await self.linkedin_source.fetch_jobs({
                     "keywords": keywords,
                     "delhi_ncr_only": delhi_ncr_only,
+                    "max_age_days": 14,
                     "limit": 25,
                 })
                 for j in linkedin_jobs:
@@ -97,6 +98,7 @@ class JobFetcherAgent:
                 naukri_jobs = await self.naukri_source.fetch_jobs({
                     "keyword": (keywords[0] if keywords else "software-engineer"),
                     "delhi_ncr_only": delhi_ncr_only,
+                    "max_age_days": 14,
                     "limit": 25,
                 })
                 for j in naukri_jobs:
@@ -108,6 +110,7 @@ class JobFetcherAgent:
                 indeed_jobs = await self.indeed_source.fetch_jobs({
                     "keywords": keywords,
                     "delhi_ncr_only": delhi_ncr_only,
+                    "max_age_days": 14,
                     "limit": 25,
                 })
                 for j in indeed_jobs:
@@ -164,6 +167,8 @@ class JobFetcherAgent:
                 "application_url": norm["application_url"],
                 "hr_contact": {},
                 "required_skills": norm["required_skills"],
+                "posted_at": norm.get("posted_at") or raw.posted_at or now,
+                "posted_at_raw": norm.get("posted_at_raw") or raw.posted_at_raw,
                 "is_active": True,
                 "enriched": True,
                 "discovered_at": now,

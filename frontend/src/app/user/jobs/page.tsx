@@ -93,6 +93,8 @@ interface JobItem {
     grade?: string;
     employment_type?: string;
     discovered_at?: string;
+    posted_at?: string;
+    posted_at_raw?: string;
   };
   application?: {
     _id?: string;

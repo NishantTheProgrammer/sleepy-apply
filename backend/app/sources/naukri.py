@@ -53,8 +53,8 @@ DELHI_NCR_CITIES = {
 SITEMAP_CITIES = ["Delhi", "Noida", "Bangalore", "Hyderabad", "Pune", "Chennai"]
 
 
-def parse_naukri_url(url: str) -> RawJobData | None:
-    """Parse real canonical Naukri URL from official sitemaps into a clean RawJobData record."""
+def parse_naukri_url(url: str, posted_at: datetime | None = None, posted_raw: str | None = None) -> RawJobData | None:
+    """Parse real canonical Naukri URL from official sitemaps into a clean RawJobData record with posting date."""
     m = re.match(r"^https://www\.naukri\.com/job-listings-(.+)-(\d{8,16})$", url)
     if not m:
         return None
@@ -198,6 +198,8 @@ def parse_naukri_url(url: str) -> RawJobData | None:
         application_url=url,
         description=desc,
         external_id=f"naukri_{job_id}",
+        posted_at_raw=posted_raw or (posted_at.strftime("%Y-%m-%d") if posted_at else None),
+        posted_at=posted_at or datetime.now(timezone.utc),
         required_skills=skills[:8],
         source="naukri",
     )
@@ -207,13 +209,15 @@ class NaukriJobSource(BaseJobSource):
     source_type: str = "naukri"
 
     async def fetch_jobs(self, config: dict | None = None) -> list[RawJobData]:
-        """Fetch 100% real live tech jobs from Naukri's official daily XML sitemaps without static fallback."""
+        """Fetch 100% real live tech jobs from Naukri's official daily XML sitemaps, strictly filtering out stale entries."""
         config = config or {}
         max_jobs = int(config.get("limit", 25))
+        max_age_days = int(config.get("max_age_days", 14))
         keyword = (config.get("keyword") or "").lower().strip()
         delhi_ncr_only = config.get("delhi_ncr_only", False)
 
         cities_to_scan = ["Delhi", "Noida"] if delhi_ncr_only else SITEMAP_CITIES
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -236,13 +240,31 @@ class NaukriJobSource(BaseJobSource):
                         logger.warning("Naukri sitemap request non-200", city=city, status=res.status_code)
                         continue
 
-                    urls = re.findall(r"<loc>(https://www\.naukri\.com/job-listings-[^<]+)</loc>", res.text)
-                    for u in urls:
+                    # Parse URL blocks with lastmod tags
+                    url_blocks = re.findall(
+                        r"<url>\s*<loc>(https://www\.naukri\.com/job-listings-[^<]+)</loc>(?:\s*<lastmod>([^<]+)</lastmod>)?",
+                        res.text,
+                    )
+
+                    # Fallback to simple loc regex if sitemap doesn't use url blocks
+                    if not url_blocks:
+                        simple_urls = re.findall(r"<loc>(https://www\.naukri\.com/job-listings-[^<]+)</loc>", res.text)
+                        url_blocks = [(u, "") for u in simple_urls]
+
+                    for u, lastmod_str in url_blocks:
                         if len(collected_jobs) >= max_jobs:
                             break
 
+                        posted_at: datetime | None = None
+                        if lastmod_str:
+                            try:
+                                posted_at = datetime.fromisoformat(lastmod_str.strip()).replace(tzinfo=timezone.utc)
+                                if posted_at < cutoff_date:
+                                    continue
+                            except Exception:
+                                pass
+
                         u_lower = u.lower()
-                        # Match user keyword if supplied, or standard tech keywords
                         if keyword:
                             if keyword not in u_lower:
                                 continue
@@ -253,7 +275,7 @@ class NaukriJobSource(BaseJobSource):
                         if delhi_ncr_only and not any(nc in u_lower for nc in DELHI_NCR_CITIES):
                             continue
 
-                        parsed = parse_naukri_url(u)
+                        parsed = parse_naukri_url(u, posted_at=posted_at, posted_raw=lastmod_str)
                         if not parsed or parsed.external_id in seen_ids:
                             continue
 

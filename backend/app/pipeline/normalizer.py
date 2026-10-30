@@ -178,4 +178,6 @@ class DelhiNCRJobNormalizer:
             "source_url": raw.source_url,
             "application_url": raw.application_url or raw.source_url,
             "external_id": raw.external_id,
+            "posted_at": getattr(raw, "posted_at", None),
+            "posted_at_raw": getattr(raw, "posted_at_raw", None),
         }

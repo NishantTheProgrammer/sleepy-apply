@@ -2,6 +2,8 @@ import asyncio
 import re
 import urllib.parse
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+import email.utils
 import httpx
 import html2text
 import structlog
@@ -59,6 +61,8 @@ class IndeedJobSource(BaseJobSource):
             locations = [loc_cfg] if isinstance(loc_cfg, str) else loc_cfg
 
         max_jobs = int(config.get("limit", 25))
+        max_age_days = int(config.get("max_age_days", 14))
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -101,6 +105,21 @@ class IndeedJobSource(BaseJobSource):
                             desc_el = item.find("description")
                             source_el = item.find("source")
                             guid_el = item.find("guid")
+                            pubdate_el = item.find("pubDate")
+
+                            # Parse posting date
+                            posted_at = None
+                            posted_raw = None
+                            if pubdate_el is not None and pubdate_el.text:
+                                posted_raw = pubdate_el.text.strip()
+                                try:
+                                    posted_at = email.utils.parsedate_to_datetime(posted_raw)
+                                    if posted_at.tzinfo is None:
+                                        posted_at = posted_at.replace(tzinfo=timezone.utc)
+                                    if posted_at < cutoff_date:
+                                        continue
+                                except Exception:
+                                    pass
 
                             title = title_el.text.strip() if title_el is not None and title_el.text else "Software Engineer"
                             link = link_el.text.strip() if link_el is not None and link_el.text else ""
@@ -146,6 +165,8 @@ class IndeedJobSource(BaseJobSource):
                                     application_url=link,
                                     description=clean_desc[:5000],
                                     external_id=ext_id,
+                                    posted_at_raw=posted_raw,
+                                    posted_at=posted_at or datetime.now(timezone.utc),
                                     required_skills=skills,
                                     source="indeed",
                                 )

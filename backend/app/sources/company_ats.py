@@ -2,6 +2,7 @@ import httpx
 import re
 import html
 import html2text
+from datetime import datetime, timezone
 from typing import Any
 import asyncio
 import structlog
@@ -337,6 +338,13 @@ class CompanyATSJobSource(BaseJobSource):
         content = self._clean_html(item.get("content", ""))
         is_remote = bool("remote" in raw_loc.lower() or "remote" in content[:300].lower())
         std_loc = standardize_india_location(company, raw_loc, is_remote)
+        updated_str = item.get("updated_at") or item.get("first_published")
+        posted_at = None
+        if updated_str:
+            try:
+                posted_at = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+            except Exception:
+                pass
 
         return RawJobData(
             title=str(item.get("title", "Software Engineer")).strip(),
@@ -349,6 +357,8 @@ class CompanyATSJobSource(BaseJobSource):
             employment_type="full-time",
             application_url=item.get("absolute_url") or default_url,
             external_id=str(item.get("id")) if item.get("id") else None,
+            posted_at=posted_at or datetime.now(timezone.utc),
+            posted_at_raw=updated_str,
         )
 
     def _parse_lever_job(self, item: dict, company: str, default_url: str) -> RawJobData:
@@ -357,6 +367,13 @@ class CompanyATSJobSource(BaseJobSource):
         desc = self._clean_html(item.get("descriptionPlain") or item.get("description", ""))
         is_remote = bool(cats.get("commitment") == "Remote" or "remote" in raw_loc.lower() or "remote" in desc[:300].lower())
         std_loc = standardize_india_location(company, raw_loc, is_remote)
+        created_ms = item.get("createdAt")
+        posted_at = None
+        if created_ms:
+            try:
+                posted_at = datetime.fromtimestamp(created_ms / 1000, tz=timezone.utc)
+            except Exception:
+                pass
 
         return RawJobData(
             title=str(item.get("text", "Software Engineer")).strip(),
@@ -369,6 +386,8 @@ class CompanyATSJobSource(BaseJobSource):
             employment_type=str(cats.get("commitment", "full-time")).lower() if isinstance(cats, dict) else "full-time",
             application_url=item.get("applyUrl") or item.get("hostedUrl") or default_url,
             external_id=str(item.get("id")) if item.get("id") else None,
+            posted_at=posted_at or datetime.now(timezone.utc),
+            posted_at_raw=str(posted_at.date()) if posted_at else None,
         )
 
     def _parse_ashby_job(self, item: dict, company: str, default_url: str) -> RawJobData:
@@ -376,6 +395,13 @@ class CompanyATSJobSource(BaseJobSource):
         desc = self._clean_html(item.get("descriptionHtml") or item.get("descriptionPlain", ""))
         is_remote = bool(item.get("isRemote", False) or "remote" in raw_loc.lower())
         std_loc = standardize_india_location(company, raw_loc, is_remote)
+        published_str = item.get("publishedAt") or item.get("updatedAt")
+        posted_at = None
+        if published_str:
+            try:
+                posted_at = datetime.fromisoformat(published_str.replace("Z", "+00:00"))
+            except Exception:
+                pass
 
         return RawJobData(
             title=str(item.get("title", "Software Engineer")).strip(),
@@ -388,6 +414,8 @@ class CompanyATSJobSource(BaseJobSource):
             employment_type=str(item.get("employmentType", "full-time")).lower(),
             application_url=item.get("jobUrl") or default_url,
             external_id=str(item.get("id")) if item.get("id") else None,
+            posted_at=posted_at or datetime.now(timezone.utc),
+            posted_at_raw=published_str,
         )
 
     def _parse_smartrecruiters_job(self, item: dict, company: str, board_token: str, default_url: str) -> RawJobData:
@@ -400,6 +428,13 @@ class CompanyATSJobSource(BaseJobSource):
         job_id = str(item.get("id", ""))
         app_url = f"https://jobs.smartrecruiters.com/{board_token}/{job_id}" if job_id else default_url
         emp_type = item.get("typeOfEmployment", {}).get("label", "full-time").lower() if isinstance(item.get("typeOfEmployment"), dict) else "full-time"
+        released_str = item.get("releasedDate")
+        posted_at = None
+        if released_str:
+            try:
+                posted_at = datetime.fromisoformat(released_str.replace("Z", "+00:00"))
+            except Exception:
+                pass
 
         desc = (
             f"### {item.get('name', 'Software Engineer')}\n\n"
@@ -420,6 +455,8 @@ class CompanyATSJobSource(BaseJobSource):
             employment_type=emp_type if emp_type in ["full-time", "part-time", "contract", "internship"] else "full-time",
             application_url=app_url,
             external_id=f"sr_{job_id}" if job_id else None,
+            posted_at=posted_at or datetime.now(timezone.utc),
+            posted_at_raw=released_str,
         )
 
     def _parse_workday_job(self, item: dict, company: str, tenant: str, site: str, default_url: str) -> RawJobData:

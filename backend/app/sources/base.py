@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pydantic import BaseModel, Field
 import hashlib
 
@@ -15,6 +16,7 @@ class RawJobData(BaseModel):
     external_id: str | None = None
     company_website: str | None = None
     posted_at_raw: str | None = None
+    posted_at: datetime | None = None
     required_skills: list[str] = Field(default_factory=list)
     source: str = "career"
 

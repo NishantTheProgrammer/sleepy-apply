@@ -188,6 +188,8 @@ export interface AdminJobRecord {
   is_active?: boolean;
   enriched?: boolean;
   discovered_at?: string;
+  posted_at?: string;
+  posted_at_raw?: string;
   company_meta?: TargetCompany;
 }
 

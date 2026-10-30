@@ -95,13 +95,21 @@ export default function AdminAllJobsPage() {
     setFetchingSource(src);
     try {
       const res = await adminApi.fetchLiveJobs(src);
-      setActionMsg(res.message);
-      setTimeout(() => setActionMsg(""), 6000);
-      setTimeout(() => loadJobs(page, search, selectedCompany, selectedSource, remoteFilter), 3000);
+      setActionMsg(res.message || "Live fetch initiated in background. Refreshing listings...");
+      // Poll multiple times as background jobs finish and save to MongoDB
+      let pollCount = 0;
+      const interval = setInterval(() => {
+        pollCount++;
+        loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
+        if (pollCount >= 5) {
+          clearInterval(interval);
+          setFetchingSource(null);
+        }
+      }, 3500);
+      setTimeout(() => setActionMsg(""), 12000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to trigger live fetch";
       alert(msg);
-    } finally {
       setFetchingSource(null);
     }
   };
@@ -393,17 +401,16 @@ export default function AdminAllJobsPage() {
                 setSelectedSource(s.id);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                selectedSource === s.id
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${selectedSource === s.id
                   ? s.id === "linkedin"
                     ? "bg-sky-600 text-white shadow-sm"
                     : s.id === "naukri"
-                    ? "bg-amber-600 text-white shadow-sm"
-                    : s.id === "career"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-purple-600 text-white shadow-sm"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : s.id === "career"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-purple-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               {s.label}
             </button>
@@ -439,11 +446,10 @@ export default function AdminAllJobsPage() {
                   setRemoteFilter(r.id);
                   setPage(1);
                 }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  remoteFilter === r.id
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${remoteFilter === r.id
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-slate-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {r.label}
               </button>
@@ -537,13 +543,12 @@ export default function AdminAllJobsPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-white">{j.company}</span>
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            j.grade === "Tier-1"
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${j.grade === "Tier-1"
                               ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                               : j.grade === "Tier-2"
-                              ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
-                              : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                          }`}
+                                ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                                : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                            }`}
                         >
                           {j.grade || "Tier-1"}
                         </span>
@@ -763,22 +768,21 @@ export default function AdminAllJobsPage() {
                     href={getValidJobUrl(selectedJob)}
                     target="_blank"
                     rel="noreferrer"
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${
-                        selectedJob.source === "linkedin"
-                          ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
-                          : selectedJob.source === "naukri"
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${selectedJob.source === "linkedin"
+                        ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
+                        : selectedJob.source === "naukri"
                           ? "bg-amber-600 hover:bg-amber-500 shadow-amber-600/30"
                           : "bg-purple-600 hover:bg-purple-500 shadow-purple-600/30"
                       }`}
-                    >
-                      <span>
-                        {selectedJob.source === "linkedin"
-                          ? "Apply on LinkedIn"
-                          : selectedJob.source === "naukri"
+                  >
+                    <span>
+                      {selectedJob.source === "linkedin"
+                        ? "Apply on LinkedIn"
+                        : selectedJob.source === "naukri"
                           ? "Apply on Naukri"
                           : "Apply on Career Portal"}
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                    </span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>

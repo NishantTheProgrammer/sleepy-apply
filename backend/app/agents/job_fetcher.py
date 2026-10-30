@@ -37,96 +37,114 @@ class JobFetcherAgent:
         source_clean = (source or "all").lower().strip()
 
         if custom_urls:
-            jobs = await self.static_source.fetch_jobs({"urls": custom_urls})
-            all_raw_jobs.extend(jobs)
+            try:
+                jobs = await self.static_source.fetch_jobs({"urls": custom_urls})
+                all_raw_jobs.extend(jobs)
+            except Exception as e:
+                logger.error("Static URL fetch error", error=str(e))
         else:
             # 1. Career Portals / Target ATS (Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Darwinbox, Keka)
             if source_clean in ["career", "all"]:
-                active_companies = []
-                custom_companies = []
-                cursor = db.companies.find({"is_active": True})
-                async for doc in cursor:
-                    comp_info = {
-                        "name": doc["name"],
-                        "ats_type": doc.get("ats_type", "custom"),
-                        "board_token": doc.get("board_token"),
-                        "career_page": doc.get("career_page", ""),
-                    }
-                    if comp_info["ats_type"] == "custom" and comp_info["career_page"]:
-                        custom_companies.append(comp_info)
-                    else:
-                        active_companies.append(comp_info)
+                try:
+                    active_companies = []
+                    custom_companies = []
+                    cursor = db.companies.find({"is_active": True})
+                    async for doc in cursor:
+                        comp_info = {
+                            "name": doc["name"],
+                            "ats_type": doc.get("ats_type", "custom"),
+                            "board_token": doc.get("board_token"),
+                            "career_page": doc.get("career_page", ""),
+                        }
+                        if comp_info["ats_type"] == "custom" and comp_info["career_page"]:
+                            custom_companies.append(comp_info)
+                        else:
+                            active_companies.append(comp_info)
 
-                if active_companies:
-                    ats_jobs = await self.ats_source.fetch_jobs({
-                        "companies": active_companies,
-                        "limit_per_company": 15,
-                        "delhi_ncr_only": delhi_ncr_only,
-                    })
-                    for j in ats_jobs:
-                        j.source = "career"
-                    all_raw_jobs.extend(ats_jobs)
-
-                # Fallback to Playwright crawler for custom / SPA career portals
-                if custom_companies:
-                    try:
-                        pw_jobs = await self.playwright_crawler.fetch_jobs({
-                            "companies": custom_companies[:5],  # polite batch limit for headless browsing
+                    if active_companies:
+                        ats_jobs = await self.ats_source.fetch_jobs({
+                            "companies": active_companies,
+                            "limit_per_company": 15,
                             "delhi_ncr_only": delhi_ncr_only,
-                            "limit_per_company": 10,
                         })
-                        for j in pw_jobs:
+                        for j in ats_jobs:
                             j.source = "career"
-                        all_raw_jobs.extend(pw_jobs)
-                    except Exception as e:
-                        logger.warning("Playwright custom crawler execution error", error=str(e))
+                        all_raw_jobs.extend(ats_jobs)
+
+                    # Fallback to Playwright crawler for custom / SPA career portals
+                    if custom_companies:
+                        try:
+                            pw_jobs = await self.playwright_crawler.fetch_jobs({
+                                "companies": custom_companies[:5],  # polite batch limit for headless browsing
+                                "delhi_ncr_only": delhi_ncr_only,
+                                "limit_per_company": 10,
+                            })
+                            for j in pw_jobs:
+                                j.source = "career"
+                            all_raw_jobs.extend(pw_jobs)
+                        except Exception as e:
+                            logger.warning("Playwright custom crawler execution error", error=str(e))
+                except Exception as e:
+                    logger.error("Career ATS source error", error=str(e))
 
             # 2. LinkedIn Job Fetcher (Targeting Delhi NCR tech hubs)
             if source_clean in ["linkedin", "all"]:
-                linkedin_jobs = await self.linkedin_source.fetch_jobs({
-                    "keywords": keywords,
-                    "delhi_ncr_only": delhi_ncr_only,
-                    "max_age_days": 14,
-                    "limit": 25,
-                })
-                for j in linkedin_jobs:
-                    j.source = "linkedin"
-                all_raw_jobs.extend(linkedin_jobs)
+                try:
+                    linkedin_jobs = await self.linkedin_source.fetch_jobs({
+                        "keywords": keywords,
+                        "delhi_ncr_only": delhi_ncr_only,
+                        "max_age_days": 14,
+                        "limit": 25,
+                    })
+                    for j in linkedin_jobs:
+                        j.source = "linkedin"
+                    all_raw_jobs.extend(linkedin_jobs)
+                except Exception as e:
+                    logger.error("LinkedIn source error", error=str(e))
 
             # 3. Naukri Job Fetcher (Delhi & Noida XML Sitemaps)
             if source_clean in ["naukri", "all"]:
-                naukri_jobs = await self.naukri_source.fetch_jobs({
-                    "keyword": (keywords[0] if keywords else "software-engineer"),
-                    "delhi_ncr_only": delhi_ncr_only,
-                    "max_age_days": 14,
-                    "limit": 25,
-                })
-                for j in naukri_jobs:
-                    j.source = "naukri"
-                all_raw_jobs.extend(naukri_jobs)
+                try:
+                    naukri_jobs = await self.naukri_source.fetch_jobs({
+                        "keyword": (keywords[0] if keywords else "software-engineer"),
+                        "delhi_ncr_only": delhi_ncr_only,
+                        "max_age_days": 14,
+                        "limit": 25,
+                    })
+                    for j in naukri_jobs:
+                        j.source = "naukri"
+                    all_raw_jobs.extend(naukri_jobs)
+                except Exception as e:
+                    logger.error("Naukri source error", error=str(e))
 
             # 4. Indeed Job Fetcher (Delhi NCR RSS)
             if source_clean in ["indeed", "all"]:
-                indeed_jobs = await self.indeed_source.fetch_jobs({
-                    "keywords": keywords,
-                    "delhi_ncr_only": delhi_ncr_only,
-                    "max_age_days": 14,
-                    "limit": 25,
-                })
-                for j in indeed_jobs:
-                    j.source = "indeed"
-                all_raw_jobs.extend(indeed_jobs)
+                try:
+                    indeed_jobs = await self.indeed_source.fetch_jobs({
+                        "keywords": keywords,
+                        "delhi_ncr_only": delhi_ncr_only,
+                        "max_age_days": 14,
+                        "limit": 25,
+                    })
+                    for j in indeed_jobs:
+                        j.source = "indeed"
+                    all_raw_jobs.extend(indeed_jobs)
+                except Exception as e:
+                    logger.error("Indeed source error", error=str(e))
 
             # 5. Check DB for custom job sources if configured
             if source_clean == "all":
-                cursor_sources = db.job_sources.find({"is_active": True})
-                async for doc in cursor_sources:
-                    s_type = doc.get("type", "static_urls")
-                    if s_type == "static_urls":
-                        jobs = await self.static_source.fetch_jobs(doc.get("config", {}))
-                        for j in jobs:
-                            j.source = "career"
-                        all_raw_jobs.extend(jobs)
+                try:
+                    cursor_sources = db.job_sources.find({"is_active": True})
+                    async for doc in cursor_sources:
+                        s_type = doc.get("type", "static_urls")
+                        if s_type == "static_urls":
+                            jobs = await self.static_source.fetch_jobs(doc.get("config", {}))
+                            for j in jobs:
+                                j.source = "career"
+                            all_raw_jobs.extend(jobs)
+                except Exception as e:
+                    logger.error("Custom DB sources error", error=str(e))
 
         new_jobs = []
         now = datetime.now(timezone.utc)

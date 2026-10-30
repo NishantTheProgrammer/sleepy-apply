@@ -1,7 +1,7 @@
 import asyncio
 import re
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import httpx
 import html2text
 import structlog
@@ -25,7 +25,8 @@ COMMON_TECH_SKILLS = [
 TECH_KEYWORDS = [
     "software-engineer", "software-developer", "backend", "frontend", "full-stack", "fullstack",
     "python", "java", "react", "node", "golang", "devops", "cloud", "data-engineer",
-    "machine-learning", "ai-engineer", "qa-engineer", "sre", "architect", "developer", "engineer"
+    "machine-learning", "ai-engineer", "qa-engineer", "sre", "platform-engineer", "systems-engineer",
+    "developer", "architect"
 ]
 
 ROLE_TERMS = [

@@ -17,13 +17,19 @@ class OllamaProvider(BaseAIProvider):
         self.model = model
 
     def _candidate_urls(self) -> list[str]:
-        candidates = [self.base_url]
-        if "localhost" in self.base_url:
+        candidates = []
+        if "host.docker.internal" in self.base_url:
+            # On native host environments (macOS/Linux), localhost is reachable directly
+            candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
+            candidates.append(self.base_url)
+        elif "localhost" in self.base_url:
+            candidates.append(self.base_url)
             candidates.append(self.base_url.replace("localhost", "host.docker.internal"))
         elif "127.0.0.1" in self.base_url:
+            candidates.append(self.base_url)
             candidates.append(self.base_url.replace("127.0.0.1", "host.docker.internal"))
-        elif "host.docker.internal" in self.base_url:
-            candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
+        else:
+            candidates.append(self.base_url)
         return candidates
 
     async def complete(self, messages: list[dict], **kwargs) -> str:

@@ -275,7 +275,7 @@ function JobsPageContent() {
   // Filters & Selected Job
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "high" | "remote" | "bengaluru">("all");
+  const [filterTab, setFilterTab] = useState<"all" | "delhi_ncr" | "high" | "remote" | "bengaluru">("all");
   const [sourceFilter, setSourceFilter] = useState<"all" | "career" | "linkedin" | "naukri">("all");
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -320,8 +320,10 @@ function JobsPageContent() {
     try {
       const res = await jobsApi.fetchNow();
       setDiscoverMsg(res.message || "Discovery started! Matching jobs to your profile…");
-      setTimeout(() => load(1), 3000);
-      setTimeout(() => load(1), 7000);
+      // Instant load for existing synced repository jobs
+      await load(1);
+      setTimeout(() => load(1), 2000);
+      setTimeout(() => load(1), 6000);
       setTimeout(() => {
         load(1);
         setDiscovering(false);
@@ -442,6 +444,11 @@ function JobsPageContent() {
       if (filterTab === "high") {
         return item.compatibility_score >= 75;
       }
+      if (filterTab === "delhi_ncr") {
+        const hub = ((item.job as Record<string, unknown>).delhi_ncr_hub as string || "").toLowerCase();
+        const isNCR = Boolean((item.job as Record<string, unknown>).is_delhi_ncr);
+        return isNCR || !!hub || ["delhi", "gurugram", "gurgaon", "noida", "faridabad", "ghaziabad", "ncr"].some((h) => jobLoc.includes(h));
+      }
       if (filterTab === "remote") {
         return item.job.is_remote || jobLoc.includes("remote");
       }
@@ -475,9 +482,9 @@ function JobsPageContent() {
               {total} Verified Indian Positions
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs (India)</h1>
+          <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs</h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-            Active tech openings across Bengaluru, Hyderabad, Pune, Gurugram, Mumbai, and Remote (India).
+            Active tech openings across Gurugram, Noida, Delhi NCR, Remote (India), and tech hubs.
           </p>
         </div>
 
@@ -551,7 +558,7 @@ function JobsPageContent() {
           </div>
 
           {/* Location & Match Pills */}
-          <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
+          <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap gap-1">
             <button
               onClick={() => setFilterTab("all")}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -561,6 +568,16 @@ function JobsPageContent() {
               }`}
             >
               All India
+            </button>
+            <button
+              onClick={() => setFilterTab("delhi_ncr")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                filterTab === "delhi_ncr"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Delhi NCR
             </button>
             <button
               onClick={() => setFilterTab("bengaluru")}
@@ -586,7 +603,7 @@ function JobsPageContent() {
               onClick={() => setFilterTab("high")}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 filterTab === "high"
-                  ? "bg-emerald-600 text-white shadow-sm"
+                  ? "bg-amber-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >

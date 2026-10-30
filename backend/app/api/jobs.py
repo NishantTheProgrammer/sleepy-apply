@@ -13,6 +13,20 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
     """Trigger job discovery and matching pipeline for current user."""
     user_id = get_current_user_id(request)
     from app.graphs.job_pipeline_graph import job_pipeline
+    from app.agents.job_matcher import JobMatcherAgent
+    from app.models.settings import UserSettings
+
+    # Fast-match all existing jobs in the repository for immediate UI response
+    try:
+        db = get_db()
+        matcher = JobMatcherAgent()
+        settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+        user_settings = UserSettings(**settings_doc) if settings_doc else None
+        cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
+        async for j in cursor:
+            await matcher.match_user_and_job(user_id, str(j["_id"]), user_settings=user_settings, use_ai_reasoning=False)
+    except Exception as e:
+        logger.warning("Fast job matching failed", error=str(e), user_id=user_id)
 
     async def run_pipeline():
         try:
@@ -22,7 +36,7 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
             logger.error("On-demand job pipeline failed", user_id=user_id, error=str(e))
 
     background_tasks.add_task(run_pipeline)
-    return {"ok": True, "message": "Job discovery and matching started in background"}
+    return {"ok": True, "message": "Jobs matched and discovery running in background"}
 
 
 @router.get("")

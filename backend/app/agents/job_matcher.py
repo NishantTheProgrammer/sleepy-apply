@@ -50,6 +50,7 @@ class JobMatcherAgent:
         user_id: str,
         job_id: str,
         user_settings: UserSettings | None = None,
+        use_ai_reasoning: bool = False,
     ) -> dict | None:
         db = get_db()
         profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
@@ -138,8 +139,13 @@ class JobMatcherAgent:
 
             prefs = profile.get("job_preferences") or profile.get("jobPreferences") or {}
             rem_pref = prefs.get("remote_preference") or prefs.get("remotePreference") or "any"
-            pref_locs = [l.lower() for l in (prefs.get("preferred_locations") or prefs.get("locations") or [])]
-            user_loc = (profile.get("personal", {}).get("location") or "").lower()
+            pref_locs = [str(l).lower() for l in (prefs.get("preferred_locations") or prefs.get("locations") or []) if l]
+            raw_loc = profile.get("personal", {}).get("location")
+            user_loc = ""
+            if isinstance(raw_loc, str):
+                user_loc = raw_loc.lower()
+            elif isinstance(raw_loc, dict):
+                user_loc = " ".join(str(v).lower() for v in raw_loc.values() if v)
 
             is_remote_job = job.get("is_remote") or job.get("work_model") == "Remote"
             is_ncr = job.get("is_delhi_ncr", False) or any(h in location.lower() for h in ["gurgaon", "gurugram", "noida", "delhi", "faridabad", "ghaziabad"])
@@ -169,7 +175,7 @@ class JobMatcherAgent:
 
         # 6. AI Match Reasoning
         reasoning = default_reason
-        if user_settings:
+        if use_ai_reasoning and user_settings:
             try:
                 # For high-throughput scoring speed with Ollama, prefer fast 3B model
                 scoring_settings = user_settings

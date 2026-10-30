@@ -78,9 +78,9 @@ async def match_jobs_node(state: JobPipelineState) -> JobPipelineState:
         threshold = int(getattr(app_prefs, "auto_apply_threshold", getattr(app_prefs, "min_compatibility_score", 60)) if app_prefs else 60)
 
         # Find active jobs to match
-        job_cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(50)
+        job_cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
         async for j in job_cursor:
-            m = await matcher.match_user_and_job(uid, str(j["_id"]), user_settings=user_settings)
+            m = await matcher.match_user_and_job(uid, str(j["_id"]), user_settings=user_settings, use_ai_reasoning=False)
             if m and m.get("compatibility_score", 0) >= threshold:
                 matches.append(m)
 

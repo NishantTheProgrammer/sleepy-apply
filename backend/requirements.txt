@@ -44,3 +44,4 @@ python-dotenv>=1.0.0
 tenacity>=9.0.0
 structlog>=24.4.0
 html2text>=2024.2.26
+playwright>=1.49.0

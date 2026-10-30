@@ -138,10 +138,28 @@ class JobMatcherAgent:
 
             prefs = profile.get("job_preferences") or profile.get("jobPreferences") or {}
             rem_pref = prefs.get("remote_preference") or prefs.get("remotePreference") or "any"
-            location_score = 18 if (job.get("is_remote") or rem_pref in ["remote", "any", "open"]) else 14
+            pref_locs = [l.lower() for l in (prefs.get("preferred_locations") or prefs.get("locations") or [])]
+            user_loc = (profile.get("personal", {}).get("location") or "").lower()
+
+            is_remote_job = job.get("is_remote") or job.get("work_model") == "Remote"
+            is_ncr = job.get("is_delhi_ncr", False) or any(h in location.lower() for h in ["gurgaon", "gurugram", "noida", "delhi", "faridabad", "ghaziabad"])
+
+            # Location & Commute Scoring for Delhi NCR
+            if is_remote_job or rem_pref in ["remote", "any", "open"]:
+                location_score = 20
+            elif is_ncr:
+                hub = job.get("delhi_ncr_hub", "").lower()
+                if any(h in user_loc for h in [hub, "delhi", "ncr", "gurugram", "noida"]) or any(h in " ".join(pref_locs) for h in [hub, "delhi", "ncr"]):
+                    location_score = 20
+                else:
+                    location_score = 18
+            else:
+                location_score = 14
+
             total_score = min(98, max(45, skills_score + title_score + location_score))
             matched_str = ", ".join(matching_skills[:3]) if matching_skills else "software engineering fundamentals"
-            default_reason = f"Strong alignment with your profile. Matched core capabilities: {matched_str}."
+            loc_label = f" ({job.get('delhi_ncr_hub', 'Delhi NCR')})" if is_ncr else ""
+            default_reason = f"Strong alignment with your profile for this {job.get('title')}{loc_label} position. Matched core capabilities: {matched_str}."
         else:
             title_score = 15
             skills_score = min(35, 12 + (len(matching_skills) * 5))

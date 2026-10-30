@@ -41,11 +41,16 @@ ROLE_TERMS = [
 ]
 
 KNOWN_CITIES = [
+    "delhi", "new-delhi", "gurgaon", "gurugram", "noida", "greater-noida", "faridabad", "ghaziabad",
     "bengaluru", "bangalore-rural", "bangalore", "hyderabad", "pune", "mumbai",
-    "chennai", "delhi", "gurgaon", "gurugram", "noida", "kolkata", "ahmedabad", "remote"
+    "chennai", "kolkata", "ahmedabad", "remote"
 ]
 
-SITEMAP_CITIES = ["Bangalore", "Hyderabad", "Pune", "Noida", "Delhi", "Chennai"]
+DELHI_NCR_CITIES = {
+    "delhi", "new-delhi", "gurgaon", "gurugram", "noida", "greater-noida", "faridabad", "ghaziabad"
+}
+
+SITEMAP_CITIES = ["Delhi", "Noida", "Bangalore", "Hyderabad", "Pune", "Chennai"]
 
 
 def parse_naukri_url(url: str) -> RawJobData | None:
@@ -72,14 +77,34 @@ def parse_naukri_url(url: str) -> RawJobData | None:
     if city_idx is not None and city_idx > 0:
         loc_parts = parts[city_idx:]
         rest_parts = parts[:city_idx]
-        loc_raw = " ".join(loc_parts).title().replace("Bangalore Rural", "Bengaluru").replace("Bangalore", "Bengaluru")
-        unique_loc_words = list(dict.fromkeys(loc_raw.split()))
-        loc_str = " ".join(unique_loc_words)
-        if "India" not in loc_str:
-            loc_str = f"{loc_str}, India"
+        raw_loc_str = " ".join(loc_parts).lower()
+        if "gurgaon" in raw_loc_str or "gurugram" in raw_loc_str:
+            loc_str = "Gurugram, India"
+        elif "noida" in raw_loc_str:
+            loc_str = "Noida, India"
+        elif "delhi" in raw_loc_str:
+            loc_str = "Delhi NCR, India"
+        elif "faridabad" in raw_loc_str:
+            loc_str = "Faridabad, India"
+        elif "ghaziabad" in raw_loc_str:
+            loc_str = "Ghaziabad, India"
+        elif "bangalore" in raw_loc_str or "bengaluru" in raw_loc_str:
+            loc_str = "Bengaluru, India"
+        elif "hyderabad" in raw_loc_str:
+            loc_str = "Hyderabad, India"
+        elif "pune" in raw_loc_str:
+            loc_str = "Pune, India"
+        elif "mumbai" in raw_loc_str:
+            loc_str = "Mumbai, India"
+        else:
+            loc_raw = " ".join(loc_parts).title()
+            unique_loc_words = list(dict.fromkeys(loc_raw.split()))
+            loc_str = " ".join(unique_loc_words)
+            if "India" not in loc_str:
+                loc_str = f"{loc_str}, India"
     else:
         rest_parts = parts
-        loc_str = "Bengaluru, India"
+        loc_str = "Delhi NCR, India"
 
     rest_str = " ".join(rest_parts).strip()
     s_lower = rest_str.lower()
@@ -178,6 +203,9 @@ class NaukriJobSource(BaseJobSource):
         config = config or {}
         max_jobs = int(config.get("limit", 25))
         keyword = (config.get("keyword") or "").lower().strip()
+        delhi_ncr_only = config.get("delhi_ncr_only", False)
+
+        cities_to_scan = ["Delhi", "Noida"] if delhi_ncr_only else SITEMAP_CITIES
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -189,7 +217,7 @@ class NaukriJobSource(BaseJobSource):
         seen_ids: set[str] = set()
 
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
-            for city in SITEMAP_CITIES:
+            for city in cities_to_scan:
                 if len(collected_jobs) >= max_jobs:
                     break
 
@@ -214,6 +242,9 @@ class NaukriJobSource(BaseJobSource):
                             if not any(k in u_lower for k in TECH_KEYWORDS):
                                 continue
 
+                        if delhi_ncr_only and not any(nc in u_lower for nc in DELHI_NCR_CITIES):
+                            continue
+
                         parsed = parse_naukri_url(u)
                         if not parsed or parsed.external_id in seen_ids:
                             continue
@@ -225,5 +256,5 @@ class NaukriJobSource(BaseJobSource):
                     logger.warning("Error fetching Naukri city sitemap", city=city, error=str(e))
                     continue
 
-        logger.info("Naukri live job fetch complete", total=len(collected_jobs))
+        logger.info("Naukri live job fetch complete", total=len(collected_jobs), delhi_ncr_only=delhi_ncr_only)
         return collected_jobs

@@ -37,7 +37,7 @@ class LinkedInJobSource(BaseJobSource):
     source_type: str = "linkedin"
 
     async def fetch_jobs(self, config: dict | None = None) -> list[RawJobData]:
-        """Fetch 100% real live tech jobs from LinkedIn guest API without static fallback."""
+        """Fetch real live tech jobs from LinkedIn guest API for target regions, prioritizing Delhi NCR."""
         config = config or {}
         keywords_list = config.get("keywords") or [
             "software engineer",
@@ -51,7 +51,13 @@ class LinkedInJobSource(BaseJobSource):
         if isinstance(keywords_list, str):
             keywords_list = [keywords_list]
 
-        location = config.get("location", "India")
+        delhi_ncr_only = config.get("delhi_ncr_only", False)
+        if delhi_ncr_only:
+            locations = ["Gurugram, Haryana, India", "Noida, Uttar Pradesh, India", "Delhi, India"]
+        else:
+            loc_cfg = config.get("location", "Delhi NCR, India")
+            locations = [loc_cfg] if isinstance(loc_cfg, str) else loc_cfg
+
         max_jobs = int(config.get("limit", 25))
 
         headers = {
@@ -63,105 +69,108 @@ class LinkedInJobSource(BaseJobSource):
         collected_jobs: list[RawJobData] = []
         seen_ids: set[str] = set()
 
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
-            for kw in keywords_list:
+        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, headers=headers) as client:
+            for loc in locations:
                 if len(collected_jobs) >= max_jobs:
                     break
-                try:
-                    q_kw = urllib.parse.quote_plus(kw)
-                    q_loc = urllib.parse.quote_plus(location)
-                    search_url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_kw}&location={q_loc}&start=0"
+                for kw in keywords_list:
+                    if len(collected_jobs) >= max_jobs:
+                        break
+                    try:
+                        q_kw = urllib.parse.quote_plus(kw)
+                        q_loc = urllib.parse.quote_plus(loc)
+                        search_url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_kw}&location={q_loc}&start=0"
 
-                    r = await client.get(search_url, headers=headers)
-                    if r.status_code != 200:
-                        logger.warning("LinkedIn guest search returned non-200", status=r.status_code, kw=kw)
-                        continue
-
-                    # Parse job cards
-                    card_pattern = re.compile(
-                        r'<div class="[^"]*base-card[^"]*"[^>]*data-entity-urn="urn:li:jobPosting:(\d+)"[^>]*>([\s\S]*?)<\/li>',
-                        re.IGNORECASE,
-                    )
-                    matches = card_pattern.findall(r.text)
-
-                    for jid, card_html in matches:
-                        if jid in seen_ids or len(collected_jobs) >= max_jobs:
+                        r = await client.get(search_url, headers=headers)
+                        if r.status_code != 200:
+                            logger.warning("LinkedIn guest search returned non-200", status=r.status_code, kw=kw, loc=loc)
                             continue
-                        seen_ids.add(jid)
 
-                        title_m = re.search(r'<h3 class="[^"]*base-search-card__title[^"]*">\s*([\s\S]*?)\s*<\/h3>', card_html)
-                        comp_m = (
-                            re.search(r'<h4 class="[^"]*base-search-card__subtitle[^"]*">[\s\S]*?<a[^>]*>\s*([\s\S]*?)\s*<\/a>', card_html)
-                            or re.search(r'<h4 class="[^"]*base-search-card__subtitle[^"]*">\s*([\s\S]*?)\s*<\/h4>', card_html)
+                        # Parse job cards
+                        card_pattern = re.compile(
+                            r'<div class="[^"]*base-card[^"]*"[^>]*data-entity-urn="urn:li:jobPosting:(\d+)"[^>]*>([\s\S]*?)<\/li>',
+                            re.IGNORECASE,
                         )
-                        loc_m = re.search(r'<span class="[^"]*job-search-card__location[^"]*">\s*([\s\S]*?)\s*<\/span>', card_html)
-                        link_m = re.search(r'<a class="[^"]*base-card__full-link[^"]*"[^>]*href="([^"]*)"', card_html)
+                        matches = card_pattern.findall(r.text)
 
-                        title = title_m.group(1).strip() if title_m else "Software Engineer"
-                        company = comp_m.group(1).strip() if comp_m else "Company"
-                        loc_str = loc_m.group(1).strip() if loc_m else location
-                        job_url = link_m.group(1).strip() if link_m else f"https://www.linkedin.com/jobs/view/{jid}"
+                        for jid, card_html in matches:
+                            if jid in seen_ids or len(collected_jobs) >= max_jobs:
+                                continue
+                            seen_ids.add(jid)
 
-                        # Clean any query parameters off URL for canonical link
-                        if "?" in job_url:
-                            job_url = job_url.split("?")[0]
+                            title_m = re.search(r'<h3 class="[^"]*base-search-card__title[^"]*">\s*([\s\S]*?)\s*<\/h3>', card_html)
+                            comp_m = (
+                                re.search(r'<h4 class="[^"]*base-search-card__subtitle[^"]*">[\s\S]*?<a[^>]*>\s*([\s\S]*?)\s*<\/a>', card_html)
+                                or re.search(r'<h4 class="[^"]*base-search-card__subtitle[^"]*">\s*([\s\S]*?)\s*<\/h4>', card_html)
+                            )
+                            loc_m = re.search(r'<span class="[^"]*job-search-card__location[^"]*">\s*([\s\S]*?)\s*<\/span>', card_html)
+                            link_m = re.search(r'<a class="[^"]*base-card__full-link[^"]*"[^>]*href="([^"]*)"', card_html)
 
-                        is_remote = bool(
-                            "remote" in title.lower()
-                            or "remote" in loc_str.lower()
-                            or "work from home" in loc_str.lower()
-                        )
+                            title = title_m.group(1).strip() if title_m else "Software Engineer"
+                            company = comp_m.group(1).strip() if comp_m else "Company"
+                            loc_str = loc_m.group(1).strip() if loc_m else loc
+                            job_url = link_m.group(1).strip() if link_m else f"https://www.linkedin.com/jobs/view/{jid}"
 
-                        # Fetch full description if possible
-                        description = ""
-                        try:
-                            det_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}"
-                            det_res = await client.get(det_url, headers=headers)
-                            if det_res.status_code == 200:
-                                desc_html = det_res.text
-                                desc_match = re.search(r'<div class="[^"]*show-more-less-html__markup[^"]*">([\s\S]*?)<\/div>', desc_html)
-                                if desc_match:
-                                    description = _html2text.handle(desc_match.group(1)).strip()
-                                else:
-                                    description = _html2text.handle(desc_html).strip()
-                        except Exception:
-                            pass
+                            # Clean any query parameters off URL for canonical link
+                            if "?" in job_url:
+                                job_url = job_url.split("?")[0]
 
-                        if not description or len(description) < 40:
-                            description = (
-                                f"### {title}\n\n"
-                                f"**Company**: {company}\n"
-                                f"**Location**: {loc_str}\n"
-                                f"**Work Arrangement**: {'Remote' if is_remote else 'On-site / Hybrid'}\n\n"
-                                f"#### Overview\n"
-                                f"{company} has posted an active opening for **{title}** in {loc_str}. "
-                                f"This live posting is listed on LinkedIn with Job ID `{jid}`.\n\n"
-                                f"#### Application\n"
-                                f"View qualification requirements and submit your application on LinkedIn using the job link."
+                            is_remote = bool(
+                                "remote" in title.lower()
+                                or "remote" in loc_str.lower()
+                                or "work from home" in loc_str.lower()
                             )
 
-                        skills = extract_skills_from_text(f"{title} {description}")
+                            # Fetch full description if possible
+                            description = ""
+                            try:
+                                det_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}"
+                                det_res = await client.get(det_url, headers=headers)
+                                if det_res.status_code == 200:
+                                    desc_html = det_res.text
+                                    desc_match = re.search(r'<div class="[^"]*show-more-less-html__markup[^"]*">([\s\S]*?)<\/div>', desc_html)
+                                    if desc_match:
+                                        description = _html2text.handle(desc_match.group(1)).strip()
+                                    else:
+                                        description = _html2text.handle(desc_html).strip()
+                            except Exception:
+                                pass
 
-                        collected_jobs.append(
-                            RawJobData(
-                                title=title,
-                                company=company,
-                                location=loc_str,
-                                is_remote=is_remote,
-                                source_url=job_url,
-                                application_url=job_url,
-                                description=description,
-                                external_id=f"linkedin_{jid}",
-                                required_skills=skills,
-                                source="linkedin",
+                            if not description or len(description) < 40:
+                                description = (
+                                    f"### {title}\n\n"
+                                    f"**Company**: {company}\n"
+                                    f"**Location**: {loc_str}\n"
+                                    f"**Work Arrangement**: {'Remote' if is_remote else 'On-site / Hybrid'}\n\n"
+                                    f"#### Overview\n"
+                                    f"{company} has posted an active opening for **{title}** in {loc_str}. "
+                                    f"This live posting is listed on LinkedIn with Job ID `{jid}`.\n\n"
+                                    f"#### Application\n"
+                                    f"View qualification requirements and submit your application on LinkedIn using the job link."
+                                )
+
+                            skills = extract_skills_from_text(f"{title} {description}")
+
+                            collected_jobs.append(
+                                RawJobData(
+                                    title=title,
+                                    company=company,
+                                    location=loc_str,
+                                    is_remote=is_remote,
+                                    source_url=job_url,
+                                    application_url=job_url,
+                                    description=description,
+                                    external_id=f"linkedin_{jid}",
+                                    required_skills=skills,
+                                    source="linkedin",
+                                )
                             )
-                        )
 
-                    # Polite delay between keyword queries to prevent rate-limiting
-                    await asyncio.sleep(0.5)
+                        # Polite delay between keyword queries to prevent rate-limiting
+                        await asyncio.sleep(0.5)
 
-                except Exception as e:
-                    logger.warning("LinkedIn search iteration failed", error=str(e), kw=kw)
+                    except Exception as e:
+                        logger.warning("LinkedIn search iteration failed", error=str(e), kw=kw, loc=loc)
 
-        logger.info("LinkedIn real live job fetch complete", total=len(collected_jobs))
+        logger.info("LinkedIn real live job fetch complete", total=len(collected_jobs), delhi_ncr_only=delhi_ncr_only)
         return collected_jobs

@@ -344,27 +344,29 @@ async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
 @router.post("/jobs/fetch-live")
 async def admin_fetch_live_jobs(
     background_tasks: BackgroundTasks,
-    source: str = Query("all", description="Source to fetch: 'all', 'career', 'linkedin', or 'naukri'"),
+    source: str = Query("all", description="Source to fetch: 'all', 'career', 'linkedin', 'naukri', or 'indeed'"),
+    delhi_ncr_only: bool = Query(True, description="Filter specifically for Delhi NCR tech positions"),
     admin_id: str = Depends(require_admin),
 ):
-    """Trigger live job fetching across target sources (career ATS, LinkedIn, Naukri, or all)."""
+    """Trigger live job fetching across target sources (career ATS + Playwright, LinkedIn, Naukri, Indeed, or all)."""
     fetcher = JobFetcherAgent()
 
     async def run():
         try:
-            logger.info("Admin triggered live job fetcher", source=source)
-            res = await fetcher.fetch_and_store_jobs(source=source)
+            logger.info("Admin triggered live job fetcher", source=source, delhi_ncr_only=delhi_ncr_only)
+            res = await fetcher.fetch_and_store_jobs(source=source, delhi_ncr_only=delhi_ncr_only)
             logger.info("Live job fetcher completed", source=source, count=len(res))
         except Exception as e:
             logger.error("Live job fetcher failed", source=source, error=str(e))
 
     background_tasks.add_task(run)
     source_labels = {
-        "all": "all sources (Career ATS, LinkedIn, Naukri)",
-        "career": "Company Career Portals (Greenhouse, Lever, Ashby)",
-        "linkedin": "LinkedIn Jobs (India tech)",
-        "naukri": "Naukri Jobs (India tech)",
+        "all": "all sources (ATS APIs, LinkedIn, Naukri, Indeed, Custom)",
+        "career": "Company Career Portals (Greenhouse, Lever, Ashby, Workday, Darwinbox, SmartRecruiters, Keka)",
+        "linkedin": "LinkedIn Jobs (Delhi NCR tech)",
+        "naukri": "Naukri Jobs (Delhi NCR tech)",
+        "indeed": "Indeed Jobs (Delhi NCR tech)",
     }
     label = source_labels.get(source, source)
-    return {"ok": True, "message": f"Live job fetching triggered for {label}"}
+    return {"ok": True, "message": f"Live job fetching triggered for {label} (Delhi NCR: {delhi_ncr_only})"}
 

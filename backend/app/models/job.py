@@ -35,7 +35,11 @@ class Job(MongoBaseModel):
     requirements: list[str] = Field(default_factory=list)
     responsibilities: list[str] = Field(default_factory=list)
     location: str = ""
+    delhi_ncr_hub: str | None = None
+    is_delhi_ncr: bool = False
     is_remote: bool = False
+    work_model: str = "On-site"
+    seniority: str = "Mid-Level"
     employment_type: Literal["full-time", "part-time", "contract", "internship"] = "full-time"
     salary_range: SalaryRange = Field(default_factory=SalaryRange)
     application_url: str

@@ -122,8 +122,17 @@ def parse_naukri_url(url: str) -> RawJobData | None:
         title = rest_str[:best_match_end].strip()
         comp = rest_str[best_match_end:].strip()
         comp = re.sub(r"^\d+\s+\d+\s*", "", comp).strip()
-        if not comp:
-            comp = "Technology Employer"
+        # Clean leading tech tags / role suffixes mistakenly caught in company string
+        comp = re.sub(
+            r"^(?:(?:ii|iii|iv|sr|lead|role|ic role|fullstack|frontend|backend|dotnet|\.net|java|python|c\+\+|c|react(?: js)?|node|javascript|typescript|html5|css3|angular|spring|aws|cloud|devops|data|ml|ai|microsoft fabric)\s+)+",
+            "",
+            comp,
+            flags=re.IGNORECASE,
+        ).strip()
+        # Clean recruitment agency noise
+        comp = re.sub(r"\s+hiring for(?: a client)?.*$", "", comp, flags=re.IGNORECASE).strip()
+        if not comp or len(comp) < 2:
+            return None
     else:
         words = rest_str.split()
         if len(words) >= 4:
@@ -133,8 +142,7 @@ def parse_naukri_url(url: str) -> RawJobData | None:
             title = " ".join(words[:-1])
             comp = words[-1]
         else:
-            title = rest_str
-            comp = "Technology Employer"
+            return None
 
     # Normalize casing & common tech acronyms
     title = (

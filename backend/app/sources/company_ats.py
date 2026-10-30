@@ -64,15 +64,25 @@ def is_indian_job(company: str, location: str, text_snippet: str = "") -> bool:
 
     # Domestic Indian tech companies are in India by default unless explicitly in another country
     if comp_lower in INDIAN_DOMESTIC_COMPANIES:
-        foreign_countries = ["united states", "usa", "san francisco", "new york", "london", "dublin", "singapore", "sydney", "berlin", "tokyo", "paris"]
-        if not any(fc in loc_lower for fc in foreign_countries):
+        foreign_locations = [
+            "united states", "usa", "san francisco", "new york", "london", "dublin",
+            "singapore", "sydney", "berlin", "tokyo", "paris", "santa clara", "san mateo",
+            "egypt", "cairo", "dubai", "malaysia", "skopje", "debar", "pristina", "canada",
+            "australia", "germany", "japan", "netherlands", "brazil", "poland"
+        ]
+        if any(fl in loc_lower for fl in foreign_locations):
+            return False
+        if not loc_lower or INDIA_LOCATION_REGEX.search(loc_lower):
             return True
 
     # Remote checking
     if "remote" in loc_lower:
+        foreign_terms = ["us only", "us/canada", "emea", "latam", "americas", "north america"]
+        if any(ft in loc_lower for ft in foreign_terms):
+            return False
         if "india" in loc_lower or "india" in text_snippet.lower():
             return True
-        # If it says Remote (APAC) or Worldwide without US/EU restriction
+        # If it says Remote (APAC) or Worldwide without foreign restriction
         if any(term in loc_lower for term in ["apac", "worldwide", "anywhere", "global"]):
             return True
 
@@ -128,7 +138,7 @@ def standardize_india_location(company: str, loc_name: str, is_remote: bool) -> 
     if is_remote and "india" in loc_lower:
         return "Remote - India"
 
-    if "india" not in loc_lower and (company.lower() in INDIAN_DOMESTIC_COMPANIES or is_remote):
+    if "india" not in loc_lower and INDIA_LOCATION_REGEX.search(loc_lower):
         return f"{clean}, India"
 
     return clean

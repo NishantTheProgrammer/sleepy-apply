@@ -266,7 +266,43 @@ export default function ProfilePage() {
 
     setUploading(true);
     setUploadError("");
-    setUploadMsg("Reading document and analyzing with AI...");
+    setUploadMsg("Purging previous profile data and reading new resume with AI...");
+
+    // Immediately clear old form state so previous resume data is deleted from UI
+    setPersonal({
+      fullName: "",
+      email: "",
+      phone: "",
+      location: { address: "", city: "", postalCode: "", country: "" },
+      linkedin: "",
+      github: "",
+      portfolio: "",
+    });
+    setSummary("");
+    setSkills({
+      backend: [],
+      frontend: [],
+      languages: [],
+      databases: [],
+      ui: [],
+      tools: [],
+      architecture: [],
+    });
+    setExperience([]);
+    setProjects([]);
+    setEducation([]);
+    setAchievements([]);
+    setJobPreferences({
+      jobTitles: [],
+      locations: [],
+      remotePreference: "any",
+      minimumSalary: "",
+      employmentTypes: ["full-time"],
+    });
+    setAdditionalInfo({
+      yearsOfExperience: "",
+      totalProjects: "",
+    });
 
     try {
       await profileApi.uploadResume(file);

@@ -115,24 +115,51 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     import re
     cleaned_text = re.sub(r"\n{3,}", "\n\n", text).strip()
 
-    # Store raw text and set is_analyzing flag
+    # Clear old information completely: purge old job matches, old tailored resumes, and reset profile
     db = get_db()
+    uid = ObjectId(user_id)
     now = datetime.now(timezone.utc)
-    await db.profiles.update_one(
-        {"user_id": ObjectId(user_id)},
-        {
-            "$set": {
-                "resume_filename": file.filename,
-                "resume_raw_text": cleaned_text,
-                "is_analyzing": True,
-                "analysis_started_at": now,
-                "analysis_error": None,
-                "updated_at": now,
-            },
-            "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now},
-        },
-        upsert=True,
-    )
+
+    # 1. Delete previous job matches and generated resumes
+    await db.job_matches.delete_many({"user_id": uid})
+    await db.resumes.delete_many({"user_id": uid})
+
+    # 2. Preserve original creation timestamp if present, otherwise set now
+    existing_created_at = now
+    existing_profile = await db.profiles.find_one({"user_id": uid}, {"created_at": 1})
+    if existing_profile and existing_profile.get("created_at"):
+        existing_created_at = existing_profile["created_at"]
+
+    # 3. Clean fresh profile state (deleting all old experiences, skills, questions, and Q/A history)
+    fresh_profile = {
+        "user_id": uid,
+        "resume_filename": file.filename,
+        "resume_raw_text": cleaned_text,
+        "is_analyzing": True,
+        "analysis_started_at": now,
+        "analysis_error": None,
+        "personal": {},
+        "summary": "",
+        "skills": {},
+        "experience": [],
+        "education": [],
+        "projects": [],
+        "achievements": [],
+        "jobPreferences": {},
+        "job_preferences": {},
+        "additionalInformation": {},
+        "completion_score": 0,
+        "missing_fields": [],
+        "pending_questions": [],
+        "qa_history": [],
+        "screening_questions": [],
+        "target_role": None,
+        "suggested_roles": [],
+        "created_at": existing_created_at,
+        "updated_at": now,
+    }
+
+    await db.profiles.replace_one({"user_id": uid}, fresh_profile, upsert=True)
 
     import asyncio
     from app.graphs.profile_graph import profile_pipeline

@@ -91,6 +91,21 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         score=update_fields["completion_score"],
         experiences=len(update_fields["experience"]),
     )
+
+    # Immediately calculate fresh job matches for this new candidate
+    import asyncio
+    from app.agents.job_matcher import JobMatcherAgent
+
+    async def match_fresh_jobs():
+        try:
+            matcher = JobMatcherAgent()
+            cursor = db.jobs.find({"is_active": True}).limit(50)
+            async for j in cursor:
+                await matcher.match_user_and_job(user_id=user_id, job_id=str(j["_id"]), use_ai_reasoning=False)
+        except Exception as err:
+            logger.warning("Auto job match after resume save failed", error=str(err))
+
+    asyncio.create_task(match_fresh_jobs())
     return state
 
 

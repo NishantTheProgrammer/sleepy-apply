@@ -2,11 +2,10 @@ import json
 import re
 import uuid
 import structlog
-import urllib.request
 from typing import Any
 from datetime import datetime, timezone
 from bson import ObjectId
-from app.db.client import get_db
+
 from app.models.settings import UserSettings
 from app.providers.factory import AIProviderFactory
 
@@ -15,47 +14,19 @@ logger = structlog.get_logger()
 
 class ScreeningQAAgent:
     """
-    Dynamic AI Screening & Q/A Agent.
-    Analyzes uploaded resumes, suggests target profile chips, and generates recruiter screening questions
-    using a fast local model (Ollama llama3.2 / llama3.1) with reliable fallbacks.
+    Dynamic AI Recruiter Screening Agent.
+    Retrieves tailored recruiter screening questions and candidate prefill options
+    directly via LLM inference based on the candidate's actual resume, skills, and target role.
+    No hardcoded question templates or if/else role branching.
     """
-
-    OLLAMA_URL = "http://host.docker.internal:11434"
-
-    def _call_local_ollama(self, prompt: str, model: str = "llama3.2:latest") -> dict[str, Any] | None:
-        """Calls local Ollama instance with timeout and returns parsed JSON if successful."""
-        try:
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "You are an expert technical recruiter and hiring manager assistant. Return strict JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False,
-                "format": "json"
-            }
-            req = urllib.request.Request(
-                f"{self.OLLAMA_URL}/api/chat",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=12) as response:
-                res_data = json.loads(response.read().decode("utf-8"))
-                content = res_data.get("message", {}).get("content", "")
-                return self._parse_json(content)
-        except Exception as e:
-            logger.warning("Local Ollama chat call failed, will try fallback", error=str(e))
-            return None
 
     def _parse_json(self, text: str) -> dict[str, Any] | None:
         if not text:
             return None
-        # Strip code blocks if any
         clean = re.sub(r"```(?:json)?\s*([\s\S]*?)\s*```", r"\1", text).strip()
         try:
             return json.loads(clean)
         except Exception:
-            # Try finding outer braces
             m = re.search(r"\{[\s\S]*\}", text)
             if m:
                 try:
@@ -64,70 +35,73 @@ class ScreeningQAAgent:
                     pass
         return None
 
+    def _resolve_provider(self, user_settings: UserSettings | None):
+        """Resolves user configured AI provider or defaults to local Ollama llama3.2."""
+        if not user_settings:
+            user_settings = UserSettings(
+                user_id=ObjectId(),
+                ai_provider="ollama",
+                ai_model="llama3.2:latest",
+            )
+        return AIProviderFactory.resolve(user_settings)
+
     def generate_suggested_roles(self, profile: dict) -> list[str]:
-        """Infers candidate's strongest target role options as chips from skills and experience."""
-        summary = (profile.get("summary") or "").lower()
-        skills = profile.get("skills", {})
-        all_skills = []
-        if isinstance(skills, dict):
-            for v in skills.values():
-                if isinstance(v, list): all_skills.extend(v)
-        elif isinstance(skills, list):
-            all_skills = skills
+        """
+        Dynamically extracts candidate's target roles from LLM-parsed job preferences
+        and work experience history without hardcoded if/else branching.
+        """
+        roles: list[str] = []
+        seen = set()
 
-        exp_titles = [
-            (e.get("title") or e.get("jobTitle") or "")
-            for e in profile.get("experience", [])
-            if (e.get("title") or e.get("jobTitle"))
-        ]
+        def _add(r: str):
+            clean = str(r).strip()
+            if (
+                clean
+                and len(clean) >= 3
+                and clean.lower() not in seen
+                and not clean.startswith("<")
+                and clean.lower() not in ["null", "none", "undefined"]
+                and not any(bad in clean.lower() for bad in ["derive", "e.g.", "aligned", "target job titles", "example"])
+            ):
+                seen.add(clean.lower())
+                roles.append(clean)
 
-        text = f"{summary} {' '.join(exp_titles)} {' '.join(all_skills)}".lower()
+        # 1. Primary: Job titles derived by the LLM during resume parsing
+        for key in ["job_preferences", "jobPreferences"]:
+            prefs = profile.get(key, {})
+            if isinstance(prefs, dict):
+                for t in prefs.get("jobTitles") or prefs.get("titles") or []:
+                    _add(t)
 
-        # SDET / QA Automation
-        if any(k in text for k in ["sdet", "qa", "playwright", "selenium", "cypress", "quality engineer", "test automation"]):
-            return [
-                "Senior SDET",
-                "QA Automation Engineer (Playwright/Selenium)",
-                "Lead Quality Engineer",
-                "Software Development Engineer in Test (SDET)",
-                "API & Performance Test Engineer"
+        # 2. Candidate's actual job titles from experience history
+        for exp in profile.get("experience", []):
+            if isinstance(exp, dict):
+                _add(exp.get("jobTitle") or exp.get("title") or "")
+
+        # 3. Derive natural seniority variants if we have a primary role
+        if roles:
+            base_role = roles[0]
+            if "senior" not in base_role.lower() and "lead" not in base_role.lower():
+                _add(f"Senior {base_role}")
+            if "lead" not in base_role.lower():
+                _add(f"Lead {base_role}")
+
+        # 4. Fallback if profile has zero extracted roles
+        if not roles:
+            skills = profile.get("skills", {})
+            cand_skills = []
+            if isinstance(skills, dict):
+                for v in skills.values():
+                    if isinstance(v, list):
+                        cand_skills.extend(v[:3])
+            tech = f" ({cand_skills[0]} & {cand_skills[1]})" if len(cand_skills) >= 2 else ""
+            roles = [
+                f"Senior Software Engineer{tech}",
+                f"Software Development Engineer II (SDE-2){tech}",
+                "Full Stack Developer",
             ]
-        # ETL / Data QA
-        elif any(k in text for k in ["etl", "snowflake", "pyspark", "airflow", "data quality", "data warehouse"]):
-            return [
-                "Senior Quality Engineer (ETL & Data)",
-                "Data Platform QA Engineer",
-                "Big Data Test Engineer",
-                "Data Quality Engineer",
-                "Senior Data Engineer"
-            ]
-        # Intern / Fresh Graduate
-        elif any(k in text for k in ["intern", "fresh graduate", "fresher", "trainee", "0 exp", "academic projects"]):
-            return [
-                "MERN Stack Intern",
-                "Software Engineering Intern",
-                "Junior React Developer",
-                "Junior Fullstack Developer",
-                "Graduate Trainee Engineer"
-            ]
-        # Python Backend
-        elif any(k in text for k in ["python", "django", "fastapi", "flask"]) and "react" not in text:
-            return [
-                "Senior Python Developer",
-                "Software Engineer - Python",
-                "Backend Engineer (FastAPI / Django)",
-                "Python Microservices Architect",
-                "Data Platform Engineer"
-            ]
-        # Full Stack / JS / React
-        else:
-            return [
-                "Senior Full Stack Engineer (Node.js & React)",
-                "Software Development Engineer II (SDE-2)",
-                "Senior Backend Engineer (Node.js)",
-                "Senior Frontend Engineer (React/Next.js)",
-                "Full Stack Developer"
-            ]
+
+        return roles[:5]
 
     async def generate_screening_questions(
         self,
@@ -135,19 +109,21 @@ class ScreeningQAAgent:
         target_role: str | None = None,
         user_settings: UserSettings | None = None
     ) -> list[dict[str, Any]]:
-        """Generates 3-5 recruiter screening questions tailored to the resume and target role."""
-        name = profile.get("personal", {}).get("fullName") or "Candidate"
+        """
+        Dynamically retrieves recruiter screening questions via LLM inference.
+        No hardcoded question templates or if/else branches.
+        """
+        name = (
+            profile.get("personal", {}).get("fullName")
+            or profile.get("personal", {}).get("full_name")
+            or "Candidate"
+        )
         summary = profile.get("summary") or ""
-        skills = profile.get("skills", {})
-        skills_summary = ", ".join(
-            (v if isinstance(v, str) else ", ".join(v[:4]))
-            for v in (skills.values() if isinstance(skills, dict) else [skills])
-        )[:200]
-
-        role = target_role or (profile.get("job_preferences", {}).get("jobTitles") or ["Software Engineer"])[0]
-        role_low = role.lower()
+        suggested = self.generate_suggested_roles(profile)
+        role = target_role or (suggested[0] if suggested else "Software Engineer")
 
         # Extract all candidate skills
+        skills = profile.get("skills", {})
         cand_skills = []
         if isinstance(skills, dict):
             for v in skills.values():
@@ -159,110 +135,132 @@ class ScreeningQAAgent:
             cand_skills = [str(s) for s in skills]
 
         clean_cand_skills = []
-        seen_cs = set()
+        seen_s = set()
         for s in cand_skills:
-            if isinstance(s, str) and s.strip() and s.strip().lower() not in seen_cs:
-                seen_cs.add(s.strip().lower())
+            if isinstance(s, str) and s.strip() and s.strip().lower() not in seen_s:
+                seen_s.add(s.strip().lower())
                 clean_cand_skills.append(s.strip())
 
-        is_qa = any(k in role_low for k in ["sdet", "qa", "quality", "test", "automation"])
-        is_data = any(k in role_low for k in ["data", "etl", "snowflake", "big data", "pyspark", "pipeline"])
-        is_fullstack = any(k in role_low for k in ["full stack", "fullstack", "software engineer", "developer", "backend", "sde"])
-        is_frontend = any(k in role_low for k in ["frontend", "ui"]) and not is_fullstack and not is_qa
+        exp_highlights = [
+            f"{e.get('jobTitle') or e.get('title')} at {e.get('company')}"
+            for e in profile.get("experience", [])
+            if (e.get("jobTitle") or e.get("title"))
+        ][:3]
 
-        if is_qa:
-            domain_name = "QA & Test Automation"
-            tech_question = "Which test automation frameworks, API testing libraries, and CI/CD tools have you worked with hands-on in production?"
-            exp_question = "How many total years of hands-on QA & test automation experience do you have?"
-            default_chips = ["Playwright", "Selenium WebDriver", "REST Assured", "Cypress", "Appium", "Postman", "Jenkins"]
-            matched = [s for s in clean_cand_skills if any(q in s.lower() for q in ["playwright", "selenium", "rest", "cypress", "appium", "postman", "jenkins", "k6", "testng"])]
-            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
-            ctc_options = ["8 - 12 LPA", "12 - 16 LPA", "16 - 22 LPA", "22+ LPA"]
-        elif is_data:
-            domain_name = "Data Engineering & ETL Pipelines"
-            tech_question = "Which data processing frameworks, ETL tools, databases, and cloud platforms have you worked with hands-on in production?"
-            exp_question = "How many total years of hands-on data engineering / ETL experience do you have?"
-            default_chips = ["PySpark / Apache Spark", "SQL & Stored Procedures", "Apache Airflow", "Snowflake / BigQuery", "Kafka", "PostgreSQL / MySQL", "dbt"]
-            matched = [s for s in clean_cand_skills if any(d in s.lower() for d in ["spark", "sql", "airflow", "snowflake", "bigquery", "kafka", "postgres", "dbt"])]
-            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
-            ctc_options = ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"]
-        elif is_frontend:
-            domain_name = "Frontend & UI Engineering"
-            tech_question = f"Which frontend frameworks, state management libraries, and web tooling have you worked with hands-on for {role} roles?"
-            exp_question = "How many total years of hands-on frontend web development experience do you have?"
-            default_chips = ["React.js", "Next.js", "TypeScript", "Tailwind CSS", "Redux / Zustand", "HTML5 & CSS3", "REST / GraphQL APIs", "Jest / Vitest"]
-            matched = [s for s in clean_cand_skills if any(f in s.lower() for f in ["react", "next", "type", "tail", "redux", "html", "css", "vue", "angular"])]
-            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
-            ctc_options = ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"]
-        else:
-            domain_name = "Full Stack & Software Engineering"
-            tech_question = f"Which backend frameworks, frontend libraries, databases, and architectural tools have you worked with hands-on for {role} roles?"
-            exp_question = "How many total years of hands-on full stack & software engineering experience do you have?"
-            default_chips = ["Node.js & Express", "React.js & Next.js", "TypeScript & JavaScript", "MongoDB", "PostgreSQL / MySQL", "Docker & Microservices", "Spring Boot & Java", "REST & GraphQL APIs"]
-            matched = [s for s in clean_cand_skills if any(m in s.lower() for m in ["node", "express", "react", "next", "type", "java", "spring", "mongo", "postgres", "sql", "docker", "micro", "jest"])]
-            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
-            ctc_options = ["14 - 20 LPA", "20 - 28 LPA", "28 - 40 LPA", "40+ LPA"]
+        skills_str = ", ".join(clean_cand_skills[:18]) if clean_cand_skills else "Software engineering technologies"
+        exp_str = "; ".join(exp_highlights) if exp_highlights else "Professional software development experience"
 
-        # Build 100% reliable, instant dynamic questions with matched skills chips (0 ms latency)
-        now_iso = datetime.now(timezone.utc).isoformat()
-        tailored_questions = [
-            {
-                "id": "q1",
-                "category": "technical",
-                "type": "multiselect",
-                "question": tech_question,
-                "context_hint": "Select all technologies and tools in your active production toolkit.",
-                "suggested_options": tech_options,
-                "asked_at": now_iso,
-                "answer": None,
-                "answered_at": None,
-            },
-            {
-                "id": "q2",
-                "category": "experience",
-                "type": "single_select",
-                "question": exp_question,
-                "context_hint": "Select your total experience bracket.",
-                "suggested_options": ["1-2 years", "3-4 years", "5-7 years", "7+ years"],
-                "asked_at": now_iso,
-                "answer": None,
-                "answered_at": None,
-            },
-            {
-                "id": "q3",
-                "category": "logistics",
-                "type": "single_select",
-                "question": "What is your current official notice period?",
-                "context_hint": "Recruiter assessing onboarding timeline.",
-                "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"],
-                "asked_at": now_iso,
-                "answer": None,
-                "answered_at": None,
-            },
-            {
-                "id": "q4",
-                "category": "logistics",
-                "type": "boolean",
-                "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
-                "context_hint": "Location flexibility check.",
-                "suggested_options": ["Yes", "No"],
-                "asked_at": now_iso,
-                "answer": None,
-                "answered_at": None,
-            },
-            {
-                "id": "q5",
-                "category": "compensation",
-                "type": "single_select",
-                "question": "What is your expected annual CTC bracket?",
-                "context_hint": "Compensation expectation alignment.",
-                "suggested_options": ctc_options,
-                "asked_at": now_iso,
-                "answer": None,
-                "answered_at": None,
-            },
-        ]
-        return tailored_questions
+        prompt = f"""You are a technical recruiter screening an applicant for a {role} position.
+
+Candidate Context:
+- Candidate Name: {name}
+- Target Position: {role}
+- Candidate Extracted Skills: {skills_str}
+- Career Background: {exp_str}
+- Resume Summary: {summary[:400]}
+
+Task:
+Generate 5 recruiter screening questions tailored specifically to {role} and this candidate's profile to collect their application facts, tooling toolkit, and logistics.
+
+CRITICAL RULES:
+1. DO NOT ask theoretical interview questions, exam viva questions, or concept explanations (NEVER ask 'explain concurrency', 'walk me through how you solve X', 'what is the difference between', etc.). We are collecting candidate details, NOT testing their textbook knowledge.
+2. Generate exactly 5 questions matching this structure:
+   - Question 1 (type: "multiselect", category: "technical"): A hands-on production tooling & technology checklist tailored to {role}. In "suggested_options", include 6-8 relevant technology chips matching both the role and candidate's toolkit.
+   - Question 2 (type: "single_select", category: "experience"): Total relevant hands-on experience in this domain (with 4-5 realistic year brackets in "suggested_options").
+   - Question 3 (type: "single_select", category: "logistics"): Official notice period or earliest joining availability (e.g., Immediate, 15 - 30 Days, 45 - 60 Days, 90 Days).
+   - Question 4 (type: "boolean" or "single_select", category: "logistics"): Work arrangement / location readiness (e.g., hybrid in candidate's city/region or remote).
+   - Question 5 (type: "single_select", category: "compensation"): Expected annual compensation / CTC bracket (with realistic brackets in LPA for India or standard salary ranges for {role} seniority).
+
+Return strict JSON only in this schema:
+{{
+  "questions": [
+    {{
+      "id": "q1",
+      "category": "technical",
+      "type": "multiselect",
+      "question": "<tooling checklist question tailored to {role}>",
+      "context_hint": "<short hint for candidate>",
+      "suggested_options": ["<Tool1>", "<Tool2>", "<Tool3>", "<Tool4>", "<Tool5>", "<Tool6>"]
+    }},
+    {{
+      "id": "q2",
+      "category": "experience",
+      "type": "single_select",
+      "question": "<experience question tailored to {role}>",
+      "context_hint": "<short hint>",
+      "suggested_options": ["1-2 years", "3-5 years", "5-8 years", "8+ years"]
+    }},
+    {{
+      "id": "q3",
+      "category": "logistics",
+      "type": "single_select",
+      "question": "What is your official notice period?",
+      "context_hint": "Recruiter assessing onboarding timeline",
+      "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"]
+    }},
+    {{
+      "id": "q4",
+      "category": "logistics",
+      "type": "boolean",
+      "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
+      "context_hint": "Workplace flexibility check",
+      "suggested_options": ["Yes", "No"]
+    }},
+    {{
+      "id": "q5",
+      "category": "compensation",
+      "type": "single_select",
+      "question": "What is your expected annual CTC bracket for this role?",
+      "context_hint": "Compensation expectation alignment",
+      "suggested_options": ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"]
+    }}
+  ]
+}}
+"""
+
+        # 1. Primary: Retrieve questions directly via LLM call
+        try:
+            provider = self._resolve_provider(user_settings)
+            raw = await provider.complete(
+                [
+                    {"role": "system", "content": "You are an expert technical recruiter assistant. Return strict JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                format="json",
+                temperature=0.2,
+                num_predict=700,
+            )
+            parsed = self._parse_json(raw)
+            if parsed and isinstance(parsed.get("questions"), list) and len(parsed["questions"]) > 0:
+                formatted = self._format_questions(parsed["questions"])
+                if formatted:
+                    return formatted
+        except Exception as e:
+            logger.warning("Primary LLM call for screening questions failed, trying fallback", error=str(e))
+
+        # 2. Fallback to local Ollama if remote provider failed
+        if user_settings and user_settings.ai_provider != "ollama":
+            try:
+                local_provider = self._resolve_provider(None)
+                raw = await local_provider.complete(
+                    [
+                        {"role": "system", "content": "You are an expert technical recruiter assistant. Return strict JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    format="json",
+                    temperature=0.2,
+                    num_predict=700,
+                )
+                parsed = self._parse_json(raw)
+                if parsed and isinstance(parsed.get("questions"), list) and len(parsed["questions"]) > 0:
+                    formatted = self._format_questions(parsed["questions"])
+                    if formatted:
+                        return formatted
+            except Exception as e2:
+                logger.warning("Local Ollama fallback LLM call failed", error=str(e2))
+
+        # 3. Dynamic generic fallback (only reached if all LLM attempts are offline)
+        return self._generate_dynamic_fallback_questions(profile, role, clean_cand_skills)
 
     def _format_questions(self, raw_questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         disallowed_patterns = [
@@ -332,221 +330,66 @@ class ScreeningQAAgent:
             })
         return formatted
 
-    def _generate_heuristic_questions(self, profile: dict, role: str) -> list[dict[str, Any]]:
-        """Candidate profile details questions (tools checklist, years of exp, notice period, location, CTC)."""
-        role_low = role.lower()
+    def _generate_dynamic_fallback_questions(
+        self, profile: dict, role: str, clean_skills: list[str]
+    ) -> list[dict[str, Any]]:
+        """Dynamic fallback with zero hardcoded if/else role branches, using candidate's actual skills."""
         now_iso = datetime.now(timezone.utc).isoformat()
-
-        if "sdet" in role_low or "quality" in role_low or "qa" in role_low:
-            return [
-                {
-                    "id": "q_sdet_tools",
-                    "category": "technical",
-                    "type": "multiselect",
-                    "question": "Which test automation frameworks and tools have you worked with hands-on in production?",
-                    "context_hint": "Select all tools in your active toolkit.",
-                    "suggested_options": [
-                        "Playwright with TypeScript / JavaScript",
-                        "Selenium WebDriver with Java & TestNG",
-                        "REST Assured for API testing",
-                        "Appium for mobile test automation",
-                        "Cypress for E2E web testing",
-                        "Postman / Newman",
-                        "Jenkins / GitHub Actions CI"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_sdet_experience",
-                    "category": "experience",
-                    "type": "single_select",
-                    "question": "How many total years of hands-on test automation experience do you have?",
-                    "context_hint": "Select your total experience bracket.",
-                    "suggested_options": [
-                        "1 - 2 Years",
-                        "3 - 4 Years",
-                        "4.5+ Years",
-                        "6+ Years"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_logistics_notice",
-                    "category": "logistics",
-                    "type": "single_select",
-                    "question": "What is your official notice period / earliest joining date?",
-                    "context_hint": "Recruiter evaluating onboarding timeline.",
-                    "suggested_options": [
-                        "Immediate (Serving notice)",
-                        "15 - 30 Days",
-                        "45 - 60 Days",
-                        "90 Days (Negotiable buy-out)"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_sdet_relocate",
-                    "category": "logistics",
-                    "type": "boolean",
-                    "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
-                    "context_hint": "Location flexibility check.",
-                    "suggested_options": ["Yes", "No"],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_sdet_ctc",
-                    "category": "compensation",
-                    "type": "single_select",
-                    "question": "What is your expected annual CTC bracket?",
-                    "context_hint": "Compensation expectation alignment.",
-                    "suggested_options": [
-                        "8 - 12 LPA",
-                        "12 - 16 LPA",
-                        "16 - 22 LPA",
-                        "22+ LPA"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                }
-            ]
-        elif "intern" in role_low or "fresher" in role_low:
-            return [
-                {
-                    "id": "q_intern_tools",
-                    "category": "technical",
-                    "type": "multiselect",
-                    "question": "Which programming languages and frameworks are in your active toolkit?",
-                    "context_hint": "Select all technologies you are comfortable working with.",
-                    "suggested_options": [
-                        "JavaScript & TypeScript",
-                        "React.js & Next.js",
-                        "Node.js & Express",
-                        "MongoDB & Mongoose",
-                        "Tailwind CSS",
-                        "Python",
-                        "Git & GitHub"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_intern_avail",
-                    "category": "logistics",
-                    "type": "single_select",
-                    "question": "What is your availability for full-time work or internship?",
-                    "context_hint": "Confirming immediate internship timeline.",
-                    "suggested_options": [
-                        "Immediate full-time (Graduated)",
-                        "Available for 6-month internship with PPO",
-                        "Available immediately (Hybrid/Remote in NCR)",
-                        "Part-time / Final semester"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_intern_relocate",
-                    "category": "logistics",
-                    "type": "boolean",
-                    "question": "Are you comfortable working from office in Noida / Gurugram?",
-                    "context_hint": "On-site readiness confirmation.",
-                    "suggested_options": ["Yes", "No"],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_intern_stipend",
-                    "category": "compensation",
-                    "type": "single_select",
-                    "question": "What is your expected monthly internship stipend bracket?",
-                    "context_hint": "Stipend expectation alignment.",
-                    "suggested_options": [
-                        "₹15,000 - ₹25,000 / month",
-                        "₹25,000 - ₹35,000 / month",
-                        "₹35,000+ / month"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                }
-            ]
-        else:
-            return [
-                {
-                    "id": "q_dev_stack",
-                    "category": "technical",
-                    "type": "multiselect",
-                    "question": "Which backend technologies, databases, and microservices tools have you used in production?",
-                    "context_hint": "Select all technologies in your active toolkit.",
-                    "suggested_options": [
-                        "Node.js & Express / NestJS",
-                        "Python (FastAPI / Django)",
-                        "MongoDB & Redis",
-                        "PostgreSQL / MySQL",
-                        "Docker & Kubernetes",
-                        "Kafka & Event queues",
-                        "AWS / Cloud services"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_dev_experience",
-                    "category": "experience",
-                    "type": "single_select",
-                    "question": "How many total years of hands-on professional software development experience do you have?",
-                    "context_hint": "Select your total experience bracket.",
-                    "suggested_options": [
-                        "1 - 2 Years",
-                        "3 - 4 Years",
-                        "5+ Years",
-                        "7+ Years"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_logistics_notice",
-                    "category": "logistics",
-                    "type": "single_select",
-                    "question": "What is your official notice period?",
-                    "context_hint": "Key logistics filter for active recruiter outreach.",
-                    "suggested_options": [
-                        "Immediate (Serving notice)",
-                        "15 - 30 Days",
-                        "60 Days",
-                        "90 Days (Negotiable)"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_dev_relocate",
-                    "category": "logistics",
-                    "type": "boolean",
-                    "question": "Are you open to hybrid roles in Delhi NCR or Bengaluru?",
-                    "context_hint": "Workplace flexibility check.",
-                    "suggested_options": ["Yes", "No"],
-                    "asked_at": now_iso,
-                    "answer": None,
-                },
-                {
-                    "id": "q_dev_ctc",
-                    "category": "compensation",
-                    "type": "single_select",
-                    "question": "What is your expected annual CTC bracket?",
-                    "context_hint": "Compensation expectation alignment.",
-                    "suggested_options": [
-                        "12 - 18 LPA",
-                        "18 - 25 LPA",
-                        "25 - 35 LPA",
-                        "35+ LPA"
-                    ],
-                    "asked_at": now_iso,
-                    "answer": None,
-                }
-            ]
-
+        options = clean_skills[:8] if clean_skills else ["Core Technologies", "Frameworks", "APIs & Services", "Databases", "DevOps & CI/CD"]
+        return [
+            {
+                "id": "q1",
+                "category": "technical",
+                "type": "multiselect",
+                "question": f"Which core technologies, libraries, and tools have you worked with hands-on for {role} roles?",
+                "context_hint": "Select all technologies in your active toolkit.",
+                "suggested_options": options,
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q2",
+                "category": "experience",
+                "type": "single_select",
+                "question": f"How many total years of hands-on professional experience do you have in {role}?",
+                "context_hint": "Select your total experience bracket.",
+                "suggested_options": ["1-2 years", "3-4 years", "5-7 years", "7+ years"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q3",
+                "category": "logistics",
+                "type": "single_select",
+                "question": "What is your current official notice period?",
+                "context_hint": "Recruiter assessing onboarding timeline.",
+                "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q4",
+                "category": "logistics",
+                "type": "boolean",
+                "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
+                "context_hint": "Location flexibility check.",
+                "suggested_options": ["Yes", "No"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q5",
+                "category": "compensation",
+                "type": "single_select",
+                "question": f"What is your expected annual CTC bracket for {role}?",
+                "context_hint": "Compensation expectation alignment.",
+                "suggested_options": ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+        ]

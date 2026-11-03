@@ -56,12 +56,16 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
 
     parsed = state["parsed_data"]
 
+    settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    user_settings = UserSettings(**settings_doc) if settings_doc else None
+
     from app.agents.screening_agent import ScreeningQAAgent
     screening_agent = ScreeningQAAgent()
     suggested_roles = screening_agent.generate_suggested_roles(parsed)
     initial_questions = await screening_agent.generate_screening_questions(
         profile=parsed,
-        target_role=suggested_roles[0] if suggested_roles else None
+        target_role=suggested_roles[0] if suggested_roles else None,
+        user_settings=user_settings,
     )
 
     update_fields = {

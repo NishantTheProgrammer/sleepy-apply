@@ -25,7 +25,19 @@ class JobPipelineState(TypedDict, total=False):
 async def fetch_jobs_node(state: JobPipelineState) -> JobPipelineState:
     agent = JobFetcherAgent()
     try:
-        new_jobs = await agent.fetch_and_store_jobs(custom_urls=state.get("custom_urls"))
+        user_keywords = None
+        if state.get("user_id"):
+            db = get_db()
+            profile = await db.profiles.find_one({"user_id": ObjectId(state["user_id"])})
+            if profile:
+                user_keywords = (
+                    profile.get("job_preferences", {}).get("jobTitles")
+                    or profile.get("jobPreferences", {}).get("jobTitles")
+                )
+        new_jobs = await agent.fetch_and_store_jobs(
+            custom_urls=state.get("custom_urls"),
+            keywords=user_keywords,
+        )
         return {"discovered_jobs": new_jobs}
     except Exception as e:
         logger.error("Job fetch node failed", error=str(e))

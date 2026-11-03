@@ -79,6 +79,10 @@ class LinkedInJobSource(BaseJobSource):
         """Fetch fresh live tech jobs from LinkedIn guest API, applying strict recency filters and extracting posting dates."""
         config = config or {}
         keywords_list = config.get("keywords") or [
+            "sdet",
+            "qa automation",
+            "quality engineer",
+            "test automation engineer",
             "software engineer",
             "backend engineer",
             "full stack developer",

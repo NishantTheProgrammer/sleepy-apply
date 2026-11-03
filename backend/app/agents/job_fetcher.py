@@ -106,7 +106,7 @@ class JobFetcherAgent:
             if source_clean in ["naukri", "all"]:
                 try:
                     naukri_jobs = await self.naukri_source.fetch_jobs({
-                        "keyword": (keywords[0] if keywords else "software-engineer"),
+                        "keyword": (keywords[0] if keywords else None),
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
                         "limit": 25,

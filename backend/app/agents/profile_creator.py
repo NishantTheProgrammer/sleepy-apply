@@ -135,7 +135,7 @@ STRICT JSON SCHEMA:
     }
   ],
   "jobPreferences": {
-    "jobTitles": ["Full Stack Developer", "Backend Developer", "Software Engineer"],
+    "jobTitles": ["<derive 2-3 target job titles directly aligned with candidate's actual work experience and summary, e.g. SDET, Senior Quality Engineer, or Backend Engineer>"],
     "locations": [],
     "remotePreference": "any",
     "minimumSalary": null,
@@ -471,7 +471,15 @@ class ProfileCreatorAgent:
             "education": education_list,
             "achievements": achievements_list,
             "jobPreferences": {
-                "jobTitles": ["Full Stack Developer", "Software Engineer"],
+                "jobTitles": [
+                    exp.get("title") or exp.get("jobTitle")
+                    for exp in experience_list
+                    if (exp.get("title") or exp.get("jobTitle"))
+                ] or (
+                    ["SDET", "QA Automation Engineer"]
+                    if any(t in text.lower() for t in ["sdet", "quality engineer", "test automation", "qa"])
+                    else ["Software Engineer"]
+                ),
                 "locations": [],
                 "remotePreference": "any",
                 "minimumSalary": None,

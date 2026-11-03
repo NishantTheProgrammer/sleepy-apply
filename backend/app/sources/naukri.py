@@ -23,13 +23,16 @@ COMMON_TECH_SKILLS = [
 ]
 
 TECH_KEYWORDS = [
+    "sdet", "qa-engineer", "quality-engineer", "test-engineer", "test-automation", "automation-engineer",
     "software-engineer", "software-developer", "backend", "frontend", "full-stack", "fullstack",
     "python", "java", "react", "node", "golang", "devops", "cloud", "data-engineer",
-    "machine-learning", "ai-engineer", "qa-engineer", "sre", "platform-engineer", "systems-engineer",
+    "machine-learning", "ai-engineer", "sre", "platform-engineer", "systems-engineer",
     "developer", "architect"
 ]
 
 ROLE_TERMS = [
+    "software development engineer in test", "sdet", "quality engineer", "test automation engineer",
+    "qa automation engineer", "qa engineer", "software test engineer",
     "software development engineer", "senior software engineer", "lead software engineer",
     "principal software engineer", "staff software engineer", "software engineer",
     "software developer", "application developer", "fullstack developer", "full stack developer",

@@ -331,12 +331,13 @@ export default function DashboardPage() {
                       <div className="flex items-start gap-3.5 min-w-0">
                         {/* Score Circle */}
                         <div
-                          className={`w-11 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${isHigh
+                          className={`w-11 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${
+                            isHigh
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : isMed
-                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                : "bg-red-500/10 text-red-400 border border-red-500/20"
-                            }`}
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/20"
+                          }`}
                         >
                           <span className="text-sm leading-none">{score}</span>
                           <span className="text-[8px] uppercase tracking-wider font-semibold opacity-70">pts</span>

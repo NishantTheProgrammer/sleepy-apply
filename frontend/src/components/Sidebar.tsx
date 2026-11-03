@@ -5,10 +5,11 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard, User, Briefcase, Settings,
-  Menu, X, LogOut, ChevronRight, ShieldCheck,
+  Menu, X, LogOut, ChevronRight, ShieldCheck, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme, THEME_CONFIGS } from "@/context/ThemeContext";
+import TestLoginModal from "@/components/TestLoginModal";
 import { clsx } from "clsx";
 
 const NAV_ITEMS = [
@@ -23,6 +24,7 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const { theme, setTheme, themes } = useTheme();
   const [open, setOpen] = useState(false);
+  const [testModalOpen, setTestModalOpen] = useState(false);
 
   const avatarUrl = user?.discord_avatar
     ? `https://cdn.discordapp.com/avatars/${user.discord_id}/${user.discord_avatar}.png?size=64`
@@ -136,6 +138,19 @@ export default function Sidebar() {
           })}
         </div>
       </div>
+
+      {/* Test Persona switcher */}
+      <button
+        onClick={() => {
+          setOpen(false);
+          setTestModalOpen(true);
+        }}
+        className="flex items-center gap-2 w-full px-3 py-2 rounded-xl mb-1 text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-xs font-semibold transition-all cursor-pointer"
+      >
+        <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+        <span>Switch Test Profile</span>
+      </button>
+
       <button
         onClick={logout}
         className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 text-xs transition-all"
@@ -197,6 +212,11 @@ export default function Sidebar() {
           </>
         )}
       </AnimatePresence>
+
+      <TestLoginModal
+        isOpen={testModalOpen}
+        onClose={() => setTestModalOpen(false)}
+      />
     </>
   );
 }

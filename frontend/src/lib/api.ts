@@ -18,6 +18,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // ── Auth ──────────────────────────────────────────────────
+export interface TestPersona {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  category: string;
+  title: string;
+  badge_color: string;
+  avatar_letter: string;
+  location: string;
+  target_titles: string[];
+  summary: string;
+  skills: Record<string, string[]>;
+}
+
 export const authApi = {
   getLoginUrl: () => request<{ url: string }>("/api/auth/discord/login"),
   callback: (code: string) =>
@@ -29,6 +44,12 @@ export const authApi = {
   logout: () => request("/api/auth/logout", { method: "POST" }),
   refresh: () => request("/api/auth/refresh", { method: "POST" }),
   devLogin: () => request<{ ok: boolean; user: Record<string, unknown> }>("/api/auth/dev-login", { method: "POST" }),
+  getTestPersonas: () => request<{ personas: TestPersona[] }>("/api/auth/test-personas"),
+  testLogin: (persona_id: string) =>
+    request<{ ok: boolean; user: Record<string, unknown>; persona: TestPersona }>("/api/auth/test-login", {
+      method: "POST",
+      body: JSON.stringify({ persona_id }),
+    }),
 };
 
 // ── Profile ───────────────────────────────────────────────

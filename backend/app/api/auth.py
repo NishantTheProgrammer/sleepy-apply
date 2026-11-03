@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from pydantic import BaseModel
 import httpx
 from app.core.config import get_settings
 from app.db.client import get_db
@@ -231,4 +232,90 @@ async def dev_login(response: Response):
     response.set_cookie("access_token", access_token, httponly=True, samesite="lax", max_age=3600 * 24)
     response.set_cookie("refresh_token", refresh_token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
     return {"ok": True, "user": {"id": user_id, "_id": user_id, "email": user_email, "role": "admin", "discord_username": "Nishant (Admin)"}}
+
+
+class TestLoginRequest(BaseModel):
+    persona_id: str
+
+
+@router.get("/test-personas")
+async def get_test_personas():
+    """Returns the list of 6 curated test personas for rapid QA testing."""
+    from app.api.test_personas import TEST_PERSONAS
+    return {
+        "personas": [
+            {
+                "id": p["id"],
+                "name": p["name"],
+                "email": p["email"],
+                "role": p["role"],
+                "category": p["category"],
+                "title": p["title"],
+                "badge_color": p["badge_color"],
+                "avatar_letter": p["avatar_letter"],
+                "location": p["location"],
+                "target_titles": p["target_titles"],
+                "summary": p["summary"],
+                "skills": p["skills"],
+            }
+            for p in TEST_PERSONAS
+        ]
+    }
+
+
+@router.post("/test-login")
+async def test_login(payload: TestLoginRequest, response: Response):
+    """Dev-only: Switch identity to one of the 6 test personas."""
+    from app.api.test_personas import TEST_PERSONAS, seed_persona_profile
+    persona = next((p for p in TEST_PERSONAS if p["id"] == payload.persona_id), None)
+    if not persona:
+        raise HTTPException(status_code=404, detail="Test persona not found")
+
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    user_email = persona["email"]
+
+    user_doc = await db.users.find_one({"email": user_email})
+    if not user_doc:
+        user_doc = {
+            "discord_id": f"test_{persona['id']}",
+            "discord_username": persona["discord_username"],
+            "email": user_email,
+            "role": persona.get("role", "user"),
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
+            "last_login": now,
+        }
+        res = await db.users.insert_one(user_doc)
+        user_doc["_id"] = res.inserted_id
+    else:
+        await db.users.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {"is_active": True, "last_login": now}}
+        )
+
+    user_id = str(user_doc["_id"])
+
+    # Seed profile and score active jobs
+    await seed_persona_profile(user_doc["_id"], persona)
+
+    token_data = {"sub": user_id, "discord_id": user_doc.get("discord_id", f"test_{persona['id']}")}
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    response.set_cookie("access_token", access_token, httponly=True, samesite="lax", max_age=3600 * 24)
+    response.set_cookie("refresh_token", refresh_token, httponly=True, samesite="lax", max_age=3600 * 24 * 30)
+
+    return {
+        "ok": True,
+        "user": {
+            "id": user_id,
+            "_id": user_id,
+            "email": user_email,
+            "role": user_doc.get("role", "user"),
+            "discord_username": user_doc.get("discord_username", persona["name"]),
+        },
+        "persona": persona,
+    }
 

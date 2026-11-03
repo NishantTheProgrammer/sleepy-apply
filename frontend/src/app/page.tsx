@@ -1,15 +1,16 @@
 "use client";
-import { useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
-import { Bot, Briefcase, FileText, Zap, ShieldCheck, AlertCircle } from "lucide-react";
+import { Bot, Briefcase, FileText, Zap, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
+import TestLoginModal from "@/components/TestLoginModal";
 
 const FEATURES = [
-  { icon: FileText, label: "AI Profile Builder",      desc: "Upload your resume, AI fills the rest" },
-  { icon: Briefcase, label: "Smart Job Discovery",    desc: "Auto-fetches matching jobs continuously" },
-  { icon: Zap,       label: "Auto Applications",      desc: "Applies with a tailored resume per job" },
-  { icon: Bot,       label: "Discord Notifications",  desc: "Updates you on every step" },
+  { icon: FileText, label: "AI Profile Builder", desc: "Upload your resume, AI fills the rest" },
+  { icon: Briefcase, label: "Smart Job Discovery", desc: "Auto-fetches matching jobs continuously" },
+  { icon: Zap, label: "Auto Applications", desc: "Applies with a tailored resume per job" },
+  { icon: Bot, label: "Discord Notifications", desc: "Updates you on every step" },
 ];
 
 function LoginContent() {
@@ -17,6 +18,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const [testModalOpen, setTestModalOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && user) router.replace("/user/dashboard");
@@ -90,14 +92,27 @@ function LoginContent() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.35 }}
+          onClick={() => setTestModalOpen(true)}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/50 hover:to-indigo-600/50 text-purple-200 hover:text-white border border-purple-500/40 text-xs font-bold transition-all shadow-lg hover:-translate-y-0.5 active:scale-95 cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-purple-400" />
+          Test Candidate Logins (5 Profiles)
+        </motion.button>
+
+        <motion.button
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.4 }}
           onClick={devLogin}
           disabled={loading}
           className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 cursor-pointer"
         >
-          <ShieldCheck className="w-4 h-4 text-purple-400" />
+          <ShieldCheck className="w-4 h-4 text-slate-400" />
           Quick Admin Sign-In (Dev Mode)
         </motion.button>
       </div>
+
+      <TestLoginModal isOpen={testModalOpen} onClose={() => setTestModalOpen(false)} />
 
       <p className="text-xs text-slate-600 mt-6 text-center max-w-xs">
         We only read your Discord username and avatar. Your credentials are encrypted and never exposed.

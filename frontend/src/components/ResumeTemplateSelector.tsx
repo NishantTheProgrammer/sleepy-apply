@@ -466,7 +466,6 @@ export default function ResumeTemplateSelector({
               </p>
             </div>
           ) : (
-            /* Actual Document Sheet */
             <div
               className={`w-full max-w-3xl mx-auto rounded-xl p-6 sm:p-10 shadow-2xl transition-all duration-300 ${theme.paperClass}`}
               style={{ fontFamily: theme.fontFamily }}

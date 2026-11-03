@@ -62,11 +62,27 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
     from app.agents.screening_agent import ScreeningQAAgent
     screening_agent = ScreeningQAAgent()
     suggested_roles = screening_agent.generate_suggested_roles(parsed)
-    initial_questions = await screening_agent.generate_screening_questions(
-        profile=parsed,
-        target_role=suggested_roles[0] if suggested_roles else None,
-        user_settings=user_settings,
-    )
+    try:
+        import asyncio
+        initial_questions = await asyncio.wait_for(
+            screening_agent.generate_screening_questions(
+                profile=parsed,
+                target_role=suggested_roles[0] if suggested_roles else None,
+                user_settings=user_settings,
+            ),
+            timeout=15.0
+        )
+    except Exception as q_err:
+        logger.warning("Screening questions LLM call timed out, using dynamic fallback", error=str(q_err))
+        clean_skills = []
+        for v in (parsed.get("skills") or {}).values():
+            if isinstance(v, list):
+                clean_skills.extend(v)
+        initial_questions = screening_agent._generate_dynamic_fallback_questions(
+            profile=parsed,
+            role=suggested_roles[0] if suggested_roles else "Software Engineer",
+            clean_skills=clean_skills
+        )
 
     update_fields = {
         "personal": parsed.get("personal", {}),

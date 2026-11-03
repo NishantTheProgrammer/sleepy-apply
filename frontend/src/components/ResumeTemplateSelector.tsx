@@ -435,7 +435,23 @@ export default function ResumeTemplateSelector({
             isFullScreen ? "max-h-[85vh]" : "max-h-[580px]"
           } transition-all duration-300 shadow-inner relative`}
         >
-          {isAnalyzing && (
+          {/* Live refinement pill if profile data is already visible */}
+          {isAnalyzing && hasProfileData && (
+            <div className="sticky top-0 z-20 mb-4 px-4 py-2.5 rounded-xl bg-indigo-950/90 border border-indigo-500/30 backdrop-blur-md flex items-center justify-between text-xs text-indigo-200 shadow-xl">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                <span>
+                  <strong>Live Extraction Active</strong> — Initial details parsed below. Refining achievements & ATS calibration...
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 shrink-0 ml-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Updating
+              </span>
+            </div>
+          )}
+
+          {/* Full overlay loader ONLY when no profile data is extracted yet */}
+          {isAnalyzing && !hasProfileData && (
             <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
               <div className="relative mb-4">
                 <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center">

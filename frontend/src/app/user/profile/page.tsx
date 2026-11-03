@@ -320,20 +320,31 @@ const sanitizeStr = (val: unknown): string => {
     }, 1000);
 
     let attempts = 0;
-    const maxAttempts = 60; // 60 * 2.5s = 150 seconds max
+    const maxAttempts = 60; // 60 * 2s = 120 seconds max
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
       try {
         const updated = await profileApi.get();
         const p = updated?.profile;
         if (p) {
+          // Auto-fill details continuously as each step parses data
+          if (
+            p.personal?.fullName ||
+            (Array.isArray(p.experience) && p.experience.length > 0) ||
+            (p.skills && Object.keys(p.skills).length > 0)
+          ) {
+            populateForm(p);
+          }
+
           if (p.analysis_error) {
             stopAnalysis();
             setUploadError("Analysis error: " + String(p.analysis_error));
             void load();
             return;
           }
-          if (!p.is_analyzing && (Array.isArray(p.experience) && p.experience.length >= 1)) {
+
+          // When backend finishes, stop analysis and finalize
+          if (!p.is_analyzing) {
             stopAnalysis();
             populateForm(p);
             setUploadMsg("✓ Resume parsed successfully! Extracted all work experiences, skills, and projects.");
@@ -350,7 +361,7 @@ const sanitizeStr = (val: unknown): string => {
       } catch {
         // Keep polling
       }
-    }, 2500);
+    }, 2000);
   };
 
   const load = async () => {

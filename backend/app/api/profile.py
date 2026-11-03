@@ -44,14 +44,20 @@ async def get_profile(request: Request):
                 parsed = agent._normalize_extracted_data(parsed)
                 screening_agent = ScreeningQAAgent()
                 suggested_roles = screening_agent.generate_suggested_roles(parsed)
-                screening_qs = await screening_agent.generate_screening_questions(
-                    profile=parsed,
-                    target_role=suggested_roles[0] if suggested_roles else None
-                )
                 score = agent._calculate_completion_score(parsed)
                 full_name = parsed.get("personal", {}).get("fullName")
                 if full_name and full_name.lower() != "candidate":
                     await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"name": full_name}})
+
+                fallback_skills = []
+                for v in (parsed.get("skills") or {}).values():
+                    if isinstance(v, list):
+                        fallback_skills.extend(v)
+                fallback_qs = screening_agent._generate_dynamic_fallback_questions(
+                    parsed,
+                    suggested_roles[0] if suggested_roles else "Software Engineer",
+                    fallback_skills
+                )
 
                 update_fields = {
                     "personal": parsed.get("personal", {}),
@@ -63,7 +69,7 @@ async def get_profile(request: Request):
                     "achievements": parsed.get("achievements", []),
                     "completion_score": score,
                     "suggested_roles": suggested_roles,
-                    "screening_questions": screening_qs,
+                    "screening_questions": fallback_qs,
                     "is_analyzing": False,
                     "analysis_error": None,
                     "analyzed_at": now,
@@ -210,7 +216,17 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     if existing_profile and existing_profile.get("created_at"):
         existing_created_at = existing_profile["created_at"]
 
-    # 3. Clean fresh profile state (deleting all old experiences, skills, questions, and Q/A history)
+    # 3. Immediately parse initial details (takes ~0.02s) so UI and ATS preview auto-fill instantly
+    from app.agents.profile_creator import ProfileCreatorAgent
+    agent = ProfileCreatorAgent()
+    fast_parsed = agent._heuristic_parse(cleaned_text)
+    fast_parsed = agent._normalize_extracted_data(fast_parsed)
+    score = agent._calculate_completion_score(fast_parsed)
+
+    full_name = fast_parsed.get("personal", {}).get("fullName")
+    if full_name and full_name.lower() != "candidate":
+        await db.users.update_one({"_id": uid}, {"$set": {"name": full_name}})
+
     fresh_profile = {
         "user_id": uid,
         "resume_filename": file.filename,
@@ -218,17 +234,17 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
         "is_analyzing": True,
         "analysis_started_at": now,
         "analysis_error": None,
-        "personal": {},
-        "summary": "",
-        "skills": {},
-        "experience": [],
-        "education": [],
-        "projects": [],
-        "achievements": [],
-        "jobPreferences": {},
-        "job_preferences": {},
-        "additionalInformation": {},
-        "completion_score": 0,
+        "personal": fast_parsed.get("personal", {}),
+        "summary": fast_parsed.get("summary", ""),
+        "skills": fast_parsed.get("skills", {}),
+        "experience": fast_parsed.get("experience", []),
+        "education": fast_parsed.get("education", []),
+        "projects": fast_parsed.get("projects", []),
+        "achievements": fast_parsed.get("achievements", []),
+        "jobPreferences": fast_parsed.get("jobPreferences", {}),
+        "job_preferences": fast_parsed.get("job_preferences", {}),
+        "additionalInformation": fast_parsed.get("additionalInformation", {}),
+        "completion_score": score,
         "missing_fields": [],
         "pending_questions": [],
         "qa_history": [],

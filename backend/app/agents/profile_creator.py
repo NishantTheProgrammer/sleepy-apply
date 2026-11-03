@@ -192,17 +192,21 @@ class ProfileCreatorAgent:
         app_prefs = user_settings.application_preferences if user_settings else None
         extract_temp = float(getattr(app_prefs, "extraction_temperature", 0.1) if app_prefs else 0.1)
 
+        import asyncio
         try:
             provider = AIProviderFactory.resolve(user_settings)
-            resp = await provider.complete(
-                [{"role": "user", "content": prompt}],
-                temperature=extract_temp,
-                num_ctx=8192,
-                format="json",
+            resp = await asyncio.wait_for(
+                provider.complete(
+                    [{"role": "user", "content": prompt}],
+                    temperature=extract_temp,
+                    num_ctx=4096,
+                    format="json",
+                ),
+                timeout=35.0
             )
             extracted_data = self._extract_json_from_response(resp)
         except Exception as e:
-            logger.warning("Primary AI extraction failed, trying default local Ollama llama3.2", error=str(e))
+            logger.warning("Primary AI extraction timed out or failed, falling back to fast parsing", error=str(e))
             if user_settings.ai_provider != "ollama":
                 try:
                     from bson import ObjectId
@@ -212,17 +216,20 @@ class ProfileCreatorAgent:
                         ai_model="llama3.2:latest",
                     )
                     provider = AIProviderFactory.resolve(local_settings)
-                    resp = await provider.complete(
-                        [{"role": "user", "content": prompt}],
-                        temperature=extract_temp,
-                        num_ctx=8192,
-                        format="json",
+                    resp = await asyncio.wait_for(
+                        provider.complete(
+                            [{"role": "user", "content": prompt}],
+                            temperature=extract_temp,
+                            num_ctx=4096,
+                            format="json",
+                        ),
+                        timeout=25.0
                     )
                     extracted_data = self._extract_json_from_response(resp)
                 except Exception as fallback_err:
-                    logger.warning("AI extraction failed, falling back to heuristic parsing", error=str(fallback_err))
+                    logger.warning("AI extraction fallback failed, using heuristic parser", error=str(fallback_err))
             else:
-                logger.warning("Ollama AI extraction failed, falling back to heuristic parsing", error=str(e))
+                logger.warning("Ollama AI extraction timed out, using heuristic parser", error=str(e))
 
         # 2. Heuristic fallback
         if not extracted_data:
@@ -486,34 +493,58 @@ class ProfileCreatorAgent:
         exp_match = re.search(r"(?:EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT HISTORY)\s*\n+([\s\S]*?)(?=\n+(?:EDUCATION|PROJECTS|RELEVANT PROJECTS|SKILLS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
         if exp_match:
             exp_block = exp_match.group(1)
-            # Find company / date chunks
-            # Match lines with dates like Jan 2023 – Current or 2021 - 2022
-            date_pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})[^\n]*?(?:Current|Present|\d{4}))"
+            # Match comprehensive date ranges like January 2026 to Present or Feb 2022 - Jan 2026
+            date_pattern = r"((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{4})[^\n\r]*(?:to|–|-|—)[^\n\r]*(?:Current|Present|\d{4}))"
             entries = re.split(date_pattern, exp_block, flags=re.IGNORECASE)
-            # Pair companies with date ranges
+            if len(entries) <= 1:
+                # Fallback to single date or year pattern if no date range
+                date_pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})[^\n]*?(?:Current|Present|\d{4}))"
+                entries = re.split(date_pattern, exp_block, flags=re.IGNORECASE)
+
             if len(entries) > 1:
-                # entries[0] = company or header before date, entries[1] = date, entries[2] = content...
                 for i in range(1, len(entries), 2):
                     date_str = entries[i].strip()
                     content_chunk = entries[i+1].strip() if i+1 < len(entries) else ""
-                    # The company name was likely on the line right before the date
-                    prev_chunk = entries[i-1].strip().split("\n")
-                    company_name = prev_chunk[-1].strip() if prev_chunk else "Company"
-                    # Look for job title at the start of content_chunk
+                    prev_chunk = [l.strip() for l in entries[i-1].strip().split("\n") if l.strip()]
+
+                    company_name = "Company"
+                    job_title = "Software Engineer"
+                    if len(prev_chunk) >= 2:
+                        l1, l2 = prev_chunk[-2], prev_chunk[-1]
+                        if "|" in l2 or any(c in l2.lower() for c in ["pvt", "ltd", "inc", "systems", "technologies", "noida", "gurugram", "delhi", "bangalore"]):
+                            company_name = l2.split("|")[0].strip()
+                            job_title = l1
+                        elif "|" in l1:
+                            company_name = l1.split("|")[0].strip()
+                            job_title = l2
+                        else:
+                            company_name = l2
+                            job_title = l1
+                    elif len(prev_chunk) == 1:
+                        if "|" in prev_chunk[0]:
+                            parts = prev_chunk[0].split("|")
+                            company_name = parts[0].strip()
+                            job_title = parts[1].strip()
+                        else:
+                            company_name = prev_chunk[0]
+
                     chunk_lines = [l.strip() for l in content_chunk.split("\n") if l.strip()]
-                    job_title = chunk_lines[0] if chunk_lines else "Software Engineer"
-                    bullets = [l.lstrip("●-•* ").strip() for l in chunk_lines[1:] if len(l) > 15]
+                    bullets = [l.lstrip("●-•* ").strip() for l in chunk_lines if len(l) > 15]
 
                     is_current = bool(re.search(r"current|present", date_str, re.IGNORECASE))
+                    split_dates = re.split(r"to|–|-|—", date_str, flags=re.IGNORECASE)
+                    start_d = split_dates[0].strip() if split_dates else date_str
+                    end_d = "Present" if is_current else (split_dates[-1].strip() if len(split_dates) > 1 else date_str)
+
                     experience_list.append({
                         "company": company_name,
                         "jobTitle": job_title,
                         "title": job_title,
-                        "startDate": date_str.split("–")[0].split("-")[0].strip(),
-                        "endDate": "Current" if is_current else (date_str.split("–")[-1].split("-")[-1].strip() if "–" in date_str or "-" in date_str else date_str),
+                        "startDate": start_d,
+                        "endDate": end_d,
                         "current": is_current,
                         "is_current": is_current,
-                        "description": " ".join(chunk_lines[1:3]) if len(chunk_lines) > 1 else "",
+                        "description": " ".join(chunk_lines[:2]) if chunk_lines else "",
                         "responsibilities": bullets[:8],
                         "projects": [],
                     })

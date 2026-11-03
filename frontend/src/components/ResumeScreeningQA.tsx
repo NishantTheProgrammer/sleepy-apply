@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, CheckCircle2, MessageSquare, ChevronRight, Loader2,
-  RefreshCw, Check, ArrowRight, UserCheck, HelpCircle, Briefcase, Plus
+  RefreshCw, Check, ArrowRight, UserCheck, HelpCircle, Briefcase, Plus,
+  ListFilter, CheckSquare, Square, Circle, Sliders, Hash, X
 } from "lucide-react";
 import { profileApi, ScreeningData, ScreeningQuestion, ScreeningQAItem } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +24,8 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
 
   // Question answers state: { [questionId]: answerText }
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Selected option chips: { [questionId]: string[] }
+  const [selectedChips, setSelectedChips] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -38,12 +41,29 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
       const res = await profileApi.getScreening();
       setData(res);
       setSelectedRole(res.selected_role || (res.target_roles.length > 0 ? res.target_roles[0] : ""));
-      // Pre-fill answers from any existing QA history
+
+      // Pre-fill answers & selected chips from existing QA history or questions
       const initialAnswers: Record<string, string> = {};
+      const initialChips: Record<string, string[]> = {};
+
       (res.qa_history || []).forEach((item) => {
         initialAnswers[item.id] = item.answer;
+        const parts = item.answer.split(",").map((s) => s.trim()).filter(Boolean);
+        initialChips[item.id] = parts;
       });
+
+      (res.questions || []).forEach((q) => {
+        if (q.answer && !initialAnswers[q.id]) {
+          const ansStr = Array.isArray(q.answer) ? q.answer.join(", ") : String(q.answer);
+          initialAnswers[q.id] = ansStr;
+          initialChips[q.id] = Array.isArray(q.answer)
+            ? q.answer.map(String)
+            : ansStr.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+      });
+
       setAnswers(initialAnswers);
+      setSelectedChips(initialChips);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!msg.includes("Invalid or expired token") && !msg.includes("401")) {
@@ -85,11 +105,41 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
     setCustomRoleInput("");
   };
 
-  const handleOptionClick = (questionId: string, option: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: option,
-    }));
+  const handleToggleChip = (q: ScreeningQuestion, option: string) => {
+    const qType = q.type || "single_select";
+    const currentList = selectedChips[q.id] || [];
+
+    if (qType === "multiselect") {
+      let nextList: string[];
+      if (currentList.includes(option)) {
+        nextList = currentList.filter((item) => item !== option);
+      } else {
+        nextList = [...currentList, option];
+      }
+      setSelectedChips((prev) => ({ ...prev, [q.id]: nextList }));
+      setAnswers((prev) => ({
+        ...prev,
+        [q.id]: nextList.join(", "),
+      }));
+    } else {
+      // Single select / boolean / number
+      const isAlreadySelected = currentList.includes(option);
+      const nextList = isAlreadySelected ? [] : [option];
+      setSelectedChips((prev) => ({ ...prev, [q.id]: nextList }));
+      setAnswers((prev) => ({
+        ...prev,
+        [q.id]: isAlreadySelected ? "" : option,
+      }));
+    }
+  };
+
+  const handleTextChange = (q: ScreeningQuestion, text: string) => {
+    setAnswers((prev) => ({ ...prev, [q.id]: text }));
+    if (q.suggested_options) {
+      const lower = text.toLowerCase();
+      const matched = q.suggested_options.filter((opt) => lower.includes(opt.toLowerCase()));
+      setSelectedChips((prev) => ({ ...prev, [q.id]: matched }));
+    }
   };
 
   const handleSubmitAnswers = async () => {
@@ -98,13 +148,26 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
     setSubmitSuccess(false);
     try {
       const answerPayload = data.questions
-        .filter((q) => answers[q.id] && answers[q.id].trim().length > 0)
-        .map((q) => ({
-          question_id: q.id,
-          question: q.question,
-          answer: answers[q.id].trim(),
-          category: q.category,
-        }));
+        .filter(
+          (q) =>
+            (answers[q.id] && answers[q.id].trim().length > 0) ||
+            (selectedChips[q.id] && selectedChips[q.id].length > 0)
+        )
+        .map((q) => {
+          const chipList = selectedChips[q.id] || [];
+          const textVal = answers[q.id] ? answers[q.id].trim() : "";
+          let finalAnswer: string | string[] = textVal || chipList.join(", ");
+          if (q.type === "multiselect" && chipList.length > 0) {
+            finalAnswer = chipList;
+          }
+          return {
+            question_id: q.id,
+            question: q.question,
+            answer: finalAnswer,
+            category: q.category,
+            type: q.type || "single_select",
+          };
+        });
 
       if (answerPayload.length === 0) {
         alert("Please answer at least one screening question.");
@@ -113,7 +176,7 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
       }
 
       const res = await profileApi.submitScreeningAnswers(answerPayload, selectedRole);
-      setData((prev) => prev ? { ...prev, qa_history: res.qa_history } : prev);
+      setData((prev) => (prev ? { ...prev, qa_history: res.qa_history } : prev));
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 4000);
       if (onProfileUpdated) onProfileUpdated();
@@ -302,6 +365,39 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
                       {idx + 1}
                     </span>
                     <div>
+                      {/* Meaningful Data Type Badge */}
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {q.type === "multiselect" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                            <ListFilter className="w-3 h-3 text-purple-400" />
+                            Multi-select
+                          </span>
+                        )}
+                        {q.type === "single_select" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                            <Circle className="w-2.5 h-2.5 text-blue-400" />
+                            Single choice
+                          </span>
+                        )}
+                        {q.type === "boolean" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            <Sliders className="w-3 h-3 text-emerald-400" />
+                            Yes / No
+                          </span>
+                        )}
+                        {q.type === "number" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            <Hash className="w-3 h-3 text-amber-400" />
+                            Numeric {q.unit ? `(${q.unit})` : ""}
+                          </span>
+                        )}
+                        {q.type === "multiselect" && (
+                          <span className="text-[11px] text-purple-300/80 font-medium">
+                            (Select all that apply)
+                          </span>
+                        )}
+                      </div>
+
                       <h3 className="text-sm font-bold text-white leading-snug">
                         {q.question}
                       </h3>
@@ -324,19 +420,39 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
                 {q.suggested_options && q.suggested_options.length > 0 && (
                   <div className="mt-3 mb-2 flex flex-wrap gap-1.5">
                     {q.suggested_options.map((opt) => {
-                      const isOptionSelected = currentAns.trim() === opt.trim();
+                      const selectedList = selectedChips[q.id] || [];
+                      const isMulti = q.type === "multiselect";
+                      const isOptionSelected =
+                        selectedList.includes(opt) ||
+                        (isMulti
+                          ? currentAns.toLowerCase().includes(opt.toLowerCase())
+                          : currentAns.trim().toLowerCase() === opt.trim().toLowerCase());
+
                       return (
                         <button
                           key={opt}
                           type="button"
-                          onClick={() => handleOptionClick(q.id, opt)}
-                          className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer text-left ${
+                          onClick={() => handleToggleChip(q, opt)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${
                             isOptionSelected
-                              ? "bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30 ring-1 ring-white/20"
+                              ? isMulti
+                                ? "bg-purple-600 text-white font-semibold shadow-md shadow-purple-600/30 ring-1 ring-purple-300"
+                                : "bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30 ring-1 ring-indigo-300"
                               : "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10"
                           }`}
                         >
-                          {opt}
+                          {isMulti ? (
+                            isOptionSelected ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-purple-200 shrink-0" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            )
+                          ) : isOptionSelected ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-200 shrink-0" />
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded-full border border-slate-500 shrink-0" />
+                          )}
+                          <span>{opt}</span>
                         </button>
                       );
                     })}
@@ -348,13 +464,16 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
                   <input
                     type="text"
                     value={currentAns}
-                    onChange={(e) =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [q.id]: e.target.value,
-                      }))
+                    onChange={(e) => handleTextChange(q, e.target.value)}
+                    placeholder={
+                      q.type === "multiselect"
+                        ? "Selected choices appear above. Customize or add more items…"
+                        : q.type === "boolean"
+                        ? "Yes / No (Add any notes or context if needed)…"
+                        : q.type === "number"
+                        ? `Numeric value or tenure ${q.unit ? `(${q.unit})` : ""}, or customize answer…`
+                        : "Type or customize your answer…"
                     }
-                    placeholder="Type or customize your answer…"
                     className="w-full bg-slate-950/60 border border-white/10 focus:border-indigo-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none transition-all"
                   />
                 </div>

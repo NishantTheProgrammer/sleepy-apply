@@ -222,8 +222,9 @@ class SelectRoleRequest(BaseModel):
 class ScreeningAnswerItem(BaseModel):
     question_id: str
     question: str | None = None
-    answer: str
+    answer: Any
     category: str | None = None
+    type: str | None = None
 
 
 class SubmitScreeningAnswersRequest(BaseModel):
@@ -359,10 +360,18 @@ async def submit_screening_answers(request: Request, body: SubmitScreeningAnswer
     existing_map = {item.get("id"): item for item in existing_qa}
 
     for item in body.answers:
+        raw_ans = item.answer
+        if isinstance(raw_ans, list):
+            formatted_answer = ", ".join(str(x).strip() for x in raw_ans if str(x).strip())
+        else:
+            formatted_answer = str(raw_ans).strip()
+
         qa_entry = {
             "id": item.question_id,
             "question": item.question or f"Question {item.question_id}",
-            "answer": item.answer.strip(),
+            "answer": formatted_answer,
+            "raw_answer": raw_ans,
+            "type": item.type or ("multiselect" if isinstance(raw_ans, list) else "single_select"),
             "category": item.category or "screening",
             "target_role": body.target_role or profile.get("target_role"),
             "answered_at": now.isoformat(),
@@ -371,8 +380,15 @@ async def submit_screening_answers(request: Request, body: SubmitScreeningAnswer
 
     updated_qa = list(existing_map.values())
 
+    current_questions = profile.get("screening_questions", [])
+    for q in current_questions:
+        if q.get("id") in existing_map:
+            q["answer"] = existing_map[q["id"]]["answer"]
+            q["answered_at"] = existing_map[q["id"]]["answered_at"]
+
     update_fields: dict[str, Any] = {
         "qa_history": updated_qa,
+        "screening_questions": current_questions,
         "updated_at": now,
     }
 

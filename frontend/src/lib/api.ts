@@ -53,13 +53,19 @@ export const authApi = {
 };
 
 // ── Profile ───────────────────────────────────────────────
+export type ScreeningQuestionType = "multiselect" | "single_select" | "boolean" | "number" | "text";
+
 export interface ScreeningQuestion {
   id: string;
   category?: string;
+  type?: ScreeningQuestionType;
   question: string;
   context_hint?: string;
   suggested_options?: string[];
-  answer?: string | null;
+  unit?: string;
+  min_selections?: number;
+  max_selections?: number;
+  answer?: string | string[] | number | boolean | null;
   answered_at?: string | null;
 }
 
@@ -67,6 +73,8 @@ export interface ScreeningQAItem {
   id: string;
   question: string;
   answer: string;
+  raw_answer?: unknown;
+  type?: ScreeningQuestionType;
   category?: string;
   target_role?: string;
   answered_at: string;
@@ -106,7 +114,7 @@ export const profileApi = {
       method: "POST",
       body: JSON.stringify({ role }),
     }),
-  submitScreeningAnswers: (answers: { question_id: string; question?: string; answer: string; category?: string }[], target_role?: string) =>
+  submitScreeningAnswers: (answers: { question_id: string; question?: string; answer: string | string[] | number | boolean; category?: string; type?: string }[], target_role?: string) =>
     request<{ ok: boolean; saved_count: number; total_qa: number; qa_history: ScreeningQAItem[] }>("/api/profile/screening/answer", {
       method: "POST",
       body: JSON.stringify({ answers, target_role }),

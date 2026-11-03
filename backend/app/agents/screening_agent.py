@@ -146,18 +146,21 @@ class ScreeningQAAgent:
 
         role = target_role or (profile.get("job_preferences", {}).get("jobTitles") or ["Software Engineer"])[0]
 
-        prompt = f"""You are an expert technical recruiter and engineering hiring manager.
-Generate 3 to 4 realistic screening questions a recruiter will ask this candidate for their target role.
-Candidate: {name}
+        prompt = f"""You are a recruiter screening assistant collecting candidate details and application preferences.
+Candidate Name: {name}
 Target Role: {role}
-Summary: {summary[:300]}
+Resume Summary: {summary[:300]}
 Key Skills: {skills_summary}
 
-Requirements:
-1. Cover core technical depth on their primary tech stack (e.g. scale, framework architecture, concurrency).
-2. Cover practical experience details (e.g. project scale, testing, or system architecture).
-3. Cover availability / logistics (e.g. Notice Period, Expected CTC, or Work Location preference in Delhi NCR/Bengaluru).
-4. For each question, provide 3 to 4 quick multiple-choice chip options so the user can easily click to answer.
+CRITICAL RULES:
+- DO NOT ask interview questions, technical exam questions, or conceptual explanation questions!
+- NEVER ask 'Can you explain...', 'Walk me through...', 'How do you handle...', or theoretical questions. We are NOT interviewing or quizzing the candidate.
+- ONLY ask for candidate details, preferences, and facts to complete their application profile:
+  1. Tooling & Tech Stack hands-on checklist (type: 'multiselect'): Which frameworks, libraries, tools, and databases have you worked with hands-on in production?
+  2. Total relevant hands-on experience in years (type: 'single_select')
+  3. Official notice period / earliest joining timeline (type: 'single_select')
+  4. Work location & hybrid/relocation readiness in Delhi NCR or Bengaluru (type: 'boolean')
+  5. Expected annual CTC / salary expectation bracket (type: 'single_select')
 
 Return strict JSON only in this format:
 {{
@@ -165,9 +168,42 @@ Return strict JSON only in this format:
     {{
       "id": "q1",
       "category": "technical",
-      "question": "Clear, direct recruiter question?",
-      "context_hint": "Why the recruiter is asking this",
-      "suggested_options": ["Option 1", "Option 2", "Option 3", "Option 4"]
+      "type": "multiselect",
+      "question": "Which automation frameworks, libraries, and tools have you worked with hands-on?",
+      "context_hint": "Select all tools in your active toolkit.",
+      "suggested_options": ["Playwright", "Selenium WebDriver", "REST Assured", "Cypress", "Appium", "Postman", "Jenkins"]
+    }},
+    {{
+      "id": "q2",
+      "category": "experience",
+      "type": "single_select",
+      "question": "How many total years of hands-on test automation experience do you have?",
+      "context_hint": "Select your total experience bracket.",
+      "suggested_options": ["1-2 years", "3-4 years", "4.5+ years", "6+ years"]
+    }},
+    {{
+      "id": "q3",
+      "category": "logistics",
+      "type": "single_select",
+      "question": "What is your current official notice period?",
+      "context_hint": "Recruiter assessing onboarding timeline.",
+      "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"]
+    }},
+    {{
+      "id": "q4",
+      "category": "logistics",
+      "type": "boolean",
+      "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
+      "context_hint": "Location flexibility check.",
+      "suggested_options": ["Yes", "No"]
+    }},
+    {{
+      "id": "q5",
+      "category": "compensation",
+      "type": "single_select",
+      "question": "What is your expected annual CTC bracket?",
+      "context_hint": "Compensation expectation alignment.",
+      "suggested_options": ["8 - 12 LPA", "12 - 16 LPA", "16 - 22 LPA", "22+ LPA"]
     }}
   ]
 }}
@@ -196,17 +232,67 @@ Return strict JSON only in this format:
         return self._generate_heuristic_questions(profile, role)
 
     def _format_questions(self, raw_questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        disallowed_patterns = [
+            "can you explain",
+            "explain the concept",
+            "walk me through",
+            "how do you handle",
+            "describe your approach",
+            "what is the difference",
+            "tell me about a time",
+            "explain how you",
+            "how would you resolve",
+            "concept of concurrency",
+            "critical issue in",
+            "concept of",
+        ]
+
         formatted = []
         for i, q in enumerate(raw_questions):
             if not isinstance(q, dict):
                 continue
+
+            q_text = str(q.get("question", "")).strip()
+            q_text_low = q_text.lower()
+
+            # Reject interview / theoretical viva questions
+            if any(pattern in q_text_low for pattern in disallowed_patterns):
+                logger.info("Filtered out theoretical interview question from screening", question=q_text)
+                continue
+
             qid = q.get("id") or f"q_{i+1}_{str(uuid.uuid4())[:6]}"
+            q_type = str(q.get("type", "")).lower().strip()
+            if q_type not in ["multiselect", "single_select", "boolean", "number", "text"]:
+                opts = q.get("suggested_options", [])
+                opts_lower = {str(o).lower().strip() for o in opts}
+                if opts_lower in [{"yes", "no"}, {"true", "false"}]:
+                    q_type = "boolean"
+                elif any(w in q_text_low for w in ["which", "what tools", "frameworks", "technologies", "libraries", "all that apply", "skills", "types"]):
+                    q_type = "multiselect"
+                elif any(w in q_text_low for w in ["how many years", "how many days", "years of experience"]):
+                    q_type = "number"
+                else:
+                    q_type = "single_select"
+
+            opts = q.get("suggested_options", [])
+            if q_type == "number" and not opts:
+                if "year" in q_text_low:
+                    opts = ["1-2 years", "3-4 years", "4.5+ years", "6+ years"]
+                elif "day" in q_text_low or "notice" in q_text_low:
+                    opts = ["Immediate", "15 days", "30 days", "60 days"]
+                elif "salary" in q_text_low or "ctc" in q_text_low or "lpa" in q_text_low:
+                    opts = ["8-12 LPA", "12-16 LPA", "16-22 LPA", "22+ LPA"]
+
             formatted.append({
                 "id": str(qid),
                 "category": q.get("category", "technical"),
-                "question": q.get("question", "").strip(),
-                "context_hint": q.get("context_hint", "Recruiter screening evaluation"),
-                "suggested_options": q.get("suggested_options", []),
+                "type": q_type,
+                "question": q_text,
+                "context_hint": q.get("context_hint", "Candidate details verification"),
+                "suggested_options": opts,
+                "unit": q.get("unit"),
+                "min_selections": 1 if q_type == "multiselect" else None,
+                "max_selections": None,
                 "asked_at": datetime.now(timezone.utc).isoformat(),
                 "answer": None,
                 "answered_at": None,
@@ -214,36 +300,41 @@ Return strict JSON only in this format:
         return formatted
 
     def _generate_heuristic_questions(self, profile: dict, role: str) -> list[dict[str, Any]]:
-        """Fallback recruiter questions when LLM is unavailable."""
+        """Candidate profile details questions (tools checklist, years of exp, notice period, location, CTC)."""
         role_low = role.lower()
         now_iso = datetime.now(timezone.utc).isoformat()
 
         if "sdet" in role_low or "quality" in role_low or "qa" in role_low:
             return [
                 {
-                    "id": "q_sdet_framework",
+                    "id": "q_sdet_tools",
                     "category": "technical",
-                    "question": "Which test automation frameworks have you designed or maintained from scratch in production?",
-                    "context_hint": "Recruiter evaluating framework architecture and fixture design depth.",
+                    "type": "multiselect",
+                    "question": "Which test automation frameworks and tools have you worked with hands-on in production?",
+                    "context_hint": "Select all tools in your active toolkit.",
                     "suggested_options": [
-                        "Playwright with TypeScript (POM & Custom Fixtures)",
+                        "Playwright with TypeScript / JavaScript",
                         "Selenium WebDriver with Java & TestNG",
-                        "Cypress with JavaScript",
-                        "REST Assured for Backend APIs"
+                        "REST Assured for API testing",
+                        "Appium for mobile test automation",
+                        "Cypress for E2E web testing",
+                        "Postman / Newman",
+                        "Jenkins / GitHub Actions CI"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
                 },
                 {
-                    "id": "q_sdet_api",
-                    "category": "technical",
-                    "question": "What is your primary approach for backend API automated regression suites?",
-                    "context_hint": "Validating microservices test coverage beyond UI automation.",
+                    "id": "q_sdet_experience",
+                    "category": "experience",
+                    "type": "single_select",
+                    "question": "How many total years of hands-on test automation experience do you have?",
+                    "context_hint": "Select your total experience bracket.",
                     "suggested_options": [
-                        "REST Assured with JSON schema validation",
-                        "Playwright API request context",
-                        "Postman / Newman automated CLI pipelines",
-                        "Custom Python requests test harness"
+                        "1 - 2 Years",
+                        "3 - 4 Years",
+                        "4.5+ Years",
+                        "6+ Years"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
@@ -251,13 +342,39 @@ Return strict JSON only in this format:
                 {
                     "id": "q_logistics_notice",
                     "category": "logistics",
-                    "question": "What is your current notice period and earliest date of joining?",
-                    "context_hint": "Essential for recruiter shortlisting in Delhi NCR & Bengaluru.",
+                    "type": "single_select",
+                    "question": "What is your official notice period / earliest joining date?",
+                    "context_hint": "Recruiter evaluating onboarding timeline.",
                     "suggested_options": [
-                        "Immediate / Serving notice",
+                        "Immediate (Serving notice)",
                         "15 - 30 Days",
-                        "60 Days",
+                        "45 - 60 Days",
                         "90 Days (Negotiable buy-out)"
+                    ],
+                    "asked_at": now_iso,
+                    "answer": None,
+                },
+                {
+                    "id": "q_sdet_relocate",
+                    "category": "logistics",
+                    "type": "boolean",
+                    "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
+                    "context_hint": "Location flexibility check.",
+                    "suggested_options": ["Yes", "No"],
+                    "asked_at": now_iso,
+                    "answer": None,
+                },
+                {
+                    "id": "q_sdet_ctc",
+                    "category": "compensation",
+                    "type": "single_select",
+                    "question": "What is your expected annual CTC bracket?",
+                    "context_hint": "Compensation expectation alignment.",
+                    "suggested_options": [
+                        "8 - 12 LPA",
+                        "12 - 16 LPA",
+                        "16 - 22 LPA",
+                        "22+ LPA"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
@@ -266,15 +383,19 @@ Return strict JSON only in this format:
         elif "intern" in role_low or "fresher" in role_low:
             return [
                 {
-                    "id": "q_intern_project",
+                    "id": "q_intern_tools",
                     "category": "technical",
-                    "question": "Which full stack MERN project are you most proud of and what was your key contribution?",
-                    "context_hint": "Assessing hands-on coding and problem-solving skills.",
+                    "type": "multiselect",
+                    "question": "Which programming languages and frameworks are in your active toolkit?",
+                    "context_hint": "Select all technologies you are comfortable working with.",
                     "suggested_options": [
-                        "Full stack E-commerce with auth & Stripe payments",
-                        "Real-time chat / collaborative board (Socket.io)",
-                        "Task management portal with REST APIs & MongoDB",
-                        "Responsive frontend portfolio with React & Tailwind"
+                        "JavaScript & TypeScript",
+                        "React.js & Next.js",
+                        "Node.js & Express",
+                        "MongoDB & Mongoose",
+                        "Tailwind CSS",
+                        "Python",
+                        "Git & GitHub"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
@@ -282,7 +403,8 @@ Return strict JSON only in this format:
                 {
                     "id": "q_intern_avail",
                     "category": "logistics",
-                    "question": "What is your availability for an internship and can you work full-time on-site/hybrid in Delhi NCR?",
+                    "type": "single_select",
+                    "question": "What is your availability for full-time work or internship?",
                     "context_hint": "Confirming immediate internship timeline.",
                     "suggested_options": [
                         "Immediate full-time (Graduated)",
@@ -292,34 +414,63 @@ Return strict JSON only in this format:
                     ],
                     "asked_at": now_iso,
                     "answer": None,
+                },
+                {
+                    "id": "q_intern_relocate",
+                    "category": "logistics",
+                    "type": "boolean",
+                    "question": "Are you comfortable working from office in Noida / Gurugram?",
+                    "context_hint": "On-site readiness confirmation.",
+                    "suggested_options": ["Yes", "No"],
+                    "asked_at": now_iso,
+                    "answer": None,
+                },
+                {
+                    "id": "q_intern_stipend",
+                    "category": "compensation",
+                    "type": "single_select",
+                    "question": "What is your expected monthly internship stipend bracket?",
+                    "context_hint": "Stipend expectation alignment.",
+                    "suggested_options": [
+                        "₹15,000 - ₹25,000 / month",
+                        "₹25,000 - ₹35,000 / month",
+                        "₹35,000+ / month"
+                    ],
+                    "asked_at": now_iso,
+                    "answer": None,
                 }
             ]
         else:
             return [
                 {
-                    "id": "q_dev_scale",
+                    "id": "q_dev_stack",
                     "category": "technical",
-                    "question": "What scale (concurrent users, requests per second, or data volume) did your microservices handle in your last role?",
-                    "context_hint": "Hiring manager evaluating production readiness and distributed systems experience.",
+                    "type": "multiselect",
+                    "question": "Which backend technologies, databases, and microservices tools have you used in production?",
+                    "context_hint": "Select all technologies in your active toolkit.",
                     "suggested_options": [
-                        "10,000+ req/sec high-throughput platform",
-                        "1,000 - 5,000 req/min enterprise web portal",
-                        "200k+ monthly active users",
-                        "Internal enterprise tools & dashboards"
+                        "Node.js & Express / NestJS",
+                        "Python (FastAPI / Django)",
+                        "MongoDB & Redis",
+                        "PostgreSQL / MySQL",
+                        "Docker & Kubernetes",
+                        "Kafka & Event queues",
+                        "AWS / Cloud services"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
                 },
                 {
-                    "id": "q_dev_stack",
-                    "category": "technical",
-                    "question": "What is your core production backend & database stack?",
-                    "context_hint": "Recruiter matching against company tech radar.",
+                    "id": "q_dev_experience",
+                    "category": "experience",
+                    "type": "single_select",
+                    "question": "How many total years of hands-on professional software development experience do you have?",
+                    "context_hint": "Select your total experience bracket.",
                     "suggested_options": [
-                        "Node.js, Express, TypeScript, MongoDB & Redis",
-                        "Python, FastAPI / Django, PostgreSQL",
-                        "Java, Spring Boot, MySQL & Kafka",
-                        "Next.js full stack with Server Actions"
+                        "1 - 2 Years",
+                        "3 - 4 Years",
+                        "5+ Years",
+                        "7+ Years"
                     ],
                     "asked_at": now_iso,
                     "answer": None,
@@ -327,13 +478,39 @@ Return strict JSON only in this format:
                 {
                     "id": "q_logistics_notice",
                     "category": "logistics",
-                    "question": "What is your notice period and current work preference in Delhi NCR?",
+                    "type": "single_select",
+                    "question": "What is your official notice period?",
                     "context_hint": "Key logistics filter for active recruiter outreach.",
                     "suggested_options": [
-                        "Immediate / 15 Days (Open to Hybrid NCR)",
-                        "30 Days notice (Prefer Remote / Noida / Gurugram)",
-                        "60 Days notice",
-                        "Open to relocation across India"
+                        "Immediate (Serving notice)",
+                        "15 - 30 Days",
+                        "60 Days",
+                        "90 Days (Negotiable)"
+                    ],
+                    "asked_at": now_iso,
+                    "answer": None,
+                },
+                {
+                    "id": "q_dev_relocate",
+                    "category": "logistics",
+                    "type": "boolean",
+                    "question": "Are you open to hybrid roles in Delhi NCR or Bengaluru?",
+                    "context_hint": "Workplace flexibility check.",
+                    "suggested_options": ["Yes", "No"],
+                    "asked_at": now_iso,
+                    "answer": None,
+                },
+                {
+                    "id": "q_dev_ctc",
+                    "category": "compensation",
+                    "type": "single_select",
+                    "question": "What is your expected annual CTC bracket?",
+                    "context_hint": "Compensation expectation alignment.",
+                    "suggested_options": [
+                        "12 - 18 LPA",
+                        "18 - 25 LPA",
+                        "25 - 35 LPA",
+                        "35+ LPA"
                     ],
                     "asked_at": now_iso,
                     "answer": None,

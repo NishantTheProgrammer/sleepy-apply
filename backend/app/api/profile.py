@@ -243,7 +243,14 @@ async def get_screening_data(request: Request):
     user_id = get_current_user_id(request)
     db = get_db()
     profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
-    if not profile:
+    has_content = bool(
+        profile and (
+            profile.get("resume_filename") or
+            (isinstance(profile.get("experience"), list) and len(profile.get("experience", [])) > 0) or
+            (isinstance(profile.get("skills"), dict) and any(profile.get("skills", {}).values()))
+        )
+    )
+    if not profile or not has_content:
         return {
             "target_roles": [],
             "selected_role": None,

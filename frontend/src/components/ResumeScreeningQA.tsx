@@ -213,7 +213,7 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
     );
   }
 
-  if (!data) return null;
+  if (!data || (data.questions.length === 0 && data.target_roles.length === 0)) return null;
 
   const totalAnswered = data.questions.filter((q) => answers[q.id]?.trim()).length;
 

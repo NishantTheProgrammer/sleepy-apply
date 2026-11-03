@@ -181,7 +181,7 @@ export default function ResumeTemplateSelector({
   const candidateName =
     (isClean(personal.fullName) && personal.fullName) ||
     (isClean(personal.full_name) && personal.full_name) ||
-    "Arun Yadav";
+    "";
   const city =
     typeof personal.location === "object"
       ? [personal.location?.city, personal.location?.country]
@@ -190,6 +190,16 @@ export default function ResumeTemplateSelector({
       : typeof personal.location === "string" && isClean(personal.location)
       ? personal.location
       : "";
+
+  const totalSkillsCount = Object.values(skills).flat().filter(isClean).length;
+  const hasProfileData = Boolean(
+    candidateName ||
+    isClean(summary) ||
+    (experience && experience.length > 0) ||
+    totalSkillsCount > 0 ||
+    (education && education.length > 0) ||
+    (projects && projects.length > 0)
+  );
 
   const contactList = [
     isClean(personal.email) ? personal.email : null,
@@ -445,12 +455,23 @@ export default function ResumeTemplateSelector({
             </div>
           )}
 
-          {/* Actual Document Sheet */}
-          <div
-            className={`w-full max-w-3xl mx-auto rounded-xl p-6 sm:p-10 shadow-2xl transition-all duration-300 ${theme.paperClass}`}
-            style={{ fontFamily: theme.fontFamily }}
-          >
-            {/* Header: Candidate Identity */}
+          {!hasProfileData && !isAnalyzing ? (
+            <div className="w-full max-w-md mx-auto py-16 px-4 text-center flex flex-col items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3.5 text-slate-400">
+                <FileText className="w-7 h-7 opacity-60" />
+              </div>
+              <h4 className="text-base font-bold text-white mb-1">No Resume Uploaded</h4>
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Upload your resume PDF/DOCX or enter your details below to see your live ATS preview here.
+              </p>
+            </div>
+          ) : (
+            /* Actual Document Sheet */
+            <div
+              className={`w-full max-w-3xl mx-auto rounded-xl p-6 sm:p-10 shadow-2xl transition-all duration-300 ${theme.paperClass}`}
+              style={{ fontFamily: theme.fontFamily }}
+            >
+              {/* Header: Candidate Identity */}
             {activeTemplateId === "default" ? (
               <div className="pb-3 mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -518,7 +539,7 @@ export default function ResumeTemplateSelector({
             )}
 
             {/* Technical Skills */}
-            {Object.keys(skills).length > 0 && (
+            {totalSkillsCount > 0 && (
               <div className="mb-4">
                 <h2 className={theme.sectionHeader}>Technical Skills</h2>
                 <div className="space-y-1.5 text-xs sm:text-[13px] text-slate-700">
@@ -667,6 +688,7 @@ export default function ResumeTemplateSelector({
               </div>
             )}
           </div>
+        )}
         </div>
       </div>
     </div>

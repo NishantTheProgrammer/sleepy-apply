@@ -8,6 +8,12 @@ import {
 } from "lucide-react";
 import { templatesApi, ResumeTemplateItem } from "@/lib/api";
 
+const isClean = (val: unknown): val is string => {
+  if (typeof val !== "string") return false;
+  const s = val.trim().toLowerCase();
+  return s.length > 0 && s !== "null" && s !== "none" && s !== "undefined" && s !== "n/a";
+};
+
 interface LocationData {
   address?: string;
   city?: string;
@@ -407,20 +413,20 @@ export default function ResumeTemplateSelector({
                   </div>
                   <div className="text-left sm:text-right text-xs text-slate-600 space-y-1 font-medium">
                     <p>
-                      {personal.email || "email@example.com"}
-                      {personal.linkedin && (
+                      {isClean(personal.email) ? personal.email : ""}
+                      {isClean(personal.linkedin) && (
                         <span>
                           {" "} | <span className="text-blue-600 underline">LinkedIn®</span>
                         </span>
                       )}
-                      {personal.phone && <span> | {personal.phone}</span>}
+                      {isClean(personal.phone) && <span> | {personal.phone}</span>}
                     </p>
                     <p>
-                      {personal.github && (
+                      {isClean(personal.github) && (
                         <span className="text-blue-600 underline">GitHub</span>
                       )}
-                      {personal.github && personal.portfolio && <span> | </span>}
-                      {personal.portfolio && (
+                      {isClean(personal.github) && isClean(personal.portfolio) && <span> | </span>}
+                      {isClean(personal.portfolio) && (
                         <span className="text-blue-600 underline">
                           {personal.portfolio.replace(/https?:\/\//, "")}
                         </span>
@@ -510,42 +516,44 @@ export default function ResumeTemplateSelector({
                           )}
                         </div>
 
-                        {exp.description && (
+                        {isClean(exp.description) && (
                           <p className="text-slate-600 mt-0.5 text-xs italic">
                             {exp.description}
                           </p>
                         )}
 
-                        {exp.responsibilities && exp.responsibilities.length > 0 && (
+                        {exp.responsibilities && exp.responsibilities.filter(isClean).length > 0 && (
                           <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
-                            {exp.responsibilities.map((r, ri) => (
+                            {exp.responsibilities.filter(isClean).map((r, ri) => (
                               <li key={ri}>{r}</li>
                             ))}
                           </ul>
                         )}
 
                         {/* Sub-projects inside experience */}
-                        {exp.projects && exp.projects.length > 0 && (
+                        {exp.projects && exp.projects.filter((sp) => isClean(sp.name)).length > 0 && (
                           <div className="mt-1.5 pl-3 border-l-2 border-slate-200 space-y-1">
-                            {exp.projects.map((sp, spi) => (
-                              <div key={spi} className="text-[11px]">
-                                <span className="font-semibold text-slate-800">
-                                  {sp.name}
-                                </span>{" "}
-                                {sp.technologies && sp.technologies.length > 0 && (
-                                  <span className="text-slate-500">
-                                    ({sp.technologies.join(", ")})
-                                  </span>
-                                )}
-                                {sp.achievements && (
-                                  <ul className="list-disc pl-3 text-slate-600">
-                                    {sp.achievements.map((ach, achi) => (
-                                      <li key={achi}>{ach}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                            ))}
+                            {exp.projects
+                              .filter((sp) => isClean(sp.name))
+                              .map((sp, spi) => (
+                                <div key={spi} className="text-[11px]">
+                                  <span className="font-semibold text-slate-800">
+                                    {sp.name}
+                                  </span>{" "}
+                                  {sp.technologies && sp.technologies.filter(isClean).length > 0 && (
+                                    <span className="text-slate-500">
+                                      ({sp.technologies.filter(isClean).join(", ")})
+                                    </span>
+                                  )}
+                                  {sp.achievements && sp.achievements.filter(isClean).length > 0 && (
+                                    <ul className="list-disc pl-3 text-slate-600">
+                                      {sp.achievements.filter(isClean).map((ach, achi) => (
+                                        <li key={achi}>{ach}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              ))}
                           </div>
                         )}
                       </div>
@@ -556,27 +564,29 @@ export default function ResumeTemplateSelector({
             )}
 
             {/* Key Projects */}
-            {projects && projects.length > 0 && (
+            {projects && projects.filter((p) => isClean(p.name)).length > 0 && (
               <div className="mb-4">
                 <h2 className={theme.sectionHeader}>Key Projects</h2>
                 <div className="space-y-2">
-                  {projects.map((proj, idx) => (
-                    <div key={idx} className="text-xs sm:text-[13px]">
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-bold text-slate-900">{proj.name}</span>
-                        {proj.technologies && proj.technologies.length > 0 && (
-                          <span className="text-slate-500 text-[11px]">
-                            ({proj.technologies.join(", ")})
-                          </span>
+                  {projects
+                    .filter((proj) => isClean(proj.name))
+                    .map((proj, idx) => (
+                      <div key={idx} className="text-xs sm:text-[13px]">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-bold text-slate-900">{proj.name}</span>
+                          {proj.technologies && proj.technologies.filter(isClean).length > 0 && (
+                            <span className="text-slate-500 text-[11px]">
+                              ({proj.technologies.filter(isClean).join(", ")})
+                            </span>
+                          )}
+                        </div>
+                        {isClean(proj.description) && (
+                          <p className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
+                            {proj.description}
+                          </p>
                         )}
                       </div>
-                      {proj.description && (
-                        <p className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
-                          {proj.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             )}

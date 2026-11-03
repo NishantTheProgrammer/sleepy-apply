@@ -34,6 +34,12 @@ CRITICAL INSTRUCTIONS (MUST COMPLY STRICTLY):
    - Include all degrees, diplomas, institutions, and graduation years in the "education" array.
    - Badges, competitive programming stats, certifications, awards, or honors belong in the "achievements" array.
 
+5. NEVER OUTPUT LITERAL "null", "none", OR PLACEHOLDER PROJECTS:
+   - Never output the string "null" or "none" in any field (e.g. description, projects, endDate).
+   - If a job has no standalone description or summary line, use an empty string "" (do not write "null").
+   - If an experience has no separate sub-projects, leave the "projects" array empty []. Do NOT invent phantom project entries with name "null" or "none".
+   - If there are no standalone projects on the resume, leave top-level "projects" as []. Do NOT output projects with name "null".
+
 STRICT JSON SCHEMA:
 {
   "personal": {
@@ -259,7 +265,19 @@ class ProfileCreatorAgent:
         return None
 
     def _normalize_extracted_data(self, data: dict[str, Any]) -> dict[str, Any]:
+        def _clean_str(val: Any) -> str | None:
+            if val is None:
+                return None
+            s = str(val).strip()
+            if s.lower() in ["null", "none", "nil", "undefined", "n/a", "na"]:
+                return None
+            return s
+
         personal = data.setdefault("personal", {})
+        for field in ["fullName", "full_name", "email", "phone", "linkedin", "github", "portfolio"]:
+            if field in personal:
+                personal[field] = _clean_str(personal[field])
+
         if "fullName" in personal and not personal.get("full_name"):
             personal["full_name"] = personal["fullName"]
         elif "full_name" in personal and not personal.get("fullName"):
@@ -270,78 +288,133 @@ class ProfileCreatorAgent:
         if isinstance(loc, str):
             personal["location"] = {
                 "address": "",
-                "city": loc,
+                "city": _clean_str(loc) or "",
                 "postalCode": "",
                 "country": "",
             }
         elif isinstance(loc, dict):
-            loc.setdefault("address", "")
-            loc.setdefault("city", "")
-            loc.setdefault("postalCode", "")
-            loc.setdefault("country", "")
+            loc["address"] = _clean_str(loc.get("address")) or ""
+            loc["city"] = _clean_str(loc.get("city")) or ""
+            loc["postalCode"] = _clean_str(loc.get("postalCode")) or ""
+            loc["country"] = _clean_str(loc.get("country")) or ""
+
+        # Summary
+        if "summary" in data:
+            data["summary"] = _clean_str(data["summary"]) or ""
 
         # Normalize experience items
         exp_list = data.get("experience", [])
         if not isinstance(exp_list, list):
             exp_list = []
-            data["experience"] = exp_list
 
+        cleaned_exp_list = []
         for exp in exp_list:
             if not isinstance(exp, dict):
                 continue
-            if "jobTitle" in exp and not exp.get("title"):
-                exp["title"] = exp["jobTitle"]
-            if "title" in exp and not exp.get("jobTitle"):
-                exp["jobTitle"] = exp["title"]
-            if "startDate" in exp and not exp.get("start_date"):
-                exp["start_date"] = exp["startDate"]
-            if "endDate" in exp and not exp.get("end_date"):
-                exp["end_date"] = exp["endDate"]
-            if "current" in exp and "is_current" not in exp:
-                exp["is_current"] = exp["current"]
-            elif "is_current" in exp and "current" not in exp:
-                exp["current"] = exp["is_current"]
+            job_title = _clean_str(exp.get("jobTitle") or exp.get("title")) or "Software Engineer"
+            company = _clean_str(exp.get("company")) or "Company"
+            start_date = _clean_str(exp.get("startDate") or exp.get("start_date")) or ""
+            end_date = _clean_str(exp.get("endDate") or exp.get("end_date"))
+            is_current = bool(exp.get("current") or exp.get("is_current"))
+            if is_current:
+                end_date = "Present"
+            description = _clean_str(exp.get("description")) or ""
 
-            # Ensure responsibilities and projects are lists
-            if not isinstance(exp.get("responsibilities"), list):
-                exp["responsibilities"] = [str(exp["responsibilities"])] if exp.get("responsibilities") else []
-            if not isinstance(exp.get("projects"), list):
-                exp["projects"] = []
-            else:
-                for prj in exp["projects"]:
+            # Responsibilities
+            raw_resp = exp.get("responsibilities", [])
+            if not isinstance(raw_resp, list):
+                raw_resp = [str(raw_resp)] if raw_resp else []
+            clean_resp = [_clean_str(r) for r in raw_resp if _clean_str(r)]
+
+            # Sub-projects
+            raw_sub = exp.get("projects", [])
+            clean_sub = []
+            if isinstance(raw_sub, list):
+                for prj in raw_sub:
                     if isinstance(prj, dict):
-                        if not isinstance(prj.get("technologies"), list):
-                            prj["technologies"] = [str(prj["technologies"])] if prj.get("technologies") else []
-                        if not isinstance(prj.get("achievements"), list):
-                            prj["achievements"] = [str(prj["achievements"])] if prj.get("achievements") else []
+                        p_name = _clean_str(prj.get("name"))
+                        # Eliminate phantom projects where name is "null" or empty
+                        if not p_name:
+                            continue
+                        p_desc = _clean_str(prj.get("description")) or ""
+                        raw_tech = prj.get("technologies", [])
+                        clean_tech = [_clean_str(t) for t in (raw_tech if isinstance(raw_tech, list) else [raw_tech]) if _clean_str(t)]
+                        raw_ach = prj.get("achievements", [])
+                        clean_ach = [_clean_str(a) for a in (raw_ach if isinstance(raw_ach, list) else [raw_ach]) if _clean_str(a)]
+                        clean_sub.append({
+                            "name": p_name,
+                            "description": p_desc,
+                            "technologies": clean_tech,
+                            "achievements": clean_ach,
+                        })
 
-        # Normalize projects
-        projects_list = data.get("projects", [])
-        if not isinstance(projects_list, list):
-            data["projects"] = []
-        else:
-            for prj in data["projects"]:
+            cleaned_exp_list.append({
+                "company": company,
+                "jobTitle": job_title,
+                "title": job_title,
+                "startDate": start_date,
+                "start_date": start_date,
+                "endDate": end_date,
+                "end_date": end_date,
+                "current": is_current,
+                "is_current": is_current,
+                "description": description,
+                "responsibilities": clean_resp,
+                "projects": clean_sub,
+            })
+        data["experience"] = cleaned_exp_list
+
+        # Normalize standalone projects
+        raw_projects = data.get("projects", [])
+        clean_projects = []
+        if isinstance(raw_projects, list):
+            for prj in raw_projects:
                 if isinstance(prj, dict):
-                    if not isinstance(prj.get("technologies"), list):
-                        prj["technologies"] = [str(prj["technologies"])] if prj.get("technologies") else []
+                    p_name = _clean_str(prj.get("name"))
+                    # Discard phantom projects where name is "null"
+                    if not p_name:
+                        continue
+                    p_desc = _clean_str(prj.get("description")) or ""
+                    raw_tech = prj.get("technologies", [])
+                    clean_tech = [_clean_str(t) for t in (raw_tech if isinstance(raw_tech, list) else [raw_tech]) if _clean_str(t)]
+                    clean_projects.append({
+                        "name": p_name,
+                        "description": p_desc,
+                        "technologies": clean_tech,
+                    })
+        data["projects"] = clean_projects
 
         # Normalize education
         edu_list = data.get("education", [])
-        if not isinstance(edu_list, list):
-            data["education"] = []
+        clean_edu = []
+        if isinstance(edu_list, list):
+            for ed in edu_list:
+                if isinstance(ed, dict):
+                    deg = _clean_str(ed.get("degree"))
+                    inst = _clean_str(ed.get("institution"))
+                    yr = _clean_str(ed.get("year") or ed.get("graduation_year"))
+                    if deg or inst:
+                        clean_edu.append({
+                            "degree": deg or "",
+                            "institution": inst or "",
+                            "year": yr or "",
+                        })
+        data["education"] = clean_edu
 
         # Normalize achievements
         ach_list = data.get("achievements", [])
-        if not isinstance(ach_list, list):
-            data["achievements"] = []
-        else:
-            normalized_ach = []
+        clean_ach = []
+        if isinstance(ach_list, list):
             for ach in ach_list:
                 if isinstance(ach, str):
-                    normalized_ach.append({"title": ach})
-                elif isinstance(ach, dict) and "title" in ach:
-                    normalized_ach.append(ach)
-            data["achievements"] = normalized_ach
+                    c = _clean_str(ach)
+                    if c:
+                        clean_ach.append({"title": c})
+                elif isinstance(ach, dict):
+                    c = _clean_str(ach.get("title"))
+                    if c:
+                        clean_ach.append({"title": c})
+        data["achievements"] = clean_ach
 
         # Sync jobPreferences
         if "jobPreferences" in data and not data.get("job_preferences"):

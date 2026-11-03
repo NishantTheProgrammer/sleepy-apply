@@ -7,10 +7,10 @@ import { Bot, Briefcase, FileText, Zap, ShieldCheck, AlertCircle, Sparkles } fro
 import TestLoginModal from "@/components/TestLoginModal";
 
 const FEATURES = [
-  { icon: FileText, label: "AI Profile Builder", desc: "Upload your resume, AI fills the rest" },
-  { icon: Briefcase, label: "Smart Job Discovery", desc: "Auto-fetches matching jobs continuously" },
-  { icon: Zap, label: "Auto Applications", desc: "Applies with a tailored resume per job" },
-  { icon: Bot, label: "Discord Notifications", desc: "Updates you on every step" },
+  { icon: FileText, label: "AI Profile Builder",      desc: "Upload your resume, AI fills the rest" },
+  { icon: Briefcase, label: "Smart Job Discovery",    desc: "Auto-fetches matching jobs continuously" },
+  { icon: Zap,       label: "Auto Applications",      desc: "Applies with a tailored resume per job" },
+  { icon: Bot,       label: "Discord Notifications",  desc: "Updates you on every step" },
 ];
 
 function LoginContent() {

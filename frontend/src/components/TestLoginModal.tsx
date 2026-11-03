@@ -118,20 +118,20 @@ export default function TestLoginModal({ isOpen, onClose }: TestLoginModalProps)
 
                   const badgeStyles: Record<string, string> = {
                     emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-                    blue: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-                    cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
-                    amber: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-                    purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
-                    rose: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+                    blue:    "bg-blue-500/10 text-blue-400 border-blue-500/30",
+                    cyan:    "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
+                    amber:   "bg-amber-500/10 text-amber-400 border-amber-500/30",
+                    purple:  "bg-purple-500/10 text-purple-400 border-purple-500/30",
+                    rose:    "bg-rose-500/10 text-rose-400 border-rose-500/30",
                   };
 
                   const avatarBg: Record<string, string> = {
                     emerald: "from-emerald-500 to-teal-600",
-                    blue: "from-blue-500 to-indigo-600",
-                    cyan: "from-cyan-500 to-blue-600",
-                    amber: "from-amber-500 to-orange-600",
-                    purple: "from-purple-500 to-pink-600",
-                    rose: "from-rose-500 to-red-600",
+                    blue:    "from-blue-500 to-indigo-600",
+                    cyan:    "from-cyan-500 to-blue-600",
+                    amber:   "from-amber-500 to-orange-600",
+                    purple:  "from-purple-500 to-pink-600",
+                    rose:    "from-rose-500 to-red-600",
                   };
 
                   return (
@@ -140,8 +140,9 @@ export default function TestLoginModal({ isOpen, onClose }: TestLoginModalProps)
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => !switchingId && handleSelectPersona(p.id)}
-                      className={`group relative flex flex-col justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-indigo-500/50 transition-all cursor-pointer ${isSwitching ? "ring-2 ring-indigo-500 bg-indigo-500/10" : ""
-                        }`}
+                      className={`group relative flex flex-col justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-indigo-500/50 transition-all cursor-pointer ${
+                        isSwitching ? "ring-2 ring-indigo-500 bg-indigo-500/10" : ""
+                      }`}
                     >
                       {/* Top bar with Avatar and Badge */}
                       <div>

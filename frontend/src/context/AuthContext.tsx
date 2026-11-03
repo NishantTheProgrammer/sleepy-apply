@@ -43,7 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   const login = async () => {
     const { url } = await authApi.getLoginUrl();

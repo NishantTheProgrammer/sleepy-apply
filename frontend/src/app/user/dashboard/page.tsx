@@ -135,9 +135,10 @@ export default function DashboardPage() {
   const rawSkills = profile?.skills || {};
   let skillsList: string[] = [];
   if (Array.isArray(rawSkills)) {
-    skillsList = rawSkills.slice(0, 8);
+    skillsList = Array.from(new Set(rawSkills.map((s) => String(s).trim()))).slice(0, 8);
   } else if (typeof rawSkills === "object" && rawSkills !== null) {
-    skillsList = Object.values(rawSkills).flat().slice(0, 8) as string[];
+    const flattened = Object.values(rawSkills).flat().map((s) => String(s).trim()).filter(Boolean);
+    skillsList = Array.from(new Set(flattened)).slice(0, 8);
   }
   if (skillsList.length === 0) {
     skillsList = ["Python", "React", "TypeScript", "FastAPI", "MongoDB", "Docker"];
@@ -330,13 +331,12 @@ export default function DashboardPage() {
                       <div className="flex items-start gap-3.5 min-w-0">
                         {/* Score Circle */}
                         <div
-                          className={`w-11 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${
-                            isHigh
+                          className={`w-11 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${isHigh
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : isMed
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                              : "bg-red-500/10 text-red-400 border border-red-500/20"
-                          }`}
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            }`}
                         >
                           <span className="text-sm leading-none">{score}</span>
                           <span className="text-[8px] uppercase tracking-wider font-semibold opacity-70">pts</span>
@@ -365,9 +365,9 @@ export default function DashboardPage() {
 
                           {/* Skill Tags */}
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {(item.matching_skills || []).slice(0, 4).map((skill) => (
+                            {(item.matching_skills || []).slice(0, 4).map((skill, sIdx) => (
                               <span
-                                key={skill}
+                                key={`${item._id}-${skill}-${sIdx}`}
                                 className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
                               >
                                 {skill}
@@ -461,9 +461,9 @@ export default function DashboardPage() {
             <div className="mb-4">
               <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-2">Core Technical Stack</p>
               <div className="flex flex-wrap gap-1.5">
-                {skillsList.map((skill) => (
+                {skillsList.map((skill, sIdx) => (
                   <span
-                    key={skill}
+                    key={`${skill}-${sIdx}`}
                     className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-white/5 border border-white/10 text-slate-300"
                   >
                     {skill}

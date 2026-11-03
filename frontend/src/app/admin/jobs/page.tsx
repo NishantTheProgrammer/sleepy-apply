@@ -401,17 +401,16 @@ export default function AdminAllJobsPage() {
                 setSelectedSource(s.id);
                 setPage(1);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                selectedSource === s.id
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${selectedSource === s.id
                   ? s.id === "linkedin"
                     ? "bg-sky-600 text-white shadow-sm"
                     : s.id === "naukri"
-                    ? "bg-amber-600 text-white shadow-sm"
-                    : s.id === "career"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-purple-600 text-white shadow-sm"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : s.id === "career"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-purple-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               {s.label}
             </button>
@@ -429,8 +428,8 @@ export default function AdminAllJobsPage() {
             className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50"
           >
             <option value="all">All Companies ({companies.length})</option>
-            {companies.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {companies.map((c, i) => (
+              <option key={`${c}-${i}`} value={c}>{c}</option>
             ))}
           </select>
 
@@ -447,11 +446,10 @@ export default function AdminAllJobsPage() {
                   setRemoteFilter(r.id);
                   setPage(1);
                 }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  remoteFilter === r.id
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${remoteFilter === r.id
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-slate-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {r.label}
               </button>
@@ -545,13 +543,12 @@ export default function AdminAllJobsPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-white">{j.company}</span>
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                            j.grade === "Tier-1"
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${j.grade === "Tier-1"
                               ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                               : j.grade === "Tier-2"
-                              ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
-                              : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                          }`}
+                                ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
+                                : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                            }`}
                         >
                           {j.grade || "Tier-1"}
                         </span>
@@ -576,9 +573,9 @@ export default function AdminAllJobsPage() {
                     {/* Skills */}
                     <td className="py-3 px-4 max-w-xs">
                       <div className="flex flex-wrap gap-1">
-                        {(j.required_skills && j.required_skills.length > 0 ? j.required_skills : ["Software Engineering"]).slice(0, 3).map((s) => (
+                        {(j.required_skills && j.required_skills.length > 0 ? j.required_skills : ["Software Engineering"]).slice(0, 3).map((s, sIdx) => (
                           <span
-                            key={s}
+                            key={`${j._id}-skill-${s}-${sIdx}`}
                             className="text-[10px] px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-slate-300"
                           >
                             {s}
@@ -711,9 +708,9 @@ export default function AdminAllJobsPage() {
                   <div>
                     <h4 className="font-semibold text-white text-[11px] uppercase tracking-wider mb-2">Required Skills</h4>
                     <div className="flex flex-wrap gap-1.5">
-                      {selectedJob.required_skills.map((skill) => (
+                      {selectedJob.required_skills.map((skill, skIdx) => (
                         <span
-                          key={skill}
+                          key={`admin-sel-${skill}-${skIdx}`}
                           className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-medium text-xs"
                         >
                           {skill}
@@ -771,22 +768,21 @@ export default function AdminAllJobsPage() {
                     href={getValidJobUrl(selectedJob)}
                     target="_blank"
                     rel="noreferrer"
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${
-                        selectedJob.source === "linkedin"
-                          ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
-                          : selectedJob.source === "naukri"
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${selectedJob.source === "linkedin"
+                        ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
+                        : selectedJob.source === "naukri"
                           ? "bg-amber-600 hover:bg-amber-500 shadow-amber-600/30"
                           : "bg-purple-600 hover:bg-purple-500 shadow-purple-600/30"
                       }`}
-                    >
-                      <span>
-                        {selectedJob.source === "linkedin"
-                          ? "Apply on LinkedIn"
-                          : selectedJob.source === "naukri"
+                  >
+                    <span>
+                      {selectedJob.source === "linkedin"
+                        ? "Apply on LinkedIn"
+                        : selectedJob.source === "naukri"
                           ? "Apply on Naukri"
                           : "Apply on Career Portal"}
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5" />
+                    </span>
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>

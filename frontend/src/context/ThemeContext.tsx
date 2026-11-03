@@ -89,12 +89,13 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("default");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("sa-theme") as Theme | null;
-    if (saved && THEMES.includes(saved)) setThemeState(saved);
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sa-theme") as Theme | null;
+      if (saved && THEMES.includes(saved)) return saved;
+    }
+    return "default";
+  });
 
   const setTheme = (t: Theme) => {
     setThemeState(t);

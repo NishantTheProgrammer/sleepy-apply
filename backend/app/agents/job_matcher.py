@@ -96,7 +96,13 @@ class JobMatcherAgent:
                 if isinstance(s, str):
                     user_skills_list.append(s)
 
-        user_skills_clean = [s.strip() for s in user_skills_list if s.strip()]
+        user_skills_clean = []
+        seen_user_skills = set()
+        for s in user_skills_list:
+            sc = s.strip()
+            if sc and sc.lower() not in seen_user_skills:
+                seen_user_skills.add(sc.lower())
+                user_skills_clean.append(sc)
         user_skills_lower = set(s.lower() for s in user_skills_clean)
 
         # 2. Extract Candidate's Domain & Experience Profile
@@ -151,23 +157,29 @@ class JobMatcherAgent:
 
         # 6. Extract Matching Skills and Missing Skills
         matching_skills = []
+        seen_matched = set()
         for s in user_skills_clean:
             s_low = s.lower()
             pattern = r"\b" + re.escape(s_low) + r"\b"
             if re.search(pattern, job_full_text) or s_low in [rs.lower() for rs in job.get("required_skills", [])]:
-                if s not in matching_skills:
+                if s_low not in seen_matched:
+                    seen_matched.add(s_low)
                     matching_skills.append(s)
 
         missing_skills = []
+        seen_missing = set()
         for rs in job.get("required_skills", []):
-            if rs.lower() not in user_skills_lower and rs not in missing_skills:
+            rs_low = rs.lower()
+            if rs_low not in user_skills_lower and rs_low not in seen_missing:
+                seen_missing.add(rs_low)
                 missing_skills.append(rs)
 
         for ts in COMMON_TECH_STACK:
             pattern = r"\b" + re.escape(ts) + r"\b"
-            if re.search(pattern, job_full_text) and ts not in user_skills_lower:
+            if re.search(pattern, job_full_text) and ts not in user_skills_lower and ts not in seen_missing:
                 title_case = "AWS" if ts == "aws" else ("GCP" if ts == "gcp" else ts.title())
-                if title_case not in missing_skills:
+                if title_case.lower() not in seen_missing:
+                    seen_missing.add(title_case.lower())
                     missing_skills.append(title_case)
 
         # Categorize matches and gaps

@@ -9,6 +9,7 @@ import {
   Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import ReactMarkdown from "react-markdown";
 
 export interface TailoredResumeContent {
@@ -65,6 +66,7 @@ interface JobItem {
   user_id: string;
   compatibility_score: number;
   match_reasoning?: string;
+  experience_match?: string;
   matching_skills: string[];
   missing_skills: string[];
   score_breakdown?: {
@@ -254,13 +256,14 @@ function getValidJobUrl(job: { application_url?: string; source_url?: string; so
 
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED_SUCCESS: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
-  APPLIED:          "text-blue-300 bg-blue-400/10 border-blue-400/20",
-  APPLYING:         "text-yellow-300 bg-yellow-400/10 border-yellow-400/20",
-  FAILED:           "text-red-300 bg-red-400/10 border-red-400/20",
+  APPLIED: "text-blue-300 bg-blue-400/10 border-blue-400/20",
+  APPLYING: "text-yellow-300 bg-yellow-400/10 border-yellow-400/20",
+  FAILED: "text-red-300 bg-red-400/10 border-red-400/20",
   REQUIRES_USER_ACTION: "text-orange-300 bg-orange-400/10 border-orange-400/20",
 };
 
 function JobsPageContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const preselectedId = searchParams.get("selected");
 
@@ -313,8 +316,9 @@ function JobsPageContent() {
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    setSelectedJobId(null);
+    load(1);
+  }, [user?.id]);
 
   const handleDiscoverJobs = async () => {
     setDiscovering(true);
@@ -542,17 +546,16 @@ function JobsPageContent() {
               <button
                 key={s.id}
                 onClick={() => setSourceFilter(s.id as "all" | "career" | "linkedin" | "naukri")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  sourceFilter === s.id
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${sourceFilter === s.id
                     ? s.id === "linkedin"
                       ? "bg-sky-600 text-white shadow-sm"
                       : s.id === "naukri"
-                      ? "bg-amber-600 text-white shadow-sm"
-                      : s.id === "career"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "bg-indigo-600 text-white shadow-sm"
+                        ? "bg-amber-600 text-white shadow-sm"
+                        : s.id === "career"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "bg-indigo-600 text-white shadow-sm"
                     : "text-slate-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {s.label}
               </button>
@@ -563,51 +566,46 @@ function JobsPageContent() {
           <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap gap-1">
             <button
               onClick={() => setFilterTab("all")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === "all"
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === "all"
                   ? "bg-white/15 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               All India
             </button>
             <button
               onClick={() => setFilterTab("delhi_ncr")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === "delhi_ncr"
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === "delhi_ncr"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               Delhi NCR
             </button>
             <button
               onClick={() => setFilterTab("bengaluru")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === "bengaluru"
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === "bengaluru"
                   ? "bg-purple-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               Bengaluru
             </button>
             <button
               onClick={() => setFilterTab("remote")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === "remote"
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === "remote"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               Remote
             </button>
             <button
               onClick={() => setFilterTab("high")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filterTab === "high"
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filterTab === "high"
                   ? "bg-amber-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               ≥75% Match
             </button>
@@ -656,11 +654,10 @@ function JobsPageContent() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.02 }}
                   onClick={() => setSelectedJobId(item.job._id)}
-                  className={`p-4 rounded-2xl cursor-pointer transition-all relative overflow-hidden ${
-                    isSelected
+                  className={`p-4 rounded-2xl cursor-pointer transition-all relative overflow-hidden ${isSelected
                       ? "glass border-indigo-500 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/30 bg-white/[0.08]"
                       : "glass glass-hover hover:border-white/20"
-                  }`}
+                    }`}
                 >
                   {/* Selected Indicator Accent */}
                   {isSelected && (
@@ -670,13 +667,12 @@ function JobsPageContent() {
                   <div className="flex items-start gap-3.5">
                     {/* Score Badge */}
                     <div
-                      className={`w-12 h-12 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${
-                        isHigh
+                      className={`w-12 h-12 shrink-0 rounded-xl flex flex-col items-center justify-center font-black ${isHigh
                           ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                           : isMed
-                          ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                          : "bg-red-500/15 text-red-400 border border-red-500/30"
-                      }`}
+                            ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                            : "bg-red-500/15 text-red-400 border border-red-500/30"
+                        }`}
                     >
                       <span className="text-base leading-none">{score}</span>
                       <span className="text-[8px] uppercase tracking-wider font-semibold opacity-70">pts</span>
@@ -718,6 +714,15 @@ function JobsPageContent() {
                           )}
                         </div>
                       </div>
+
+                      {/* Experience Match Badge */}
+                      {item.experience_match && (
+                        <div className="mt-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                            {item.experience_match}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Matching and Missing Skills */}
                       <div className="mt-2.5 flex flex-wrap gap-1">
@@ -863,8 +868,8 @@ function JobsPageContent() {
                       {applying === selectedItem.job._id
                         ? "Executing LangGraph Apply Pipeline…"
                         : selectedItem.application?.status === "APPLIED"
-                        ? "Applied with AI"
-                        : "One-Click Auto-Apply with AI"}
+                          ? "Applied with AI"
+                          : "One-Click Auto-Apply with AI"}
                     </button>
 
                     {selectedItem.tailored_resume ? (
@@ -896,13 +901,12 @@ function JobsPageContent() {
                       href={getValidJobUrl(selectedItem.job)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-                        selectedItem.job.source === "linkedin"
+                      className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${selectedItem.job.source === "linkedin"
                           ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
                           : selectedItem.job.source === "naukri"
-                          ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
-                          : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
-                      }`}
+                            ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
+                            : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
+                        }`}
                       title={`Open ${selectedItem.job.source === "linkedin" ? "LinkedIn" : selectedItem.job.source === "naukri" ? "Naukri" : "career portal"} job posting`}
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -910,8 +914,8 @@ function JobsPageContent() {
                         {selectedItem.job.source === "linkedin"
                           ? "Apply on LinkedIn"
                           : selectedItem.job.source === "naukri"
-                          ? "Apply on Naukri"
-                          : "Apply on Career Portal"}
+                            ? "Apply on Naukri"
+                            : "Apply on Career Portal"}
                       </span>
                     </a>
                   </div>
@@ -925,15 +929,24 @@ function JobsPageContent() {
                       <h3 className="text-sm font-bold text-white">AI Compatibility Breakdown</h3>
                     </div>
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        selectedItem.compatibility_score >= 75
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${selectedItem.compatibility_score >= 75
                           ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                           : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                      }`}
+                        }`}
                     >
                       {selectedItem.compatibility_score}% Compatibility
                     </span>
                   </div>
+
+                  {/* Seniority & Experience Assessment */}
+                  {selectedItem.experience_match && (
+                    <div className="mb-3.5 flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-medium text-slate-400">Seniority Alignment:</span>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                        {selectedItem.experience_match}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Match reasoning text */}
                   {selectedItem.match_reasoning ? (
@@ -1127,9 +1140,8 @@ function JobsPageContent() {
                     </div>
 
                     <div
-                      className={`text-xs text-slate-300 leading-relaxed overflow-hidden transition-all ${
-                        descExpanded ? "max-h-none" : "max-h-56 relative"
-                      }`}
+                      className={`text-xs text-slate-300 leading-relaxed overflow-hidden transition-all ${descExpanded ? "max-h-none" : "max-h-56 relative"
+                        }`}
                     >
                       <MarkdownRenderer content={selectedItem.job.description} />
                       {!descExpanded && (
@@ -1189,11 +1201,10 @@ function JobsPageContent() {
                             });
                           }
                         }}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          (previewTemplate || previewItem.tailored_resume?.template || "default") === "default"
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${(previewTemplate || previewItem.tailored_resume?.template || "default") === "default"
                             ? "bg-emerald-600 text-white shadow-sm"
                             : "text-slate-400 hover:text-white"
-                        }`}
+                          }`}
                         title="Google Doc style template with dual-side header & section divider"
                       >
                         <LayoutTemplate className="w-3 h-3" />
@@ -1212,11 +1223,10 @@ function JobsPageContent() {
                             });
                           }
                         }}
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          (previewTemplate || previewItem.tailored_resume?.template) === "classic_ats"
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${(previewTemplate || previewItem.tailored_resume?.template) === "classic_ats"
                             ? "bg-slate-700 text-white shadow-sm"
                             : "text-slate-400 hover:text-white"
-                        }`}
+                          }`}
                         title="Traditional monochrome serif ATS template"
                       >
                         <ShieldCheck className="w-3 h-3 text-emerald-400" />
@@ -1243,22 +1253,20 @@ function JobsPageContent() {
                   <div className="flex items-center p-1 rounded-xl bg-white/5 border border-white/10">
                     <button
                       onClick={() => setPreviewTab("doc")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        previewTab === "doc"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${previewTab === "doc"
                           ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
                           : "text-slate-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Document Preview</span>
                     </button>
                     <button
                       onClick={() => setPreviewTab("json")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        previewTab === "json"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${previewTab === "json"
                           ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                           : "text-slate-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <FileCode className="w-3.5 h-3.5" />
                       <span>Tailored JSON</span>
@@ -1313,17 +1321,17 @@ function JobsPageContent() {
 
                       const themeStyles = isDefault
                         ? {
-                            fontFamily: "Calibri, Arial, sans-serif",
-                            paperClass: "bg-white text-slate-800 font-sans",
-                            sectionHeader: "font-sans tracking-normal text-slate-900 uppercase text-xs font-black border-b border-slate-300 pb-1 mb-2.5",
-                            subText: "text-slate-700",
-                          }
+                          fontFamily: "Calibri, Arial, sans-serif",
+                          paperClass: "bg-white text-slate-800 font-sans",
+                          sectionHeader: "font-sans tracking-normal text-slate-900 uppercase text-xs font-black border-b border-slate-300 pb-1 mb-2.5",
+                          subText: "text-slate-700",
+                        }
                         : {
-                            fontFamily: "Times New Roman, serif",
-                            paperClass: "bg-white text-black font-serif",
-                            sectionHeader: "font-serif text-black uppercase text-xs font-bold border-b border-black pb-0.5 mb-2.5 tracking-wide",
-                            subText: "text-black",
-                          };
+                          fontFamily: "Times New Roman, serif",
+                          paperClass: "bg-white text-black font-serif",
+                          sectionHeader: "font-serif text-black uppercase text-xs font-bold border-b border-black pb-0.5 mb-2.5 tracking-wide",
+                          subText: "text-black",
+                        };
 
                       return (
                         <div

@@ -171,39 +171,52 @@ class ProfileCreatorAgent:
         # Clean text slightly (collapse 3+ newlines to 2, strip null bytes)
         clean_text = re.sub(r"\n{3,}", "\n\n", resume_text.replace("\x00", "")).strip()
 
-        # 1. Try LLM extraction if settings are provided
-        if user_settings:
-            # Prepare extraction prompt with large context limit (up to 35,000 characters)
-            prompt = EXTRACTION_PROMPT + clean_text[:35000]
+        # 1. Try LLM extraction (defaulting to local Ollama llama3.2 if no user_settings configured)
+        if not user_settings:
+            from bson import ObjectId
+            user_settings = UserSettings(
+                user_id=ObjectId(),
+                ai_provider="ollama",
+                ai_model="llama3.2:latest",
+            )
 
-            app_prefs = user_settings.application_preferences if user_settings else None
-            extract_temp = float(getattr(app_prefs, "extraction_temperature", 0.1) if app_prefs else 0.1)
+        # Prepare extraction prompt with large context limit (up to 35,000 characters)
+        prompt = EXTRACTION_PROMPT + clean_text[:35000]
 
-            # Prefer qwen2.5-coder:14b when using Ollama for highest code & structured extraction quality
-            extraction_settings = user_settings
-            if user_settings.ai_provider == "ollama":
-                extraction_settings = user_settings.model_copy(update={"ai_model": "qwen2.5-coder:14b"})
+        app_prefs = user_settings.application_preferences if user_settings else None
+        extract_temp = float(getattr(app_prefs, "extraction_temperature", 0.1) if app_prefs else 0.1)
 
-            try:
-                provider = AIProviderFactory.resolve(extraction_settings)
-                resp = await provider.complete(
-                    [{"role": "user", "content": prompt}],
-                    temperature=extract_temp,
-                    num_ctx=8192,
-                )
-                extracted_data = self._extract_json_from_response(resp)
-            except Exception as e:
-                logger.warning("Primary AI extraction failed, trying default user model", error=str(e))
+        try:
+            provider = AIProviderFactory.resolve(user_settings)
+            resp = await provider.complete(
+                [{"role": "user", "content": prompt}],
+                temperature=extract_temp,
+                num_ctx=8192,
+                format="json",
+            )
+            extracted_data = self._extract_json_from_response(resp)
+        except Exception as e:
+            logger.warning("Primary AI extraction failed, trying default local Ollama llama3.2", error=str(e))
+            if user_settings.ai_provider != "ollama":
                 try:
-                    provider = AIProviderFactory.resolve(user_settings)
+                    from bson import ObjectId
+                    local_settings = UserSettings(
+                        user_id=ObjectId(),
+                        ai_provider="ollama",
+                        ai_model="llama3.2:latest",
+                    )
+                    provider = AIProviderFactory.resolve(local_settings)
                     resp = await provider.complete(
                         [{"role": "user", "content": prompt}],
                         temperature=extract_temp,
                         num_ctx=8192,
+                        format="json",
                     )
                     extracted_data = self._extract_json_from_response(resp)
                 except Exception as fallback_err:
                     logger.warning("AI extraction failed, falling back to heuristic parsing", error=str(fallback_err))
+            else:
+                logger.warning("Ollama AI extraction failed, falling back to heuristic parsing", error=str(e))
 
         # 2. Heuristic fallback
         if not extracted_data:
@@ -342,14 +355,33 @@ class ProfileCreatorAgent:
         """Robust regex and section parser when AI is offline or model key is unconfigured."""
         email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
         phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text)
-        linkedin_match = re.search(r"linkedin\.com/in/[\w-]+", text, re.IGNORECASE)
-        github_match = re.search(r"github\.com/[\w-]+", text, re.IGNORECASE)
-        portfolio_match = re.search(r"(https?://)?(www\.)?[\w-]+\.(com|dev|io|me|org)", text, re.IGNORECASE)
+        linkedin_match = re.search(r"linkedin\.com/in/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+        github_match = re.search(r"github\.com/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+        
+        # Portfolio: avoid matching email domains like gmail.com or github.com
+        portfolio_match = re.search(
+            r"(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+\.(?:dev|me|io|app|tech|site|online))(?:\/[^\s]*)?",
+            text,
+            re.IGNORECASE,
+        )
 
         lines = [line.strip() for line in text.split("\n") if line.strip()]
-        candidate_name = lines[0] if lines else "Candidate"
-        if len(candidate_name) > 40 or "@" in candidate_name or "resume" in candidate_name.lower():
-            candidate_name = "Candidate"
+        candidate_name = "Candidate"
+        for line in lines[:6]:
+            cleaned_line = re.sub(r"[\w\.-]+@[\w\.-]+\.\w+", "", line)
+            cleaned_line = re.sub(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", "", cleaned_line)
+            cleaned_line = re.sub(r"(?:github\.com|linkedin\.com|leetcode\.com)[^\s]*", "", cleaned_line, flags=re.IGNORECASE)
+            cleaned_line = re.sub(r"(?:email|mobile|phone|contact|github|linkedin|portfolio)\s*:", "", cleaned_line, flags=re.IGNORECASE)
+            parts = re.split(r"(?:\s{2,}|[|•·/])", cleaned_line)
+            for part in parts:
+                candidate = part.strip()
+                if 2 <= len(candidate) <= 35 and re.match(r"^[A-Za-z]+([ .'-][A-Za-z]+)+$", candidate):
+                    lower = candidate.lower()
+                    if not any(header in lower for header in ["curriculum", "vitae", "resume", "summary", "profile", "engineer", "developer", "tester", "quality", "page"]):
+                        candidate_name = candidate
+                        break
+            if candidate_name != "Candidate":
+                break
 
         backend_skills = ["Node.js", "Express", "Spring Boot", "FastAPI", "Django", "Go", "Java", "Python", "Microservices"]
         frontend_skills = ["React", "Next.js", "Angular", "Vue", "TypeScript", "JavaScript", "HTML", "CSS"]

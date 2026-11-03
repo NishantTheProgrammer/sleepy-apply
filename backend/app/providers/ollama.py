@@ -19,9 +19,9 @@ class OllamaProvider(BaseAIProvider):
     def _candidate_urls(self) -> list[str]:
         candidates = []
         if "host.docker.internal" in self.base_url:
-            # On native host environments (macOS/Linux), localhost is reachable directly
-            candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
+            # Inside Docker container, host.docker.internal reaches the host directly
             candidates.append(self.base_url)
+            candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
         elif "localhost" in self.base_url:
             candidates.append(self.base_url)
             candidates.append(self.base_url.replace("localhost", "host.docker.internal"))

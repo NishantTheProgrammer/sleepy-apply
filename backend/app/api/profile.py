@@ -115,14 +115,35 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     import re
     cleaned_text = re.sub(r"\n{3,}", "\n\n", text).strip()
 
-    # Clear old information completely: purge old job matches, old tailored resumes, and reset profile
+    # Clear old information completely across all relevant collections:
+    # 1. Purge previous job matches, tailored resumes, applications, and workflow runs
     db = get_db()
     uid = ObjectId(user_id)
     now = datetime.now(timezone.utc)
+    user_match_filter = {"$or": [{"user_id": uid}, {"user_id": str(user_id)}]}
 
-    # 1. Delete previous job matches and generated resumes
-    await db.job_matches.delete_many({"user_id": uid})
-    await db.resumes.delete_many({"user_id": uid})
+    del_matches = await db.job_matches.delete_many(user_match_filter)
+    del_resumes = await db.resumes.delete_many(user_match_filter)
+    del_apps = await db.applications.delete_many(user_match_filter)
+    del_workflows = await db.workflow_runs.delete_many(user_match_filter)
+
+    # Clean local on-disk stored resumes for this user
+    import shutil
+    storage_dir = os.path.join(os.getcwd(), "storage", "resumes", str(user_id))
+    if os.path.exists(storage_dir):
+        try:
+            shutil.rmtree(storage_dir)
+        except Exception:
+            pass
+
+    logger.info(
+        "Purged user collection data on resume upload",
+        user_id=user_id,
+        purged_job_matches=del_matches.deleted_count,
+        purged_resumes=del_resumes.deleted_count,
+        purged_applications=del_apps.deleted_count,
+        purged_workflow_runs=del_workflows.deleted_count,
+    )
 
     # 2. Preserve original creation timestamp if present, otherwise set now
     existing_created_at = now

@@ -26,6 +26,12 @@ async def parse_resume_node(state: ProfileState) -> ProfileState:
     # Load user's settings to resolve their AI provider if set
     settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
     user_settings = UserSettings(**settings_doc) if settings_doc else None
+    if not user_settings:
+        user_settings = UserSettings(
+            user_id=ObjectId(user_id),
+            ai_provider="ollama",
+            ai_model="llama3.2:latest",
+        )
 
     agent = ProfileCreatorAgent()
     try:
@@ -85,6 +91,12 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         {"$set": update_fields, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},
         upsert=True,
     )
+
+    # Sync candidate's parsed name to db.users
+    full_name = parsed.get("personal", {}).get("fullName") or parsed.get("personal", {}).get("full_name")
+    if full_name and full_name.lower() != "candidate":
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"name": full_name}})
+
     logger.info(
         "Profile successfully saved from resume",
         user_id=user_id,
@@ -99,7 +111,7 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
     async def match_fresh_jobs():
         try:
             matcher = JobMatcherAgent()
-            cursor = db.jobs.find({"is_active": True}).limit(50)
+            cursor = db.jobs.find({"is_active": True})
             async for j in cursor:
                 await matcher.match_user_and_job(user_id=user_id, job_id=str(j["_id"]), use_ai_reasoning=False)
         except Exception as err:

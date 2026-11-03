@@ -11,7 +11,31 @@ import { templatesApi, ResumeTemplateItem } from "@/lib/api";
 const isClean = (val: unknown): val is string => {
   if (typeof val !== "string") return false;
   const s = val.trim().toLowerCase();
-  return s.length > 0 && s !== "null" && s !== "none" && s !== "undefined" && s !== "n/a";
+  return (
+    s.length > 0 &&
+    s !== "null" &&
+    s !== "none" &&
+    s !== "nil" &&
+    s !== "undefined" &&
+    s !== "n/a" &&
+    s !== "na"
+  );
+};
+
+const isCleanUrl = (val: unknown): val is string => {
+  if (!isClean(val)) return false;
+  const s = val.trim().toLowerCase();
+  if (
+    s === "gmail.com" ||
+    s === "yahoo.com" ||
+    s === "hotmail.com" ||
+    s.includes("@") ||
+    s === "http://" ||
+    s === "https://"
+  ) {
+    return false;
+  }
+  return true;
 };
 
 interface LocationData {
@@ -153,22 +177,25 @@ export default function ResumeTemplateSelector({
 
   // Helper strings for personal contacts
   const candidateName =
-    personal.fullName || personal.full_name || "Alex Chen";
+    (isClean(personal.fullName) && personal.fullName) ||
+    (isClean(personal.full_name) && personal.full_name) ||
+    "Arun Yadav";
   const city =
     typeof personal.location === "object"
       ? [personal.location?.city, personal.location?.country]
-          .filter(Boolean)
+          .filter(isClean)
           .join(", ")
-      : typeof personal.location === "string"
+      : typeof personal.location === "string" && isClean(personal.location)
       ? personal.location
-      : "Bengaluru, India";
+      : "";
 
   const contactList = [
-    personal.email || "candidate@example.com",
-    personal.phone || "+91 98765 43210",
-    city,
-    personal.linkedin ? "linkedin.com/in/" + personal.linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\/?/i, "") : null,
-    personal.github ? "github.com/" + personal.github.replace(/https?:\/\/(www\.)?github\.com\/?/i, "") : null,
+    isClean(personal.email) ? personal.email : null,
+    isClean(personal.phone) ? personal.phone : null,
+    isClean(city) ? city : null,
+    isClean(personal.linkedin) ? "linkedin.com/in/" + personal.linkedin.replace(/https?:\/\/(www\.)?linkedin\.com\/in\/?/i, "") : null,
+    isClean(personal.github) ? "github.com/" + personal.github.replace(/https?:\/\/(www\.)?github\.com\/?/i, "") : null,
+    isCleanUrl(personal.portfolio) ? personal.portfolio.replace(/https?:\/\//i, "") : null,
   ].filter(Boolean);
 
   // Template specific theme classes for the live resume paper preview
@@ -425,8 +452,8 @@ export default function ResumeTemplateSelector({
                       {isClean(personal.github) && (
                         <span className="text-blue-600 underline">GitHub</span>
                       )}
-                      {isClean(personal.github) && isClean(personal.portfolio) && <span> | </span>}
-                      {isClean(personal.portfolio) && (
+                      {isClean(personal.github) && isCleanUrl(personal.portfolio) && <span> | </span>}
+                      {isCleanUrl(personal.portfolio) && (
                         <span className="text-blue-600 underline">
                           {personal.portfolio.replace(/https?:\/\//, "")}
                         </span>

@@ -145,6 +145,13 @@ export default function ProfilePage() {
 
   const toggleSection = (s: string) => setExpanded((prev) => ({ ...prev, [s]: !prev[s] }));
 
+const sanitizeStr = (val: unknown): string => {
+  if (typeof val !== "string") return "";
+  const s = val.trim();
+  if (["null", "none", "nil", "undefined", "n/a", "na"].includes(s.toLowerCase())) return "";
+  return s;
+};
+
   // ── Populate form from DB profile ──────────────────────────
   const populateForm = (p: Record<string, unknown> | null) => {
     if (!p) return;
@@ -154,73 +161,109 @@ export default function ProfilePage() {
     const loc = pers.location;
     const structuredLoc: LocationData =
       typeof loc === "object" && loc !== null
-        ? (loc as LocationData)
-        : { address: "", city: typeof loc === "string" ? loc : "", postalCode: "", country: "" };
+        ? {
+            address: sanitizeStr((loc as LocationData).address),
+            city: sanitizeStr((loc as LocationData).city),
+            postalCode: sanitizeStr((loc as LocationData).postalCode),
+            country: sanitizeStr((loc as LocationData).country),
+          }
+        : { address: "", city: typeof loc === "string" ? sanitizeStr(loc) : "", postalCode: "", country: "" };
 
     setPersonal({
-      fullName: (pers.fullName as string) || (pers.full_name as string) || "",
-      email: (pers.email as string) || "",
-      phone: (pers.phone as string) || "",
+      fullName: sanitizeStr(pers.fullName || pers.full_name),
+      email: sanitizeStr(pers.email),
+      phone: sanitizeStr(pers.phone),
       location: structuredLoc,
-      linkedin: (pers.linkedin as string) || "",
-      github: (pers.github as string) || "",
-      portfolio: (pers.portfolio as string) || "",
+      linkedin: sanitizeStr(pers.linkedin),
+      github: sanitizeStr(pers.github),
+      portfolio: sanitizeStr(pers.portfolio),
     });
 
-    setSummary((p.summary as string) || "");
+    setSummary(sanitizeStr(p.summary));
 
     // Skills: handle both categorized dictionary and flat array
     const rawSkills = p.skills;
     if (rawSkills && typeof rawSkills === "object" && !Array.isArray(rawSkills)) {
-      setSkills(rawSkills as Record<string, string[]>);
+      const cleanedSkillsMap: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(rawSkills as Record<string, unknown>)) {
+        if (Array.isArray(v)) {
+          cleanedSkillsMap[k] = v.map(sanitizeStr).filter((s) => s.length > 0);
+        }
+      }
+      setSkills(cleanedSkillsMap);
     } else if (Array.isArray(rawSkills)) {
-      setSkills({ general: rawSkills as string[] });
+      setSkills({ general: rawSkills.map(sanitizeStr).filter((s) => s.length > 0) });
     }
 
     // Experience
     const rawExp = (p.experience as Array<Record<string, unknown>>) || [];
     setExperience(
-      rawExp.map((e) => ({
-        company: (e.company as string) || "",
-        jobTitle: (e.jobTitle as string) || (e.title as string) || "",
-        startDate: (e.startDate as string) || (e.start_date as string) || "",
-        endDate: (e.endDate as string) || (e.end_date as string) || null,
-        current: Boolean(e.current ?? e.is_current),
-        description: (e.description as string) || "",
-        responsibilities: (e.responsibilities as string[]) || [],
-        projects: ((e.projects as Array<Record<string, unknown>>) || []).map((sub) => ({
-          name: (sub.name as string) || "",
-          description: (sub.description as string) || "",
-          technologies: (sub.technologies as string[]) || [],
-          achievements: (sub.achievements as string[]) || [],
-        })),
-      }))
+      rawExp
+        .map((e) => {
+          const comp = sanitizeStr(e.company);
+          const title = sanitizeStr(e.jobTitle || e.title);
+          const start = sanitizeStr(e.startDate || e.start_date);
+          const endRaw = sanitizeStr(e.endDate || e.end_date);
+          const isCurr = Boolean(e.current ?? e.is_current);
+          const desc = sanitizeStr(e.description);
+
+          const rawResp = (e.responsibilities as unknown[]) || [];
+          const cleanResp = rawResp.map(sanitizeStr).filter((r) => r.length > 0);
+
+          const rawSubProjects = (e.projects as Array<Record<string, unknown>>) || [];
+          const cleanSubProjects = rawSubProjects
+            .map((sub) => ({
+              name: sanitizeStr(sub.name),
+              description: sanitizeStr(sub.description),
+              technologies: ((sub.technologies as unknown[]) || []).map(sanitizeStr).filter((t) => t.length > 0),
+              achievements: ((sub.achievements as unknown[]) || []).map(sanitizeStr).filter((a) => a.length > 0),
+            }))
+            .filter((sub) => sub.name.length > 0);
+
+          return {
+            company: comp,
+            jobTitle: title,
+            startDate: start,
+            endDate: isCurr ? "Present" : endRaw || null,
+            current: isCurr,
+            description: desc,
+            responsibilities: cleanResp,
+            projects: cleanSubProjects,
+          };
+        })
+        .filter((e) => e.company.length > 0 || e.jobTitle.length > 0)
     );
 
     // Projects
     const rawProj = (p.projects as Array<Record<string, unknown>>) || [];
     setProjects(
-      rawProj.map((pr) => ({
-        name: (pr.name as string) || "",
-        description: (pr.description as string) || "",
-        technologies: (pr.technologies as string[]) || [],
-      }))
+      rawProj
+        .map((pr) => ({
+          name: sanitizeStr(pr.name),
+          description: sanitizeStr(pr.description),
+          technologies: ((pr.technologies as unknown[]) || []).map(sanitizeStr).filter((t) => t.length > 0),
+        }))
+        .filter((pr) => pr.name.length > 0)
     );
 
     // Education
     const rawEdu = (p.education as Array<Record<string, unknown>>) || [];
     setEducation(
-      rawEdu.map((ed) => ({
-        degree: (ed.degree as string) || "",
-        institution: (ed.institution as string) || "",
-        year: (ed.year as string | number) || (ed.graduation_year as string | number) || "",
-      }))
+      rawEdu
+        .map((ed) => ({
+          degree: sanitizeStr(ed.degree),
+          institution: sanitizeStr(ed.institution),
+          year: sanitizeStr(ed.year || ed.graduation_year),
+        }))
+        .filter((ed) => ed.degree.length > 0 || ed.institution.length > 0)
     );
 
     // Achievements
     const rawAch = (p.achievements as Array<Record<string, unknown> | string>) || [];
     setAchievements(
-      rawAch.map((a) => (typeof a === "string" ? { title: a } : { title: (a.title as string) || "" }))
+      rawAch
+        .map((a) => (typeof a === "string" ? { title: sanitizeStr(a) } : { title: sanitizeStr(a.title) }))
+        .filter((a) => a.title.length > 0)
     );
 
     // Job Preferences

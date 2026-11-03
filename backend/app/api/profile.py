@@ -3,6 +3,7 @@ from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
 from app.models.profile import Profile, ProfileQuestion
+from app.models.settings import UserSettings
 from datetime import datetime, timezone
 from pydantic import BaseModel
 import structlog
@@ -164,6 +165,228 @@ async def get_pending_questions(request: Request):
 class AnswerRequest(BaseModel):
     question_id: str
     answer: str
+
+
+class SelectRoleRequest(BaseModel):
+    role: str
+
+
+class ScreeningAnswerItem(BaseModel):
+    question_id: str
+    question: str | None = None
+    answer: str
+    category: str | None = None
+
+
+class SubmitScreeningAnswersRequest(BaseModel):
+    answers: list[ScreeningAnswerItem]
+    target_role: str | None = None
+
+
+@router.get("/screening")
+async def get_screening_data(request: Request):
+    """
+    Returns suggested target profile chips, active screening questions,
+    and answered Q/A history for the candidate.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    if not profile:
+        return {
+            "target_roles": [],
+            "selected_role": None,
+            "questions": [],
+            "qa_history": [],
+        }
+
+    from app.agents.screening_agent import ScreeningQAAgent
+    agent = ScreeningQAAgent()
+
+    target_roles = profile.get("suggested_roles")
+    if not target_roles or not isinstance(target_roles, list) or len(target_roles) == 0:
+        target_roles = agent.generate_suggested_roles(profile)
+        await db.profiles.update_one(
+            {"user_id": ObjectId(user_id)},
+            {"$set": {"suggested_roles": target_roles}}
+        )
+
+    # Determine selected role
+    selected_role = profile.get("target_role")
+    if not selected_role:
+        prefs = profile.get("job_preferences") or profile.get("jobPreferences") or {}
+        titles = prefs.get("jobTitles") or prefs.get("titles") or []
+        selected_role = titles[0] if titles else (target_roles[0] if target_roles else None)
+
+    questions = profile.get("screening_questions", [])
+    if not questions or len(questions) == 0:
+        settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+        user_settings = UserSettings(**settings_doc) if settings_doc else None
+        questions = await agent.generate_screening_questions(
+            profile=profile,
+            target_role=selected_role,
+            user_settings=user_settings
+        )
+        await db.profiles.update_one(
+            {"user_id": ObjectId(user_id)},
+            {"$set": {"screening_questions": questions}}
+        )
+
+    return {
+        "target_roles": target_roles,
+        "selected_role": selected_role,
+        "questions": questions,
+        "qa_history": profile.get("qa_history", []),
+    }
+
+
+@router.post("/screening/select-role")
+async def select_target_role(request: Request, body: SelectRoleRequest):
+    """
+    User picks or enters their target role.
+    Generates dynamic recruiter screening questions specific to this role via fast local AI model.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found. Please upload a resume first.")
+
+    chosen_role = body.role.strip()
+    if not chosen_role:
+        raise HTTPException(status_code=400, detail="Target role cannot be empty")
+
+    from app.agents.screening_agent import ScreeningQAAgent
+    agent = ScreeningQAAgent()
+
+    settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    user_settings = UserSettings(**settings_doc) if settings_doc else None
+
+    # Generate role-specific recruiter questions using fast local model
+    questions = await agent.generate_screening_questions(
+        profile=profile,
+        target_role=chosen_role,
+        user_settings=user_settings
+    )
+
+    # Update job preferences with the selected target role at the top
+    current_titles = profile.get("job_preferences", {}).get("jobTitles", [])
+    updated_titles = [chosen_role] + [t for t in current_titles if t.lower() != chosen_role.lower()]
+
+    await db.profiles.update_one(
+        {"user_id": ObjectId(user_id)},
+        {
+            "$set": {
+                "target_role": chosen_role,
+                "job_preferences.jobTitles": updated_titles,
+                "jobPreferences.jobTitles": updated_titles,
+                "screening_questions": questions,
+                "updated_at": now,
+            }
+        }
+    )
+
+    return {
+        "ok": True,
+        "selected_role": chosen_role,
+        "questions": questions,
+    }
+
+
+@router.post("/screening/answer")
+async def submit_screening_answers(request: Request, body: SubmitScreeningAnswersRequest):
+    """
+    Submits user answers to the screening questions and stores them in Q/A history against the user.
+    Also syncs relevant answers into candidate profile and re-scores active jobs.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    existing_qa = profile.get("qa_history", [])
+    existing_map = {item.get("id"): item for item in existing_qa}
+
+    for item in body.answers:
+        qa_entry = {
+            "id": item.question_id,
+            "question": item.question or f"Question {item.question_id}",
+            "answer": item.answer.strip(),
+            "category": item.category or "screening",
+            "target_role": body.target_role or profile.get("target_role"),
+            "answered_at": now.isoformat(),
+        }
+        existing_map[item.question_id] = qa_entry
+
+    updated_qa = list(existing_map.values())
+
+    update_fields: dict[str, Any] = {
+        "qa_history": updated_qa,
+        "updated_at": now,
+    }
+
+    if body.target_role:
+        update_fields["target_role"] = body.target_role.strip()
+
+    await db.profiles.update_one(
+        {"user_id": ObjectId(user_id)},
+        {"$set": update_fields}
+    )
+
+    # Re-match active jobs in the background to incorporate the answers and target role
+    import asyncio
+    from app.agents.job_matcher import JobMatcherAgent
+
+    async def rescore_user_jobs():
+        try:
+            matcher = JobMatcherAgent()
+            cursor = db.jobs.find({"is_active": True}).limit(40)
+            async for j in cursor:
+                await matcher.match_user_and_job(user_id=user_id, job_id=str(j["_id"]), use_ai_reasoning=False)
+        except Exception as e:
+            logger.warning("Background job re-matching after screening answer failed", error=str(e))
+
+    asyncio.create_task(rescore_user_jobs())
+
+    return {
+        "ok": True,
+        "saved_count": len(body.answers),
+        "total_qa": len(updated_qa),
+        "qa_history": updated_qa,
+    }
+
+
+@router.post("/screening/regenerate")
+async def regenerate_screening_questions(request: Request, body: SelectRoleRequest | None = None):
+    """Forces AI to generate fresh recruiter screening questions for the candidate."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    chosen_role = (body.role if body else None) or profile.get("target_role")
+    from app.agents.screening_agent import ScreeningQAAgent
+    agent = ScreeningQAAgent()
+
+    settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    user_settings = UserSettings(**settings_doc) if settings_doc else None
+
+    questions = await agent.generate_screening_questions(
+        profile=profile,
+        target_role=chosen_role,
+        user_settings=user_settings
+    )
+
+    await db.profiles.update_one(
+        {"user_id": ObjectId(user_id)},
+        {"$set": {"screening_questions": questions, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    return {"ok": True, "questions": questions}
 
 
 @router.post("/answers")

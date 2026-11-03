@@ -50,6 +50,14 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
 
     parsed = state["parsed_data"]
 
+    from app.agents.screening_agent import ScreeningQAAgent
+    screening_agent = ScreeningQAAgent()
+    suggested_roles = screening_agent.generate_suggested_roles(parsed)
+    initial_questions = await screening_agent.generate_screening_questions(
+        profile=parsed,
+        target_role=suggested_roles[0] if suggested_roles else None
+    )
+
     update_fields = {
         "personal": parsed.get("personal", {}),
         "summary": parsed.get("summary", ""),
@@ -64,6 +72,8 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         "completion_score": parsed.get("completion_score", 0),
         "missing_fields": parsed.get("missing_fields", []),
         "pending_questions": parsed.get("pending_questions", []),
+        "suggested_roles": suggested_roles,
+        "screening_questions": initial_questions,
         "is_analyzing": False,
         "analysis_error": None,
         "analyzed_at": now,

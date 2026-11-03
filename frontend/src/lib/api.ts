@@ -53,6 +53,32 @@ export const authApi = {
 };
 
 // ── Profile ───────────────────────────────────────────────
+export interface ScreeningQuestion {
+  id: string;
+  category?: string;
+  question: string;
+  context_hint?: string;
+  suggested_options?: string[];
+  answer?: string | null;
+  answered_at?: string | null;
+}
+
+export interface ScreeningQAItem {
+  id: string;
+  question: string;
+  answer: string;
+  category?: string;
+  target_role?: string;
+  answered_at: string;
+}
+
+export interface ScreeningData {
+  target_roles: string[];
+  selected_role: string | null;
+  questions: ScreeningQuestion[];
+  qa_history: ScreeningQAItem[];
+}
+
 export const profileApi = {
   get: () => request<{ profile: Record<string, unknown> | null }>("/api/profile"),
   patch: (data: Record<string, unknown>) =>
@@ -74,6 +100,22 @@ export const profileApi = {
   getQuestions: () => request<{ questions: unknown[] }>("/api/profile/questions"),
   submitAnswers: (answers: { question_id: string; answer: string }[]) =>
     request("/api/profile/answers", { method: "POST", body: JSON.stringify(answers) }),
+  getScreening: () => request<ScreeningData>("/api/profile/screening"),
+  selectScreeningRole: (role: string) =>
+    request<{ ok: boolean; selected_role: string; questions: ScreeningQuestion[] }>("/api/profile/screening/select-role", {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    }),
+  submitScreeningAnswers: (answers: { question_id: string; question?: string; answer: string; category?: string }[], target_role?: string) =>
+    request<{ ok: boolean; saved_count: number; total_qa: number; qa_history: ScreeningQAItem[] }>("/api/profile/screening/answer", {
+      method: "POST",
+      body: JSON.stringify({ answers, target_role }),
+    }),
+  regenerateScreeningQuestions: (role?: string) =>
+    request<{ ok: boolean; questions: ScreeningQuestion[] }>("/api/profile/screening/regenerate", {
+      method: "POST",
+      body: JSON.stringify({ role: role || "" }),
+    }),
 };
 
 // ── Templates ─────────────────────────────────────────────

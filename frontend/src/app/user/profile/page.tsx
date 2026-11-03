@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { profileApi, templatesApi } from "@/lib/api";
 import ResumeTemplateSelector from "@/components/ResumeTemplateSelector";
+import ResumeScreeningQA from "@/components/ResumeScreeningQA";
 
 interface Question { id: string; question: string; field: string }
 
@@ -645,48 +646,8 @@ export default function ProfilePage() {
         onSelectTemplate={handleSelectTemplate}
       />
 
-      {/* ── AI Questions ── */}
-      <AnimatePresence>
-        {questions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="glass rounded-2xl p-5 mb-8"
-            style={{ border: "1px solid rgba(var(--theme-c1), 0.3)" }}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <HelpCircle className="w-4 h-4 text-yellow-400" />
-              <h2 className="font-bold text-sm text-white">AI Questions for Profile Perfection</h2>
-              <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-yellow-400/15 text-yellow-300 border border-yellow-400/20">
-                {questions.length} pending
-              </span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {questions.map((q) => (
-                <div key={q.id}>
-                  <label className="text-xs text-slate-300 mb-1.5 block">{q.question}</label>
-                  <input
-                    type="text"
-                    value={answers[q.id] ?? ""}
-                    onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                    placeholder="Your answer…"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                  />
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={handleAnswers}
-              disabled={saving || Object.keys(answers).length === 0}
-              className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              Submit Answers
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── AI Target Profile Selection & Recruiter Screening Q&A ── */}
+      <ResumeScreeningQA onProfileUpdated={load} />
 
       {/* ── EDITABLE FORM SECTIONS ── */}
       <div className="space-y-6">

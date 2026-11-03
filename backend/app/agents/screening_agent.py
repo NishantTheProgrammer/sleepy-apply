@@ -145,19 +145,80 @@ class ScreeningQAAgent:
         )[:200]
 
         role = target_role or (profile.get("job_preferences", {}).get("jobTitles") or ["Software Engineer"])[0]
+        role_low = role.lower()
+
+        # Extract all candidate skills
+        cand_skills = []
+        if isinstance(skills, dict):
+            for v in skills.values():
+                if isinstance(v, list):
+                    cand_skills.extend(v)
+                elif isinstance(v, str):
+                    cand_skills.extend([s.strip() for s in v.split(",") if s.strip()])
+        elif isinstance(skills, list):
+            cand_skills = [str(s) for s in skills]
+
+        clean_cand_skills = []
+        seen_cs = set()
+        for s in cand_skills:
+            if isinstance(s, str) and s.strip() and s.strip().lower() not in seen_cs:
+                seen_cs.add(s.strip().lower())
+                clean_cand_skills.append(s.strip())
+
+        is_qa = any(k in role_low for k in ["sdet", "qa", "quality", "test", "automation"])
+        is_data = any(k in role_low for k in ["data", "etl", "snowflake", "big data", "pyspark", "pipeline"])
+        is_fullstack = any(k in role_low for k in ["full stack", "fullstack", "software engineer", "developer", "backend", "sde"])
+        is_frontend = any(k in role_low for k in ["frontend", "ui"]) and not is_fullstack and not is_qa
+
+        if is_qa:
+            domain_name = "QA & Test Automation"
+            tech_question = "Which test automation frameworks, API testing libraries, and CI/CD tools have you worked with hands-on in production?"
+            exp_question = "How many total years of hands-on QA & test automation experience do you have?"
+            default_chips = ["Playwright", "Selenium WebDriver", "REST Assured", "Cypress", "Appium", "Postman", "Jenkins"]
+            matched = [s for s in clean_cand_skills if any(q in s.lower() for q in ["playwright", "selenium", "rest", "cypress", "appium", "postman", "jenkins", "k6", "testng"])]
+            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
+            ctc_options = ["8 - 12 LPA", "12 - 16 LPA", "16 - 22 LPA", "22+ LPA"]
+        elif is_data:
+            domain_name = "Data Engineering & ETL Pipelines"
+            tech_question = "Which data processing frameworks, ETL tools, databases, and cloud platforms have you worked with hands-on in production?"
+            exp_question = "How many total years of hands-on data engineering / ETL experience do you have?"
+            default_chips = ["PySpark / Apache Spark", "SQL & Stored Procedures", "Apache Airflow", "Snowflake / BigQuery", "Kafka", "PostgreSQL / MySQL", "dbt"]
+            matched = [s for s in clean_cand_skills if any(d in s.lower() for d in ["spark", "sql", "airflow", "snowflake", "bigquery", "kafka", "postgres", "dbt"])]
+            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
+            ctc_options = ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"]
+        elif is_frontend:
+            domain_name = "Frontend & UI Engineering"
+            tech_question = f"Which frontend frameworks, state management libraries, and web tooling have you worked with hands-on for {role} roles?"
+            exp_question = "How many total years of hands-on frontend web development experience do you have?"
+            default_chips = ["React.js", "Next.js", "TypeScript", "Tailwind CSS", "Redux / Zustand", "HTML5 & CSS3", "REST / GraphQL APIs", "Jest / Vitest"]
+            matched = [s for s in clean_cand_skills if any(f in s.lower() for f in ["react", "next", "type", "tail", "redux", "html", "css", "vue", "angular"])]
+            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
+            ctc_options = ["12 - 18 LPA", "18 - 25 LPA", "25 - 35 LPA", "35+ LPA"]
+        else:
+            domain_name = "Full Stack & Software Engineering"
+            tech_question = f"Which backend frameworks, frontend libraries, databases, and architectural tools have you worked with hands-on for {role} roles?"
+            exp_question = "How many total years of hands-on full stack & software engineering experience do you have?"
+            default_chips = ["Node.js & Express", "React.js & Next.js", "TypeScript & JavaScript", "MongoDB", "PostgreSQL / MySQL", "Docker & Microservices", "Spring Boot & Java", "REST & GraphQL APIs"]
+            matched = [s for s in clean_cand_skills if any(m in s.lower() for m in ["node", "express", "react", "next", "type", "java", "spring", "mongo", "postgres", "sql", "docker", "micro", "jest"])]
+            tech_options = list(dict.fromkeys(matched + default_chips))[:8]
+            ctc_options = ["14 - 20 LPA", "20 - 28 LPA", "28 - 40 LPA", "40+ LPA"]
+
+        options_json = json.dumps(tech_options)
+        ctc_json = json.dumps(ctc_options)
 
         prompt = f"""You are a recruiter screening assistant collecting candidate details and application preferences.
 Candidate Name: {name}
 Target Role: {role}
+Domain: {domain_name}
 Resume Summary: {summary[:300]}
-Key Skills: {skills_summary}
+Candidate Extracted Skills: {', '.join(clean_cand_skills[:12])}
 
 CRITICAL RULES:
 - DO NOT ask interview questions, technical exam questions, or conceptual explanation questions!
 - NEVER ask 'Can you explain...', 'Walk me through...', 'How do you handle...', or theoretical questions. We are NOT interviewing or quizzing the candidate.
 - ONLY ask for candidate details, preferences, and facts to complete their application profile:
-  1. Tooling & Tech Stack hands-on checklist (type: 'multiselect'): Which frameworks, libraries, tools, and databases have you worked with hands-on in production?
-  2. Total relevant hands-on experience in years (type: 'single_select')
+  1. Tooling & Tech Stack hands-on checklist (type: 'multiselect'): {tech_question}
+  2. Total relevant hands-on experience in years (type: 'single_select'): {exp_question}
   3. Official notice period / earliest joining timeline (type: 'single_select')
   4. Work location & hybrid/relocation readiness in Delhi NCR or Bengaluru (type: 'boolean')
   5. Expected annual CTC / salary expectation bracket (type: 'single_select')
@@ -169,17 +230,17 @@ Return strict JSON only in this format:
       "id": "q1",
       "category": "technical",
       "type": "multiselect",
-      "question": "Which automation frameworks, libraries, and tools have you worked with hands-on?",
-      "context_hint": "Select all tools in your active toolkit.",
-      "suggested_options": ["Playwright", "Selenium WebDriver", "REST Assured", "Cypress", "Appium", "Postman", "Jenkins"]
+      "question": "{tech_question}",
+      "context_hint": "Select all technologies and tools in your active production toolkit.",
+      "suggested_options": {options_json}
     }},
     {{
       "id": "q2",
       "category": "experience",
       "type": "single_select",
-      "question": "How many total years of hands-on test automation experience do you have?",
+      "question": "{exp_question}",
       "context_hint": "Select your total experience bracket.",
-      "suggested_options": ["1-2 years", "3-4 years", "4.5+ years", "6+ years"]
+      "suggested_options": ["1-2 years", "3-4 years", "5-7 years", "7+ years"]
     }},
     {{
       "id": "q3",
@@ -203,7 +264,7 @@ Return strict JSON only in this format:
       "type": "single_select",
       "question": "What is your expected annual CTC bracket?",
       "context_hint": "Compensation expectation alignment.",
-      "suggested_options": ["8 - 12 LPA", "12 - 16 LPA", "16 - 22 LPA", "22+ LPA"]
+      "suggested_options": {ctc_json}
     }}
   ]
 }}

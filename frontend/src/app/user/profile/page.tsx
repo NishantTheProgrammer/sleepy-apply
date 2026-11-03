@@ -130,6 +130,7 @@ export default function ProfilePage() {
     totalProjects: "",
   });
   const [selectedTemplate, setSelectedTemplate] = useState<string>("default");
+  const [screeningTrigger, setScreeningTrigger] = useState(0);
 
   // Collapsible section toggles
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
@@ -373,12 +374,21 @@ const sanitizeStr = (val: unknown): string => {
           const updated = await profileApi.get();
           const p = updated?.profile;
           if (p) {
+            // Check if analysis encountered an error
+            if (p.analysis_error) {
+              clearInterval(pollInterval);
+              setUploading(false);
+              setUploadError("Analysis error: " + String(p.analysis_error));
+              void load();
+              return;
+            }
             // Check if analysis is completed
-            if (!p.is_analyzing || (Array.isArray(p.experience) && p.experience.length >= 2)) {
+            if (!p.is_analyzing && (Array.isArray(p.experience) && p.experience.length >= 1)) {
               clearInterval(pollInterval);
               populateForm(p);
               setUploading(false);
               setUploadMsg("✓ Resume parsed successfully! Extracted all work experiences, skills, and projects.");
+              setScreeningTrigger((prev) => prev + 1);
               return;
             }
           }
@@ -387,6 +397,7 @@ const sanitizeStr = (val: unknown): string => {
             if (p) populateForm(p);
             setUploading(false);
             setUploadMsg("Analysis complete. Review your extracted profile below.");
+            setScreeningTrigger((prev) => prev + 1);
           }
         } catch {
           // Keep polling
@@ -395,6 +406,7 @@ const sanitizeStr = (val: unknown): string => {
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
       setUploading(false);
+      void load();
     }
   };
 
@@ -739,7 +751,7 @@ const sanitizeStr = (val: unknown): string => {
       />
 
       {/* ── AI Target Profile Selection & Recruiter Screening Q&A ── */}
-      <ResumeScreeningQA onProfileUpdated={load} />
+      <ResumeScreeningQA key={screeningTrigger} onProfileUpdated={load} />
 
       {/* ── EDITABLE FORM SECTIONS ── */}
       <div className="space-y-6">

@@ -36,9 +36,12 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
       setLoading(false);
       return;
     }
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Screening request timed out")), 10000)
+    );
     try {
       setLoading(true);
-      const res = await profileApi.getScreening();
+      const res = await Promise.race([profileApi.getScreening(), timeoutPromise]);
       setData(res);
       setSelectedRole(res.selected_role || (res.target_roles.length > 0 ? res.target_roles[0] : ""));
 

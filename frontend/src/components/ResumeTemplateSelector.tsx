@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText, Check, Download, Sparkles, LayoutTemplate,
   Maximize2, Minimize2, CheckCircle2, ShieldCheck, ChevronRight,
-  ExternalLink, Layers
+  ExternalLink, Layers, Loader2
 } from "lucide-react";
 import { templatesApi, ResumeTemplateItem } from "@/lib/api";
 
@@ -100,6 +100,7 @@ interface ResumeTemplateSelectorProps {
   education: EducationItem[];
   achievements: AchievementItem[];
   currentTemplate?: string;
+  isAnalyzing?: boolean;
   onSelectTemplate: (templateId: string) => Promise<void> | void;
 }
 
@@ -112,6 +113,7 @@ export default function ResumeTemplateSelector({
   education,
   achievements,
   currentTemplate = "default",
+  isAnalyzing = false,
   onSelectTemplate,
 }: ResumeTemplateSelectorProps) {
   const [templates, setTemplates] = useState<ResumeTemplateItem[]>([]);
@@ -421,8 +423,28 @@ export default function ResumeTemplateSelector({
         <div
           className={`bg-slate-950/80 border-x border-b border-white/10 rounded-b-2xl p-4 sm:p-8 overflow-y-auto ${
             isFullScreen ? "max-h-[85vh]" : "max-h-[580px]"
-          } transition-all duration-300 shadow-inner`}
+          } transition-all duration-300 shadow-inner relative`}
         >
+          {isAnalyzing && (
+            <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+              <div className="relative mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 text-indigo-400 animate-spin" />
+                </div>
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+              <h4 className="text-base sm:text-lg font-black text-white mb-1.5">
+                AI is Compiling Your Live ATS Resume
+              </h4>
+              <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                Reading your work experience, responsibilities, technical toolkit, and education. This preview will automatically refresh when complete.
+              </p>
+              <div className="mt-4 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-mono text-indigo-300 flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" /> Live Extraction in Progress
+              </div>
+            </div>
+          )}
+
           {/* Actual Document Sheet */}
           <div
             className={`w-full max-w-3xl mx-auto rounded-xl p-6 sm:p-10 shadow-2xl transition-all duration-300 ${theme.paperClass}`}

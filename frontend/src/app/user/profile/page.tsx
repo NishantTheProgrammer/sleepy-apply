@@ -84,6 +84,11 @@ export default function ProfilePage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingFilename, setAnalyzingFilename] = useState("");
+  const [analysisSeconds, setAnalysisSeconds] = useState(0);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [uploadError, setUploadError] = useState("");
@@ -288,10 +293,77 @@ const sanitizeStr = (val: unknown): string => {
     setSelectedTemplate(String(p.selected_template || p.selectedTemplate || "default"));
   };
 
+  const stopAnalysis = () => {
+    setIsAnalyzing(false);
+    setUploading(false);
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  };
+
+  const startAnalysisTracking = (filename?: string) => {
+    stopAnalysis();
+    setIsAnalyzing(true);
+    setUploading(true);
+    setAnalyzingFilename(filename || "resume.pdf");
+    setAnalysisSeconds(0);
+    setUploadError("");
+    setUploadMsg("AI is parsing your resume: extracting all work experiences, projects, skills & education... (takes ~30-60s)");
+
+    timerIntervalRef.current = setInterval(() => {
+      setAnalysisSeconds((prev) => prev + 1);
+    }, 1000);
+
+    let attempts = 0;
+    const maxAttempts = 60; // 60 * 2.5s = 150 seconds max
+    pollIntervalRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const updated = await profileApi.get();
+        const p = updated?.profile;
+        if (p) {
+          if (p.analysis_error) {
+            stopAnalysis();
+            setUploadError("Analysis error: " + String(p.analysis_error));
+            void load();
+            return;
+          }
+          if (!p.is_analyzing && (Array.isArray(p.experience) && p.experience.length >= 1)) {
+            stopAnalysis();
+            populateForm(p);
+            setUploadMsg("✓ Resume parsed successfully! Extracted all work experiences, skills, and projects.");
+            setScreeningTrigger((prev) => prev + 1);
+            return;
+          }
+        }
+        if (attempts >= maxAttempts) {
+          stopAnalysis();
+          if (p) populateForm(p);
+          setUploadMsg("Analysis complete. Review your extracted profile below.");
+          setScreeningTrigger((prev) => prev + 1);
+        }
+      } catch {
+        // Keep polling
+      }
+    }, 2500);
+  };
+
   const load = async () => {
     try {
       const [p, q] = await Promise.all([profileApi.get(), profileApi.getQuestions()]);
-      if (p?.profile) populateForm(p.profile);
+      if (p?.profile) {
+        populateForm(p.profile);
+        if (p.profile.is_analyzing) {
+          startAnalysisTracking(p.profile.resume_filename as string);
+        } else if (isAnalyzing) {
+          stopAnalysis();
+        }
+      }
       if (q?.questions) setQuestions(q.questions as Question[]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -300,6 +372,13 @@ const sanitizeStr = (val: unknown): string => {
       }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -321,9 +400,7 @@ const sanitizeStr = (val: unknown): string => {
       return;
     }
 
-    setUploading(true);
     setUploadError("");
-    setUploadMsg("Purging previous profile data and reading new resume with AI...");
 
     // Immediately clear old form state so previous resume data is deleted from UI
     setPersonal({
@@ -361,51 +438,13 @@ const sanitizeStr = (val: unknown): string => {
       totalProjects: "",
     });
 
+    startAnalysisTracking(file.name);
+
     try {
       await profileApi.uploadResume(file);
-      setUploadMsg("AI is parsing your resume: extracting all work experiences, projects, skills & education... (takes ~30-60s)");
-
-      // Robust polling loop until analysis is complete
-      let attempts = 0;
-      const maxAttempts = 60; // 60 * 2.5s = 150 seconds max
-      const pollInterval = setInterval(async () => {
-        attempts++;
-        try {
-          const updated = await profileApi.get();
-          const p = updated?.profile;
-          if (p) {
-            // Check if analysis encountered an error
-            if (p.analysis_error) {
-              clearInterval(pollInterval);
-              setUploading(false);
-              setUploadError("Analysis error: " + String(p.analysis_error));
-              void load();
-              return;
-            }
-            // Check if analysis is completed
-            if (!p.is_analyzing && (Array.isArray(p.experience) && p.experience.length >= 1)) {
-              clearInterval(pollInterval);
-              populateForm(p);
-              setUploading(false);
-              setUploadMsg("✓ Resume parsed successfully! Extracted all work experiences, skills, and projects.");
-              setScreeningTrigger((prev) => prev + 1);
-              return;
-            }
-          }
-          if (attempts >= maxAttempts) {
-            clearInterval(pollInterval);
-            if (p) populateForm(p);
-            setUploading(false);
-            setUploadMsg("Analysis complete. Review your extracted profile below.");
-            setScreeningTrigger((prev) => prev + 1);
-          }
-        } catch {
-          // Keep polling
-        }
-      }, 2500);
     } catch (err: unknown) {
+      stopAnalysis();
       setUploadError(err instanceof Error ? err.message : "Upload failed");
-      setUploading(false);
       void load();
     }
   };
@@ -575,42 +614,65 @@ const sanitizeStr = (val: unknown): string => {
                 <User className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-semibold text-white">Profile Completeness</span>
               </div>
-              <span className={`text-sm font-black ${completion >= 75 ? "score-high" : completion >= 50 ? "score-medium" : "score-low"}`}>
-                {completion}%
+              <span className={`text-sm font-black ${isAnalyzing ? "text-indigo-400" : completion >= 75 ? "score-high" : completion >= 50 ? "score-medium" : "score-low"}`}>
+                {isAnalyzing ? (
+                  <span className="flex items-center gap-1.5 text-xs text-indigo-400 font-semibold bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                    <Loader2 className="w-3 h-3 animate-spin" /> AI Analyzing...
+                  </span>
+                ) : (
+                  `${completion}%`
+                )}
               </span>
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden mt-3">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${completion}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="h-full rounded-full"
-                style={{ background: `linear-gradient(90deg, rgb(var(--theme-c1)), rgb(var(--theme-c2)))` }}
-              />
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden mt-3 relative">
+              {isAnalyzing ? (
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="h-full w-1/2 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"
+                />
+              ) : (
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${completion}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="h-full rounded-full"
+                  style={{ background: `linear-gradient(90deg, rgb(var(--theme-c1)), rgb(var(--theme-c2)))` }}
+                />
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-3 leading-relaxed">
-              A comprehensive profile dramatically improves AI matching accuracy and resume tailoring for your job applications.
+              {isAnalyzing
+                ? "AI is extracting all work experiences, projects, and skills from your resume into structured ATS fields."
+                : "A comprehensive profile dramatically improves AI matching accuracy and resume tailoring for your job applications."}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/5 text-xs">
             <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02]">
               <span className="text-slate-500">Skills</span>
-              <span className="font-semibold text-white">
-                {Object.values(skills).flat().length} tags
+              <span className={`font-semibold ${isAnalyzing ? "text-indigo-400 animate-pulse text-[11px]" : "text-white"}`}>
+                {isAnalyzing ? "Extracting..." : `${Object.values(skills).flat().length} tags`}
               </span>
             </div>
             <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02]">
               <span className="text-slate-500">Experience</span>
-              <span className="font-semibold text-white">{experience.length} roles</span>
+              <span className={`font-semibold ${isAnalyzing ? "text-indigo-400 animate-pulse text-[11px]" : "text-white"}`}>
+                {isAnalyzing ? "Extracting..." : `${experience.length} roles`}
+              </span>
             </div>
             <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02]">
               <span className="text-slate-500">Projects</span>
-              <span className="font-semibold text-white">{projects.length} listed</span>
+              <span className={`font-semibold ${isAnalyzing ? "text-indigo-400 animate-pulse text-[11px]" : "text-white"}`}>
+                {isAnalyzing ? "Extracting..." : `${projects.length} listed`}
+              </span>
             </div>
             <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02]">
               <span className="text-slate-500">Education</span>
-              <span className="font-semibold text-white">{education.length} degrees</span>
+              <span className={`font-semibold ${isAnalyzing ? "text-indigo-400 animate-pulse text-[11px]" : "text-white"}`}>
+                {isAnalyzing ? "Extracting..." : `${education.length} degrees`}
+              </span>
             </div>
           </div>
         </motion.div>
@@ -641,7 +703,7 @@ const sanitizeStr = (val: unknown): string => {
           />
 
           <div
-            onClick={() => !uploading && fileRef.current?.click()}
+            onClick={() => !isAnalyzing && !uploading && fileRef.current?.click()}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -649,17 +711,22 @@ const sanitizeStr = (val: unknown): string => {
               isDragging
                 ? "border-indigo-400 bg-indigo-500/15 shadow-[0_0_25px_rgba(99,102,241,0.25)] scale-[1.01]"
                 : "border-white/15 bg-white/[0.02] hover:bg-white/[0.05] hover:border-indigo-400/40"
-            } ${uploading ? "opacity-75 pointer-events-none" : ""}`}
+            } ${isAnalyzing || uploading ? "opacity-90 pointer-events-none" : ""}`}
           >
-            {uploading ? (
-              <div className="py-2 flex flex-col items-center gap-2.5">
-                <div className="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center animate-pulse">
-                  <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+            {isAnalyzing || uploading ? (
+              <div className="py-2.5 flex flex-col items-center gap-2.5">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center animate-pulse">
+                    <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 animate-ping pointer-events-none" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-white">Analyzing Resume with AI…</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Extracting skills, experience, and tailoring profile data
+                  <p className="text-xs font-bold text-white flex items-center justify-center gap-1.5">
+                    Analyzing Resume with AI…
+                  </p>
+                  <p className="text-[11px] text-indigo-300 font-mono mt-0.5">
+                    {analysisSeconds}s elapsed · Extracting roles, skills & education
                   </p>
                 </div>
               </div>
@@ -698,27 +765,33 @@ const sanitizeStr = (val: unknown): string => {
 
           {/* Current file status or notifications */}
           <div className="mt-3 space-y-2">
-            {Boolean(profile?.resume_filename) && (
+            {Boolean(profile?.resume_filename || analyzingFilename) && (
               <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] border border-white/10 text-xs">
                 <div className="flex items-center gap-2 truncate">
                   <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                   <span className="text-slate-200 truncate font-medium max-w-[200px] sm:max-w-[260px]">
-                    {String(profile?.resume_filename)}
+                    {String(analyzingFilename || profile?.resume_filename)}
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold shrink-0">
-                    Active
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                    isAnalyzing
+                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 animate-pulse"
+                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  }`}>
+                    {isAnalyzing ? "Analyzing" : "Active"}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileRef.current?.click();
-                  }}
-                  className="text-[11px] text-slate-400 hover:text-indigo-300 transition-colors shrink-0 ml-2 cursor-pointer font-medium"
-                >
-                  Replace
-                </button>
+                {!isAnalyzing && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileRef.current?.click();
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-indigo-300 transition-colors shrink-0 ml-2 cursor-pointer font-medium"
+                  >
+                    Replace
+                  </button>
+                )}
               </div>
             )}
 
@@ -737,6 +810,91 @@ const sanitizeStr = (val: unknown): string => {
         </motion.div>
       </div>
 
+      {/* ── Active Live AI Analysis Progress Card ── */}
+      {isAnalyzing && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass rounded-3xl p-6 sm:p-7 mb-8 border-2 border-indigo-500/40 bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-900/80 shadow-[0_0_40px_rgba(99,102,241,0.25)] relative overflow-hidden backdrop-blur-xl"
+        >
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-5 border-b border-white/10 relative z-10">
+            <div className="flex items-center gap-3.5">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-indigo-400 animate-pulse" />
+                </div>
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-slate-950 animate-ping" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Local AI Model Parsing
+                  </span>
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-semibold border border-indigo-500/30">
+                    {analysisSeconds}s elapsed
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  Extracting Profile from &ldquo;{analyzingFilename || String(profile?.resume_filename || "Uploaded Resume")}&rdquo;
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  The local AI engine is reading all sections. Work experience, skills, and ATS preview will update below automatically.
+                </p>
+              </div>
+            </div>
+            <div className="text-right hidden sm:block">
+              <span className="text-[11px] text-slate-400">Typical duration</span>
+              <p className="text-sm font-bold text-indigo-300 font-mono">~30 – 60 seconds</p>
+            </div>
+          </div>
+
+          {/* 4-Step Live Extraction Tracker */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 relative z-10">
+            <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
+              analysisSeconds >= 2 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/15 border-indigo-500/30 text-indigo-200"
+            }`}>
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-white">1. Text & Layout</p>
+                <p className="text-[10px] text-slate-400">Document parsed</p>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
+              analysisSeconds >= 25 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse"
+            }`}>
+              {analysisSeconds >= 25 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
+              <div>
+                <p className="font-semibold text-white">2. Work History</p>
+                <p className="text-[10px] text-slate-400">Roles & achievements</p>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
+              analysisSeconds >= 45 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : analysisSeconds >= 25 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+            }`}>
+              {analysisSeconds >= 45 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : analysisSeconds >= 25 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              <div>
+                <p className="font-semibold text-white">3. Tech Stack</p>
+                <p className="text-[10px] text-slate-400">Skills & frameworks</p>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
+              analysisSeconds >= 45 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+            }`}>
+              {analysisSeconds >= 45 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              <div>
+                <p className="font-semibold text-white">4. Finalizing</p>
+                <p className="text-[10px] text-slate-400">ATS calibration</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Resume Template Selector & Live Preview ── */}
       <ResumeTemplateSelector
         personal={personal}
@@ -747,6 +905,7 @@ const sanitizeStr = (val: unknown): string => {
         education={education}
         achievements={achievements}
         currentTemplate={selectedTemplate}
+        isAnalyzing={isAnalyzing}
         onSelectTemplate={handleSelectTemplate}
       />
 

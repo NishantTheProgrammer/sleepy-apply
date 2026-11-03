@@ -203,94 +203,66 @@ class ScreeningQAAgent:
             tech_options = list(dict.fromkeys(matched + default_chips))[:8]
             ctc_options = ["14 - 20 LPA", "20 - 28 LPA", "28 - 40 LPA", "40+ LPA"]
 
-        options_json = json.dumps(tech_options)
-        ctc_json = json.dumps(ctc_options)
-
-        prompt = f"""You are a recruiter screening assistant collecting candidate details and application preferences.
-Candidate Name: {name}
-Target Role: {role}
-Domain: {domain_name}
-Resume Summary: {summary[:300]}
-Candidate Extracted Skills: {', '.join(clean_cand_skills[:12])}
-
-CRITICAL RULES:
-- DO NOT ask interview questions, technical exam questions, or conceptual explanation questions!
-- NEVER ask 'Can you explain...', 'Walk me through...', 'How do you handle...', or theoretical questions. We are NOT interviewing or quizzing the candidate.
-- ONLY ask for candidate details, preferences, and facts to complete their application profile:
-  1. Tooling & Tech Stack hands-on checklist (type: 'multiselect'): {tech_question}
-  2. Total relevant hands-on experience in years (type: 'single_select'): {exp_question}
-  3. Official notice period / earliest joining timeline (type: 'single_select')
-  4. Work location & hybrid/relocation readiness in Delhi NCR or Bengaluru (type: 'boolean')
-  5. Expected annual CTC / salary expectation bracket (type: 'single_select')
-
-Return strict JSON only in this format:
-{{
-  "questions": [
-    {{
-      "id": "q1",
-      "category": "technical",
-      "type": "multiselect",
-      "question": "{tech_question}",
-      "context_hint": "Select all technologies and tools in your active production toolkit.",
-      "suggested_options": {options_json}
-    }},
-    {{
-      "id": "q2",
-      "category": "experience",
-      "type": "single_select",
-      "question": "{exp_question}",
-      "context_hint": "Select your total experience bracket.",
-      "suggested_options": ["1-2 years", "3-4 years", "5-7 years", "7+ years"]
-    }},
-    {{
-      "id": "q3",
-      "category": "logistics",
-      "type": "single_select",
-      "question": "What is your current official notice period?",
-      "context_hint": "Recruiter assessing onboarding timeline.",
-      "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"]
-    }},
-    {{
-      "id": "q4",
-      "category": "logistics",
-      "type": "boolean",
-      "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
-      "context_hint": "Location flexibility check.",
-      "suggested_options": ["Yes", "No"]
-    }},
-    {{
-      "id": "q5",
-      "category": "compensation",
-      "type": "single_select",
-      "question": "What is your expected annual CTC bracket?",
-      "context_hint": "Compensation expectation alignment.",
-      "suggested_options": {ctc_json}
-    }}
-  ]
-}}
-"""
-
-        # 1. Try Fast Local Ollama (llama3.2:latest or llama3.2:1b)
-        ollama_res = self._call_local_ollama(prompt, model="llama3.2:latest")
-        if not ollama_res:
-            ollama_res = self._call_local_ollama(prompt, model="llama3.2:1b")
-
-        if ollama_res and isinstance(ollama_res.get("questions"), list) and len(ollama_res["questions"]) > 0:
-            return self._format_questions(ollama_res["questions"])
-
-        # 2. Try configured AI provider (e.g. Gemini / OpenAI) if settings provided
-        if user_settings and user_settings.ai_provider != "ollama":
-            try:
-                provider = AIProviderFactory.resolve(user_settings)
-                resp = await provider.complete([{"role": "user", "content": prompt}], temperature=0.3)
-                parsed = self._parse_json(resp)
-                if parsed and isinstance(parsed.get("questions"), list):
-                    return self._format_questions(parsed["questions"])
-            except Exception as e:
-                logger.warning("Remote AI provider screening question generation failed", error=str(e))
-
-        # 3. Deterministic Heuristic Questions Fallback
-        return self._generate_heuristic_questions(profile, role)
+        # Build 100% reliable, instant dynamic questions with matched skills chips (0 ms latency)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        tailored_questions = [
+            {
+                "id": "q1",
+                "category": "technical",
+                "type": "multiselect",
+                "question": tech_question,
+                "context_hint": "Select all technologies and tools in your active production toolkit.",
+                "suggested_options": tech_options,
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q2",
+                "category": "experience",
+                "type": "single_select",
+                "question": exp_question,
+                "context_hint": "Select your total experience bracket.",
+                "suggested_options": ["1-2 years", "3-4 years", "5-7 years", "7+ years"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q3",
+                "category": "logistics",
+                "type": "single_select",
+                "question": "What is your current official notice period?",
+                "context_hint": "Recruiter assessing onboarding timeline.",
+                "suggested_options": ["Immediate (Serving notice)", "15 - 30 Days", "45 - 60 Days", "90 Days (Negotiable)"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q4",
+                "category": "logistics",
+                "type": "boolean",
+                "question": "Are you open to working in a hybrid setup in Delhi NCR or Bengaluru?",
+                "context_hint": "Location flexibility check.",
+                "suggested_options": ["Yes", "No"],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+            {
+                "id": "q5",
+                "category": "compensation",
+                "type": "single_select",
+                "question": "What is your expected annual CTC bracket?",
+                "context_hint": "Compensation expectation alignment.",
+                "suggested_options": ctc_options,
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            },
+        ]
+        return tailored_questions
 
     def _format_questions(self, raw_questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         disallowed_patterns = [

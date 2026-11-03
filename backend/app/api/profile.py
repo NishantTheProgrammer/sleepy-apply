@@ -21,6 +21,63 @@ async def get_profile(request: Request):
     doc = await db.profiles.find_one({"user_id": ObjectId(user_id)})
     if not doc:
         return {"profile": None}
+
+    # Auto-recovery for stalled or interrupted resume analysis (> 60s)
+    if doc.get("is_analyzing"):
+        started = doc.get("analysis_started_at")
+        now = datetime.now(timezone.utc)
+        if started:
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            elapsed = (now - started).total_seconds()
+        else:
+            elapsed = 999
+
+        if elapsed > 60:
+            logger.info("Auto-recovering stalled resume analysis", user_id=user_id, elapsed=elapsed)
+            raw_text = doc.get("resume_raw_text") or ""
+            if raw_text:
+                from app.agents.profile_creator import ProfileCreatorAgent
+                from app.agents.screening_agent import ScreeningQAAgent
+                agent = ProfileCreatorAgent()
+                parsed = agent._heuristic_parse(raw_text)
+                parsed = agent._normalize_extracted_data(parsed)
+                screening_agent = ScreeningQAAgent()
+                suggested_roles = screening_agent.generate_suggested_roles(parsed)
+                screening_qs = await screening_agent.generate_screening_questions(
+                    profile=parsed,
+                    target_role=suggested_roles[0] if suggested_roles else None
+                )
+                score = agent._calculate_completion_score(parsed)
+                full_name = parsed.get("personal", {}).get("fullName")
+                if full_name and full_name.lower() != "candidate":
+                    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"name": full_name}})
+
+                update_fields = {
+                    "personal": parsed.get("personal", {}),
+                    "summary": parsed.get("summary", ""),
+                    "skills": parsed.get("skills", {}),
+                    "experience": parsed.get("experience", []),
+                    "education": parsed.get("education", []),
+                    "projects": parsed.get("projects", []),
+                    "achievements": parsed.get("achievements", []),
+                    "completion_score": score,
+                    "suggested_roles": suggested_roles,
+                    "screening_questions": screening_qs,
+                    "is_analyzing": False,
+                    "analysis_error": None,
+                    "analyzed_at": now,
+                    "updated_at": now,
+                }
+                await db.profiles.update_one({"user_id": ObjectId(user_id)}, {"$set": update_fields})
+                doc.update(update_fields)
+            else:
+                await db.profiles.update_one(
+                    {"user_id": ObjectId(user_id)},
+                    {"$set": {"is_analyzing": False, "analysis_error": "Analysis timed out", "updated_at": now}}
+                )
+                doc["is_analyzing"] = False
+
     doc["_id"] = str(doc["_id"])
     doc["user_id"] = str(doc["user_id"])
     return {"profile": doc}

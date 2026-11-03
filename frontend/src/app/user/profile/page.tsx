@@ -846,7 +846,7 @@ const sanitizeStr = (val: unknown): string => {
             </div>
             <div className="text-right hidden sm:block">
               <span className="text-[11px] text-slate-400">Typical duration</span>
-              <p className="text-sm font-bold text-indigo-300 font-mono">~30 – 60 seconds</p>
+              <p className="text-sm font-bold text-indigo-300 font-mono">~20 – 35 seconds</p>
             </div>
           </div>
 
@@ -863,9 +863,9 @@ const sanitizeStr = (val: unknown): string => {
             </div>
 
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 25 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse"
+              analysisSeconds >= 10 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse"
             }`}>
-              {analysisSeconds >= 25 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
+              {analysisSeconds >= 10 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
               <div>
                 <p className="font-semibold text-white">2. Work History</p>
                 <p className="text-[10px] text-slate-400">Roles & achievements</p>
@@ -873,9 +873,9 @@ const sanitizeStr = (val: unknown): string => {
             </div>
 
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 45 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : analysisSeconds >= 25 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+              analysisSeconds >= 18 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : analysisSeconds >= 10 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
             }`}>
-              {analysisSeconds >= 45 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : analysisSeconds >= 25 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              {analysisSeconds >= 18 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : analysisSeconds >= 10 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
               <div>
                 <p className="font-semibold text-white">3. Tech Stack</p>
                 <p className="text-[10px] text-slate-400">Skills & frameworks</p>
@@ -883,12 +883,12 @@ const sanitizeStr = (val: unknown): string => {
             </div>
 
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 45 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+              analysisSeconds >= 24 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
             }`}>
-              {analysisSeconds >= 45 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              {analysisSeconds >= 24 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
               <div>
                 <p className="font-semibold text-white">4. Finalizing</p>
-                <p className="text-[10px] text-slate-400">ATS calibration</p>
+                <p className="text-[10px] text-slate-400">Recruiter Q&A & ATS</p>
               </div>
             </div>
           </div>

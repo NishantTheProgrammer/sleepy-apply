@@ -52,7 +52,7 @@ export default function TestLoginModal({ isOpen, onClose }: TestLoginModalProps)
         if (window.location.pathname === "/user/jobs") {
           window.location.reload();
         } else {
-          window.location.href = "/user/jobs";
+          window.location.assign("/user/jobs");
         }
       }
     } catch (err) {

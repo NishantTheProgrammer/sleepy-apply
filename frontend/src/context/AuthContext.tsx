@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { authApi } from "@/lib/api";
 
 interface User {
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const me = (await authApi.me()) as User;
       setUser(me);
@@ -41,15 +41,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    void refresh();
+    let ignore = false;
+    const initAuth = async () => {
+      try {
+        const me = (await authApi.me()) as User;
+        if (!ignore) setUser(me);
+      } catch {
+        try {
+          await authApi.refresh();
+          const me = (await authApi.me()) as User;
+          if (!ignore) setUser(me);
+        } catch {
+          if (!ignore) setUser(null);
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    void initAuth();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const login = async () => {
     const { url } = await authApi.getLoginUrl();
-    window.location.href = url;
+    window.location.assign(url);
   };
 
   const devLogin = async () => {
@@ -57,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.devLogin();
       await refresh();
-      window.location.href = "/user/dashboard";
+      window.location.assign("/user/dashboard");
     } catch (e) {
       console.error("Dev login failed", e);
       setLoading(false);
@@ -67,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await authApi.logout();
     setUser(null);
-    window.location.href = "/";
+    window.location.assign("/");
   };
 
   return (

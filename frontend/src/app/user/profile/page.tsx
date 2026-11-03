@@ -7,6 +7,7 @@ import {
   FileText, FileUp, AlertCircle
 } from "lucide-react";
 import { profileApi, templatesApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import ResumeTemplateSelector from "@/components/ResumeTemplateSelector";
 import ResumeScreeningQA from "@/components/ResumeScreeningQA";
 
@@ -78,6 +79,7 @@ interface AdditionalInfoData {
 }
 
 export default function ProfilePage() {
+  const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -243,12 +245,23 @@ export default function ProfilePage() {
   };
 
   const load = async () => {
-    const [p, q] = await Promise.all([profileApi.get(), profileApi.getQuestions()]);
-    populateForm(p.profile);
-    setQuestions(q.questions as Question[]);
+    try {
+      const [p, q] = await Promise.all([profileApi.get(), profileApi.getQuestions()]);
+      if (p?.profile) populateForm(p.profile);
+      if (q?.questions) setQuestions(q.questions as Question[]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("Invalid or expired token") && !msg.includes("401")) {
+        console.error("Failed to load profile data:", err);
+      }
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!authLoading && user) {
+      void load();
+    }
+  }, [authLoading, user?.id]);
 
   // ── Upload Resume & Dropzone Handlers ────────────────────────
   const processResumeFile = async (file: File) => {

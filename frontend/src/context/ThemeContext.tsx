@@ -84,31 +84,42 @@ interface ThemeContextValue {
   theme: Theme;
   setTheme: (t: Theme) => void;
   themes: Theme[];
+  mounted: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sa-theme") as Theme | null;
-      if (saved && THEMES.includes(saved)) return saved;
+  const [theme, setThemeState] = useState<Theme>("default");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem("sa-theme") as Theme | null;
+    if (saved && THEMES.includes(saved)) {
+      setThemeState(saved);
+      document.documentElement.setAttribute("data-theme", saved === "default" ? "" : saved);
     }
-    return "default";
-  });
+  }, []);
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem("sa-theme", t);
+    try {
+      localStorage.setItem("sa-theme", t);
+    } catch {
+      // ignore
+    }
     document.documentElement.setAttribute("data-theme", t === "default" ? "" : t);
   };
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme === "default" ? "" : theme);
-  }, [theme]);
+    if (mounted) {
+      document.documentElement.setAttribute("data-theme", theme === "default" ? "" : theme);
+    }
+  }, [theme, mounted]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme, setTheme, themes: THEMES, mounted }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -22,7 +22,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { theme, setTheme, themes } = useTheme();
+  const { theme, setTheme, themes, mounted } = useTheme();
   const [open, setOpen] = useState(false);
   const [testModalOpen, setTestModalOpen] = useState(false);
 
@@ -119,6 +119,7 @@ export default function Sidebar() {
         <div className="flex flex-wrap gap-1.5">
           {themes.map((t) => {
             const config = THEME_CONFIGS[t];
+            const isSelected = mounted ? theme === t : t === "default";
             return (
               <button
                 key={t}
@@ -126,7 +127,7 @@ export default function Sidebar() {
                 title={`${config.name} (${config.description})`}
                 className={clsx(
                   "w-5 h-5 rounded-full border-2 transition-all cursor-pointer shadow-sm",
-                  theme === t
+                  isSelected
                     ? "border-white scale-110 ring-2 ring-white/20"
                     : "border-transparent opacity-60 hover:opacity-100 hover:scale-105"
                 )}

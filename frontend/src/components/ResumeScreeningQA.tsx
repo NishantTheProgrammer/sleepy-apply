@@ -6,12 +6,14 @@ import {
   RefreshCw, Check, ArrowRight, UserCheck, HelpCircle, Briefcase, Plus
 } from "lucide-react";
 import { profileApi, ScreeningData, ScreeningQuestion, ScreeningQAItem } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 interface ResumeScreeningQAProps {
   onProfileUpdated?: () => void;
 }
 
 export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQAProps) {
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ScreeningData | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
@@ -27,6 +29,10 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
   const [expandedQA, setExpandedQA] = useState(true);
 
   const loadScreening = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const res = await profileApi.getScreening();
@@ -38,16 +44,23 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
         initialAnswers[item.id] = item.answer;
       });
       setAnswers(initialAnswers);
-    } catch (err) {
-      console.warn("Failed to load screening data", err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("Invalid or expired token") && !msg.includes("401")) {
+        console.warn("Failed to load screening data", err);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadScreening();
-  }, []);
+    if (!authLoading && user) {
+      void loadScreening();
+    } else if (!authLoading && !user) {
+      setLoading(false);
+    }
+  }, [authLoading, user?.id]);
 
   const handleSelectRole = async (role: string) => {
     if (role === selectedRole || roleChanging) return;

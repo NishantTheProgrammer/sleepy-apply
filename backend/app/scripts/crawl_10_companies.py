@@ -100,8 +100,8 @@ async def save_and_match_job(raw_job, db, users, matcher):
         "company": norm["company"],
         "company_info": {"website": raw_job.company_website or raw_job.source_url},
         "description": norm["description"],
-        "requirements": [],
-        "responsibilities": [],
+        "requirements": getattr(raw_job, "requirements", []),
+        "responsibilities": getattr(raw_job, "responsibilities", []),
         "location": norm["location"],
         "delhi_ncr_hub": norm["delhi_ncr_hub"],
         "is_delhi_ncr": norm["is_delhi_ncr"],
@@ -115,7 +115,7 @@ async def save_and_match_job(raw_job, db, users, matcher):
         "required_skills": norm["required_skills"],
         "posted_at": raw_job.posted_at or now,
         "is_active": True,
-        "enriched": False,
+        "enriched": bool(norm.get("required_skills")),
         "content_hash": content_hash,
         "discovered_at": now,
     }
@@ -125,7 +125,18 @@ async def save_and_match_job(raw_job, db, users, matcher):
         # Update existing record with refreshed source and timestamp
         await db.jobs.update_one(
             {"_id": job_id},
-            {"$set": {"source": "career-crawled", "is_active": True, "location": norm["location"]}}
+            {
+                "$set": {
+                    "source": "career-crawled",
+                    "is_active": True,
+                    "location": norm["location"],
+                    "description": norm["description"],
+                    "requirements": getattr(raw_job, "requirements", []),
+                    "responsibilities": getattr(raw_job, "responsibilities", []),
+                    "required_skills": norm["required_skills"],
+                    "enriched": bool(norm.get("required_skills")),
+                }
+            }
         )
         is_new = False
     else:

@@ -18,6 +18,8 @@ class RawJobData(BaseModel):
     posted_at_raw: str | None = None
     posted_at: datetime | None = None
     required_skills: list[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
     source: str = "career"
 
 

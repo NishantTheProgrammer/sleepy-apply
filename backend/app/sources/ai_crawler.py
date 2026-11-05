@@ -417,6 +417,114 @@ class AICareerCrawlerAgent:
                 )
         return jobs
 
+    async def enrich_job_with_full_jd(self, page: Page, job: RawJobData) -> RawJobData:
+        """
+        Navigates to the posting URL to extract the complete Job Description,
+        responsibilities, requirements, and technical skills for profile matching.
+        """
+        target_url = job.application_url or job.source_url
+        if not target_url or not target_url.startswith("http"):
+            return job
+
+        try:
+            await page.goto(target_url, wait_until="domcontentloaded", timeout=20000)
+            await page.wait_for_timeout(1500)
+
+            extracted = await page.evaluate("""() => {
+                const selectors = [
+                    '[data-automation-id="jobPostingDescription"]',
+                    '[data-automation-id="job-posting-details"]',
+                    '#content', '.posting-description', '.job-description',
+                    '.job-details__content', '[class*="jobDescription"]',
+                    '[class*="job-description"]', '[class*="JobDescription"]',
+                    '[class*="job-details"]', '[class*="JobDetail"]',
+                    '#job-description', '#job-details',
+                    'article', 'main', '[role="main"]'
+                ];
+
+                let container = null;
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.innerText && el.innerText.trim().length > 150) {
+                        container = el;
+                        break;
+                    }
+                }
+                if (!container) container = document.body;
+
+                return {
+                    text: container ? container.innerText.trim() : '',
+                    title: document.title || ''
+                };
+            }""")
+
+            raw_text = extracted.get("text", "")
+            if len(raw_text) > 120:
+                clean_lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
+                
+                resp = []
+                req = []
+                current_sec = None
+                
+                for line in clean_lines:
+                    lower = line.lower()
+                    if any(k in lower for k in ['responsibilit', 'what will you do', 'what you will do', 'duties', 'the role', 'key expectations']):
+                        current_sec = 'resp'
+                        continue
+                    elif any(k in lower for k in ['desired experience', 'requirement', 'qualification', 'what you bring', 'what we are looking for', 'who you are', 'skills']):
+                        current_sec = 'req'
+                        continue
+                    elif any(k in lower for k in ['who are we', 'about us', 'about the company', 'benefits', 'compensation', 'perks', 'how we hire']):
+                        current_sec = None
+                        continue
+                    
+                    if current_sec == 'resp' and 8 <= len(line) <= 350:
+                        resp.append(line.lstrip('•-* ').strip())
+                    elif current_sec == 'req' and 8 <= len(line) <= 350:
+                        req.append(line.lstrip('•-* ').strip())
+
+                # Format clean readable Markdown Description
+                overview_text = raw_text[:3500].strip()
+                formatted_jd = (
+                    f"### {job.title}\n\n"
+                    f"**Company**: {job.company} | **Location**: {job.location}\n\n"
+                    f"#### Overview & Job Description\n\n"
+                    f"{overview_text}\n"
+                )
+
+                job.description = formatted_jd
+                if resp:
+                    job.responsibilities = resp[:15]
+                if req:
+                    job.requirements = req[:15]
+
+                # Extract technical skills
+                SKILLS_VOCAB = [
+                    'Python', 'Java', 'JavaScript', 'TypeScript', 'C++', 'C#', 'Go', 'Rust', 'Ruby', 'PHP', 'Swift', 'Kotlin', 'Scala',
+                    'React', 'Next.js', 'Vue', 'Angular', 'Node.js', 'FastAPI', 'Django', 'Flask', 'Spring Boot', 'Express',
+                    'SQL', 'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Cassandra', 'Elasticsearch', 'DynamoDB',
+                    'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'Linux', 'Unix', 'MacOS', 'Windows', 'Android', 'iOS',
+                    'Git', 'CI/CD', 'Jenkins', 'GitHub Actions', 'Jira', 'Confluence',
+                    'Bash', 'Shell', 'PowerShell', 'Datacenter', 'Networking', 'TCP/IP', 'VLAN', 'Routing', 'Switching', 'DNS', 'DHCP',
+                    'VMware', 'Proxmox', 'Virtualization', 'REST API', 'GraphQL', 'Microservices', 'Kafka', 'RabbitMQ',
+                    'Machine Learning', 'Deep Learning', 'PyTorch', 'TensorFlow', 'NLP', 'Computer Vision', 'LLM',
+                    'Selenium', 'Playwright', 'Cypress', 'PySpark', 'Databricks', 'Airflow', 'Snowflake', 'BigQuery'
+                ]
+                found_skills = set(job.required_skills)
+                for s in SKILLS_VOCAB:
+                    pattern = r'(?<![a-zA-Z0-9])' + re.escape(s) + r'(?![a-zA-Z0-9])'
+                    if re.search(pattern, raw_text, re.IGNORECASE):
+                        found_skills.add(s)
+                job.required_skills = sorted(list(found_skills))[:15]
+
+                print(f"   ✅ Fetched JD ({len(raw_text)} chars, {len(job.required_skills)} skills, {len(resp)} responsibilities, {len(req)} requirements)")
+                logger.info("Enriched job with full JD", company=job.company, title=job.title, jd_len=len(raw_text), skills_count=len(job.required_skills))
+
+        except Exception as e:
+            logger.warning("Could not fetch full JD for job", url=target_url, error=str(e))
+
+        return job
+
     async def crawl_career_portal(
         self,
         company: str,
@@ -661,17 +769,25 @@ Return ONLY a valid JSON object matching this schema:
                 print("🔄 Performing final sweep extraction on current page...")
                 collected_jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
 
+            # Deduplicate by URL before fetching JDs
+            unique_results = []
+            seen_urls = set()
+            for j in collected_jobs:
+                if j.source_url not in seen_urls:
+                    seen_urls.add(j.source_url)
+                    unique_results.append(j)
+
+            target_jobs = unique_results[:limit]
+            if target_jobs:
+                print(f"\n📥 Extracting full Job Descriptions (JDs) for {len(target_jobs)} postings...")
+                for idx, j in enumerate(target_jobs, 1):
+                    if j.source_url and j.source_url != start_url:
+                        print(f"[{idx}/{len(target_jobs)}] Fetching JD for: '{j.title}'")
+                        await self.enrich_job_with_full_jd(page, j)
+
             await browser.close()
 
-        # Deduplicate by URL
-        unique_results = []
-        seen_urls = set()
-        for j in collected_jobs:
-            if j.source_url not in seen_urls:
-                seen_urls.add(j.source_url)
-                unique_results.append(j)
-
-        return unique_results[:limit]
+        return target_jobs
 
     async def auto(self, instruction: str, page: Page) -> bool:
         """

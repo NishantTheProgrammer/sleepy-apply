@@ -175,7 +175,7 @@ class JobFetcherAgent:
             # Process through Delhi NCR Job Normalizer
             norm = DelhiNCRJobNormalizer.normalize(raw)
 
-            job_source = raw.source if raw.source in ["career", "linkedin", "naukri", "indeed"] else "career"
+            job_source = raw.source if raw.source in ["career", "career-crawled", "linkedin", "naukri", "indeed"] else "career"
 
             job_doc = {
                 "source": job_source,

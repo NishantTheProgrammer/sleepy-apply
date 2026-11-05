@@ -290,7 +290,7 @@ class AICareerCrawlerAgent:
                     application_url=url,
                     description=f"### {title}\n\n**Company**: {company}\n**Location**: {std_loc}\n\nDiscovered via AI Browser Agent.",
                     external_id=f"ai_{abs(hash(url))}",
-                    source="career",
+                    source="career-crawled",
                 )
             )
 
@@ -341,7 +341,7 @@ class AICareerCrawlerAgent:
                         application_url=url,
                         description=f"### {r['title']}\n\n**Company**: {company}\n\nDiscovered via AI Browser Agent.",
                         external_id=f"ai_{abs(hash(url))}",
-                        source="career",
+                        source="career-crawled",
                     )
                 )
         return jobs

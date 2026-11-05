@@ -209,6 +209,14 @@ function MarkdownRenderer({
 
 function renderSourceBadge(source?: string) {
   const s = (source || "career").toLowerCase();
+  if (s === "career-crawled") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+        Career Crawled
+      </span>
+    );
+  }
   if (s === "linkedin") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
@@ -279,7 +287,7 @@ function JobsPageContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "delhi_ncr" | "high" | "remote" | "bengaluru">("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "career" | "linkedin" | "naukri">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "career-crawled" | "career" | "linkedin" | "naukri">("all");
   const [descExpanded, setDescExpanded] = useState(false);
 
   // Tailored Resume State & Modal
@@ -539,16 +547,19 @@ function JobsPageContent() {
           <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
             {[
               { id: "all", label: "All Sources" },
+              { id: "career-crawled", label: "🤖 Career Crawled" },
               { id: "career", label: "Career ATS" },
               { id: "linkedin", label: "LinkedIn" },
               { id: "naukri", label: "Naukri" },
             ].map((s) => (
               <button
                 key={s.id}
-                onClick={() => setSourceFilter(s.id as "all" | "career" | "linkedin" | "naukri")}
+                onClick={() => setSourceFilter(s.id as "all" | "career-crawled" | "career" | "linkedin" | "naukri")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   sourceFilter === s.id
-                    ? s.id === "linkedin"
+                    ? s.id === "career-crawled"
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : s.id === "linkedin"
                       ? "bg-sky-600 text-white shadow-sm"
                       : s.id === "naukri"
                       ? "bg-amber-600 text-white shadow-sm"
@@ -910,17 +921,21 @@ function JobsPageContent() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-                        selectedItem.job.source === "linkedin"
+                        selectedItem.job.source === "career-crawled"
+                          ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
+                          : selectedItem.job.source === "linkedin"
                           ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
                           : selectedItem.job.source === "naukri"
                           ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
                           : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
                       }`}
-                      title={`Open ${selectedItem.job.source === "linkedin" ? "LinkedIn" : selectedItem.job.source === "naukri" ? "Naukri" : "career portal"} job posting`}
+                      title={`Open ${selectedItem.job.source === "career-crawled" ? "crawled career" : selectedItem.job.source === "linkedin" ? "LinkedIn" : selectedItem.job.source === "naukri" ? "Naukri" : "career portal"} job posting`}
                     >
                       <ExternalLink className="w-4 h-4" />
                       <span className="hidden sm:inline">
-                        {selectedItem.job.source === "linkedin"
+                        {selectedItem.job.source === "career-crawled"
+                          ? "Apply on Career Portal"
+                          : selectedItem.job.source === "linkedin"
                           ? "Apply on LinkedIn"
                           : selectedItem.job.source === "naukri"
                           ? "Apply on Naukri"

@@ -23,7 +23,7 @@ async def main():
     parser.add_argument("--headless", action="store_true", default=False, help="Run in headless mode (default: False / visible browser)")
     parser.add_argument("--delhi-ncr-only", action="store_true", default=False, help="Filter strictly for Delhi NCR jobs")
     parser.add_argument("--limit", type=int, default=10, help="Max jobs to extract (default: 10)")
-    parser.add_argument("--slow-mo", type=int, default=300, help="Delay per action in ms (default: 300ms)")
+    parser.add_argument("--slow-mo", type=int, default=100, help="Delay per action in ms (default: 100ms)")
     parser.add_argument("--model", default="llama3.2:latest", help="Ollama AI model to drive the agent (default: llama3.2:latest)")
 
     args = parser.parse_args()

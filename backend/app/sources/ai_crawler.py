@@ -27,16 +27,16 @@ class AICareerCrawlerAgent:
         self,
         ollama_url: str = "http://localhost:11434",
         model: str = "llama3.2:latest",
-        max_steps: int = 7,
+        max_steps: int = 5,
     ):
         self.ollama_url = ollama_url
         self.model = model
         self.max_steps = max_steps
 
     async def _query_llm(self, prompt: str) -> dict[str, Any] | None:
-        """Call local Ollama with JSON mode and timeout."""
+        """Call local Ollama with JSON mode and fast token limit."""
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=12.0) as client:
                 r = await client.post(
                     f"{self.ollama_url}/api/generate",
                     json={
@@ -46,8 +46,8 @@ class AICareerCrawlerAgent:
                         "format": "json",
                         "options": {
                             "temperature": 0.1,
-                            "num_predict": 450,
-                            "num_ctx": 4096,
+                            "num_predict": 120,
+                            "num_ctx": 2048,
                         },
                     },
                 )
@@ -99,7 +99,8 @@ class AICareerCrawlerAgent:
                 const jobCardSelectors = [
                     '.job-tile', '.requisition-list-item', '[data-testid*="job"]',
                     '.job-card', '.career-card', '.job-listing', '.posting',
-                    'li[class*="job"]', 'tr[class*="job"]', '[class*="JobCard"]'
+                    'li[class*="job"]', 'tr[class*="job"]', '[class*="JobCard"]',
+                    'a[href*="gh_jid"]', 'a[href*="/job/"]', 'a[href*="/jobs/"]', 'a[href*="/career/"]'
                 ];
                 let jobCount = 0;
                 for (const sel of jobCardSelectors) {
@@ -162,10 +163,21 @@ class AICareerCrawlerAgent:
                 for (const s of scored.slice(0, 20)) {
                     const id = `el_${idx++}`;
                     s.el.setAttribute('data-ai-id', id);
+                    
+                    // Include surrounding card context (e.g. country name "India") if available
+                    let label = s.text;
+                    const card = s.el.closest('div[class*="card"], div[class*="item"], div[class*="col"], article');
+                    if (card) {
+                        const heading = card.querySelector('h2, h3, h4, h5, p, span');
+                        if (heading && heading.innerText && !s.text.includes(heading.innerText.trim())) {
+                            label = `${heading.innerText.trim()} -> ${s.text}`;
+                        }
+                    }
+
                     elements.push({
                         id: id,
                         tag: s.tag,
-                        text: s.text.slice(0, 70),
+                        text: label.slice(0, 80),
                         href: s.href.slice(0, 160),
                         score: s.score
                     });
@@ -284,13 +296,63 @@ class AICareerCrawlerAgent:
 
         return extracted
 
+    async def _quick_check_target_jobs(self, page: Page, company: str, target_query: str) -> list[RawJobData]:
+        """Rapidly detects if any links on the current page already match the target query."""
+        keywords = [w.lower() for w in target_query.split() if len(w) > 2]
+        if not keywords:
+            return []
+
+        raw_items = await page.evaluate(
+            """(kw) => {
+                const matches = [];
+                const anchors = Array.from(document.querySelectorAll('a[href*="/job"], a[href*="gh_jid"], a[href*="lever.co"], a[href*="workday"], a[class*="job"]'));
+                for (const a of anchors) {
+                    const txt = (a.innerText || '').trim();
+                    const lower = txt.toLowerCase();
+                    if (kw.every(k => lower.includes(k))) {
+                        matches.push({
+                            title: txt.split('\\n')[0].trim(),
+                            url: a.href,
+                            location: txt.split('\\n').slice(1).join(', ').trim()
+                        });
+                    }
+                }
+                return matches;
+            }""",
+            keywords,
+        )
+
+        if not raw_items:
+            return []
+
+        jobs = []
+        seen = set()
+        for r in raw_items:
+            url = r.get("url")
+            if url and url not in seen:
+                seen.add(url)
+                jobs.append(
+                    RawJobData(
+                        title=r["title"],
+                        company=company,
+                        location=standardize_india_location(company, r.get("location", ""), False),
+                        is_remote="remote" in r.get("location", "").lower(),
+                        source_url=url,
+                        application_url=url,
+                        description=f"### {r['title']}\n\n**Company**: {company}\n\nDiscovered via AI Browser Agent.",
+                        external_id=f"ai_{abs(hash(url))}",
+                        source="career",
+                    )
+                )
+        return jobs
+
     async def crawl_career_portal(
         self,
         company: str,
         start_url: str,
         target_query: str,
         headless: bool = False,
-        slow_mo: int = 300,
+        slow_mo: int = 100,
         delhi_ncr_only: bool = False,
         limit: int = 15,
     ) -> list[RawJobData]:
@@ -336,8 +398,8 @@ class AICareerCrawlerAgent:
 
             print(f"🌐 [Step 0] Navigating to career page: {start_url}")
             try:
-                await page.goto(start_url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(2500)
+                await page.goto(start_url, wait_until="domcontentloaded", timeout=25000)
+                await page.wait_for_timeout(1000)
             except Exception as e:
                 print(f"⚠️ Initial navigation warning: {e}")
 
@@ -347,6 +409,13 @@ class AICareerCrawlerAgent:
 
                 print(f"\n🔍 [Step {step}/{self.max_steps}] Observing page: {cur_title}")
                 print(f"   URL: {cur_url}")
+
+                # 1. Ultra-fast direct check if target jobs are already visible on this page
+                instant_jobs = await self._quick_check_target_jobs(page, company, target_query)
+                if instant_jobs:
+                    print(f"🎉 Instant match! Discovered {len(instant_jobs)} postings matching '{target_query}' directly on page.")
+                    collected_jobs.extend(instant_jobs)
+                    break
 
                 elements, job_count = await self._observe_page(page)
                 print(f"   Interactive elements found: {len(elements)} | Job listings detected: {job_count}")
@@ -445,8 +514,8 @@ Return ONLY a valid JSON object matching this schema:
                                         print(f"Direct navigating to link href: {href}")
                                         await page.goto(href, wait_until="domcontentloaded", timeout=25000)
                                 else:
-                                    await target_el.first.click(force=True, timeout=5000)
-                                await page.wait_for_timeout(3000)
+                                    await target_el.first.click(force=True, timeout=4000)
+                                await page.wait_for_timeout(1200)
                             else:
                                 print(f"⚠️ Element {el_id} not found in DOM, scrolling instead.")
                                 await page.evaluate("window.scrollBy(0, 600);")
@@ -463,20 +532,20 @@ Return ONLY a valid JSON object matching this schema:
                                 tag_name = await target_inp.first.evaluate("el => el.tagName.toLowerCase()")
                                 if tag_name not in ["input", "textarea"]:
                                     # If LLM targeted a button/anchor, click it to activate search input
-                                    await target_inp.first.click(force=True, timeout=4000)
-                                    await page.wait_for_timeout(1000)
+                                    await target_inp.first.click(force=True, timeout=3000)
+                                    await page.wait_for_timeout(800)
                                     visible_inp = page.locator('input[type="text"], input[type="search"], input:not([type])')
                                     if await visible_inp.count() > 0:
                                         await visible_inp.first.fill(value)
                                         if decision.get("submit", True):
                                             await visible_inp.first.press("Enter")
-                                            await page.wait_for_timeout(3000)
+                                            await page.wait_for_timeout(1500)
                                 else:
                                     await target_inp.first.fill(value)
-                                    await page.wait_for_timeout(500)
+                                    await page.wait_for_timeout(300)
                                     if decision.get("submit", True):
                                         await target_inp.first.press("Enter")
-                                        await page.wait_for_timeout(3500)
+                                        await page.wait_for_timeout(1500)
                             else:
                                 print(f"⚠️ Input {el_id} not found.")
                         except Exception as e:

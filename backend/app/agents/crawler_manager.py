@@ -7,6 +7,7 @@ import structlog
 
 from app.db.client import get_db
 from app.sources.ai_crawler import AICareerCrawlerAgent, CaptchaDetectedException
+from app.sources.company_ats import is_delhi_ncr_or_remote_job
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.deduplicator import JobDeduplicator
 from app.agents.job_matcher import JobMatcherAgent
@@ -168,11 +169,22 @@ class CrawlerManager:
                         target_query=query_role,
                         headless=run_headless,
                         slow_mo=0 if run_headless else slow_mo,
+                        delhi_ncr_only=True,
                         limit=limit_per_company,
                     )
 
                     new_count = 0
                     for raw_job in jobs:
+                        # Strictly enforce Delhi NCR (Gurgaon, Noida, Delhi, etc.) or Remote
+                        if not is_delhi_ncr_or_remote_job(raw_job.location, raw_job.title, raw_job.description or ""):
+                            logger.info(
+                                "Skipping non-Delhi-NCR / non-Remote job",
+                                company=comp_name,
+                                title=raw_job.title,
+                                location=raw_job.location,
+                            )
+                            continue
+
                         raw_job.source = "career-crawled"
                         content_hash = JobDeduplicator.compute_raw_hash(raw_job)
                         exists_query = (

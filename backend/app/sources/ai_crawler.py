@@ -15,7 +15,7 @@ except ImportError:
     BrowserContext = Any  # type: ignore
 
 from app.sources.base import RawJobData
-from app.sources.company_ats import standardize_india_location, is_delhi_ncr_job
+from app.sources.company_ats import standardize_india_location, is_delhi_ncr_job, is_delhi_ncr_or_remote_job
 from app.core.system_logger import log_system_event
 
 logger = structlog.get_logger()
@@ -352,8 +352,10 @@ class AICareerCrawlerAgent:
             if not title or len(title) < 3 or url in seen:
                 continue
 
-            if delhi_ncr_only and loc and not is_delhi_ncr_job(loc, title):
-                continue
+            # When delhi_ncr_only is set, filter out any location that is definitely not Delhi NCR or Remote
+            if delhi_ncr_only and loc:
+                if not is_delhi_ncr_or_remote_job(loc, title, item.get("snippet", "")):
+                    continue
 
             seen.add(url)
             is_remote = bool("remote" in loc.lower() or "remote" in title.lower())
@@ -460,11 +462,33 @@ class AICareerCrawlerAgent:
                 }
                 if (!container) container = document.body;
 
+                // Extract detail location if explicitly stated on the posting page
+                let locText = '';
+                const locSelectors = [
+                    '[data-automation-id="locations"]',
+                    '.location', '.job-location', '[class*="location"]', '[class*="Location"]',
+                    '.posting-categories', '.meta', '[class*="subheading"]'
+                ];
+                for (const sel of locSelectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.innerText && el.innerText.trim().length > 1 && el.innerText.trim().length < 80) {
+                        locText = el.innerText.trim();
+                        break;
+                    }
+                }
+
                 return {
                     text: container ? container.innerText.trim() : '',
-                    title: document.title || ''
+                    title: document.title || '',
+                    detail_location: locText
                 };
             }""")
+
+            detail_loc = extracted.get("detail_location", "")
+            if detail_loc and (not job.location or job.location in ["(opens in a new tab)", "India", "Unknown", ""]):
+                is_rem = bool("remote" in detail_loc.lower() or "remote" in job.title.lower())
+                job.location = standardize_india_location(job.company, detail_loc, is_rem)
+                job.is_remote = is_rem
 
             raw_text = extracted.get("text", "")
             if len(raw_text) > 120:
@@ -540,7 +564,7 @@ class AICareerCrawlerAgent:
         target_query: str,
         headless: bool = False,
         slow_mo: int = 100,
-        delhi_ncr_only: bool = False,
+        delhi_ncr_only: bool = True,
         limit: int = 15,
     ) -> list[RawJobData]:
         """
@@ -662,6 +686,11 @@ class AICareerCrawlerAgent:
 
                 prompt = f"""You are an autonomous web crawler agent tasked with finding job postings for: "{target_query}" at {company}.
 Starting from the company's career page, navigate through portals, search forms, and listings to discover matching jobs.
+
+STRICT LOCATION CONSTRAINT:
+The user only wants jobs located in Delhi NCR (Delhi, Gurgaon / Gurugram, Noida, Greater Noida, Faridabad, Ghaziabad) OR Remote roles.
+Do NOT target or click into postings located in foreign countries (e.g. US, Dublin, Mexico, Europe) or on-site roles outside Delhi NCR.
+If there are location filters or search inputs, prefer entering or selecting "Delhi", "Gurugram", "Noida", "India", or "Remote".
 
 CURRENT PAGE STATE:
 - Page Title: {cur_title}
@@ -790,16 +819,26 @@ Return ONLY a valid JSON object matching this schema:
                     unique_results.append(j)
 
             target_jobs = unique_results[:limit]
+            final_jobs = []
             if target_jobs:
-                print(f"\n📥 Extracting full Job Descriptions (JDs) for {len(target_jobs)} postings...")
+                print(f"📥 Extracting full Job Descriptions (JDs) for {len(target_jobs)} postings...")
                 for idx, j in enumerate(target_jobs, 1):
                     if j.source_url and j.source_url != start_url:
                         print(f"[{idx}/{len(target_jobs)}] Fetching JD for: '{j.title}'")
                         await self.enrich_job_with_full_jd(page, j)
 
+                    # Strict Delhi NCR and Remote location filter
+                    if delhi_ncr_only:
+                        if is_delhi_ncr_or_remote_job(j.location, j.title, j.description or ""):
+                            final_jobs.append(j)
+                        else:
+                            print(f"   ⏩ Skipping '{j.title}' (Location: {j.location}) - not Delhi NCR or Remote.")
+                    else:
+                        final_jobs.append(j)
+
             await browser.close()
 
-        return target_jobs
+        return final_jobs
 
     async def auto(self, instruction: str, page: Page) -> bool:
         """

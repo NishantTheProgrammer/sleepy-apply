@@ -54,6 +54,52 @@ def is_delhi_ncr_job(location: str, text_snippet: str = "") -> bool:
     return False
 
 
+def is_delhi_ncr_or_remote_job(location: str, title: str = "", text_snippet: str = "") -> bool:
+    """
+    Check if a job is located specifically in Delhi NCR (Delhi, Gurgaon/Gurugram,
+    Noida, Greater Noida, Faridabad, Ghaziabad, Manesar, etc.) OR is a Remote role.
+    Explicitly rejects on-site jobs outside Delhi NCR (e.g., Dublin, Mexico City,
+    Austin, Bengaluru, London, etc.) and non-India restricted remote postings.
+    """
+    loc_lower = (location or "").strip().lower()
+    title_lower = (title or "").strip().lower()
+    snippet_lower = (text_snippet or "").strip().lower()[:500]
+    combined = f"{loc_lower} {title_lower} {snippet_lower}"
+
+    # 1. Foreign locations keyword list
+    foreign_locations = [
+        "mexico", "ciudad de méxico", "dublin", "ireland", "austin", "new york",
+        "san francisco", "seattle", "london", "united kingdom", "uk", "germany",
+        "berlin", "canada", "toronto", "vancouver", "australia", "sydney",
+        "singapore", "tokyo", "japan", "brazil", "são paulo", "poland", "warsaw",
+        "netherlands", "amsterdam", "chicago", "boston", "atlanta", "dallas", "paris"
+    ]
+
+    # Check remote indicators
+    has_remote_word = any(r in combined for r in ["remote", "work from home", "wfh", "anywhere", "work from anywhere"])
+
+    # Check explicit foreign remote restrictions (e.g. US Only, EMEA Only)
+    foreign_remote_restrictions = [
+        "us only", "u.s. only", "united states only", "americas only",
+        "latam only", "emea only", "europe only", "uk only", "canada only", "us/canada"
+    ]
+    is_foreign_restricted_remote = any(fr in combined for fr in foreign_remote_restrictions)
+
+    # 2. Check Delhi NCR hubs
+    is_ncr = bool(DELHI_NCR_LOCATION_REGEX.search(loc_lower) or DELHI_NCR_LOCATION_REGEX.search(combined))
+    if is_ncr:
+        return True
+
+    # 3. Check Remote
+    if has_remote_word and not is_foreign_restricted_remote:
+        # If location string contains foreign country without specifying remote, reject
+        if any(fl in loc_lower for fl in foreign_locations):
+            return any(r in loc_lower for r in ["remote", "wfh", "work from home"])
+        return True
+
+    return False
+
+
 def is_indian_job(company: str, location: str, text_snippet: str = "") -> bool:
     """Check if a job posting is in India or remote within India."""
     comp_lower = company.strip().lower()

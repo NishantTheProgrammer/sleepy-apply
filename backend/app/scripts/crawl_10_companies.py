@@ -18,6 +18,7 @@ if backend_root not in sys.path:
 
 from app.db.client import connect_db, get_db
 from app.sources.ai_crawler import AICareerCrawlerAgent, CaptchaDetectedException
+from app.sources.company_ats import is_delhi_ncr_or_remote_job
 from app.core.system_logger import log_system_event
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.deduplicator import JobDeduplicator
@@ -83,6 +84,10 @@ TARGET_COMPANIES = [
 
 async def save_and_match_job(raw_job, db, users, matcher):
     """Normalize, persist to db.jobs with source='career-crawled', and compute matches."""
+    if not is_delhi_ncr_or_remote_job(raw_job.location, raw_job.title, raw_job.description or ""):
+        logger.info("Skipping non-Delhi-NCR non-Remote job", company=raw_job.company, title=raw_job.title, location=raw_job.location)
+        return False, {}
+
     content_hash = JobDeduplicator.compute_raw_hash(raw_job)
 
     # Check deduplication

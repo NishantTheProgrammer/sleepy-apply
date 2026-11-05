@@ -1,4 +1,6 @@
 import asyncio
+import os
+import sys
 import re
 import json
 import urllib.parse
@@ -39,11 +41,17 @@ class AICareerCrawlerAgent:
 
     def __init__(
         self,
-        ollama_url: str = "http://localhost:11434",
+        ollama_url: str | None = None,
         model: str = "llama3.2:latest",
         max_steps: int = 5,
     ):
-        self.ollama_url = ollama_url
+        import os
+        if ollama_url:
+            self.ollama_url = ollama_url
+        elif os.path.exists("/.dockerenv"):
+            self.ollama_url = "http://host.docker.internal:11434"
+        else:
+            self.ollama_url = "http://localhost:11434"
         self.model = model
         self.max_steps = max_steps
 
@@ -553,10 +561,14 @@ class AICareerCrawlerAgent:
         print(f" AI Model Engine: {self.model} via {self.ollama_url}")
         print("=" * 70 + "\n")
 
+        is_in_docker = os.path.exists('/.dockerenv') or not os.environ.get('DISPLAY')
+        actual_headless = True if is_in_docker else headless
+        actual_slow_mo = 0 if is_in_docker else slow_mo
+
         async with async_playwright() as p:
             browser = await p.chromium.launch(
-                headless=headless,
-                slow_mo=slow_mo,
+                headless=actual_headless,
+                slow_mo=actual_slow_mo,
                 args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
             )
 

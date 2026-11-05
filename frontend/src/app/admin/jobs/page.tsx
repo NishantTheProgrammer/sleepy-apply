@@ -164,6 +164,25 @@ export default function AdminAllJobsPage() {
   };
 
   const [purging, setPurging] = useState(false);
+  const [purgingCrawled, setPurgingCrawled] = useState(false);
+
+  const handlePurgeCrawled = async () => {
+    if (!confirm("Delete all 'career-crawled' jobs from MongoDB so you can re-trigger a fresh crawl?")) return;
+    setPurgingCrawled(true);
+    try {
+      const res = await adminApi.purgeCrawledJobs();
+      setActionMsg(res.message);
+      setShowProgressBanner(false);
+      await pollCrawlerStatus();
+      loadJobs(1, search, selectedCompany, selectedSource, remoteFilter);
+      setTimeout(() => setActionMsg(""), 6000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to purge crawled jobs";
+      alert(msg);
+    } finally {
+      setPurgingCrawled(false);
+    }
+  };
 
   const handlePurgeStatic = async () => {
     if (!confirm("Purge all static, seeded, or placeholder listings from MongoDB? Only 100% verified real live postings will remain.")) return;
@@ -327,6 +346,16 @@ export default function AdminAllJobsPage() {
           >
             {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-red-400" />}
             {purging ? "Purging..." : "Purge Static"}
+          </button>
+
+          <button
+            onClick={handlePurgeCrawled}
+            disabled={purgingCrawled}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold border border-rose-500/30 transition-all cursor-pointer disabled:opacity-50"
+            title="Delete all career-crawled jobs so you can re-trigger a fresh crawl"
+          >
+            {purgingCrawled ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-rose-400" />}
+            {purgingCrawled ? "Purging Crawled..." : "Purge Crawled"}
           </button>
 
           {/* Fetch Career ATS Button */}

@@ -243,6 +243,8 @@ export const adminApi = {
     request<{ ok: boolean; message: string; total_jobs: number }>("/api/admin/jobs/seed", { method: "POST" }),
   purgeStaticJobs: () =>
     request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number }>("/api/admin/jobs/purge-static", { method: "POST" }),
+  purgeCrawledJobs: () =>
+    request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number; crawled_jobs: number }>("/api/admin/jobs/purge-crawled", { method: "POST" }),
   fetchLiveJobs: (source: "all" | "career" | "career-crawled" | "linkedin" | "naukri" = "all") =>
     request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
   // Crawler Sync & Status

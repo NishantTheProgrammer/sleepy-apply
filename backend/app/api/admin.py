@@ -329,6 +329,53 @@ async def admin_purge_static_jobs(admin_id: str = Depends(require_admin)):
     }
 
 
+@router.post("/jobs/purge-crawled")
+async def admin_purge_crawled_jobs(admin_id: str = Depends(require_admin)):
+    """Purge all 'career-crawled' job listings and associated matches from MongoDB."""
+    db = get_db()
+    crawled_ids = []
+    async for j in db.jobs.find({"source": "career-crawled"}, {"_id": 1}):
+        crawled_ids.append(j["_id"])
+
+    del_matches = 0
+    if crawled_ids:
+        res_m = await db.job_matches.delete_many({"job_id": {"$in": crawled_ids}})
+        del_matches = res_m.deleted_count
+
+    del_res = await db.jobs.delete_many({"source": "career-crawled"})
+    remaining = await db.jobs.count_documents({})
+    crawled_rem = await db.jobs.count_documents({"source": "career-crawled"})
+
+    # Reset crawler manager state
+    crawler_manager.state = {
+        "is_running": False,
+        "current_company": None,
+        "current_index": 0,
+        "total_companies": len(crawler_manager.state.get("history", []) or [10]),
+        "percent": 0,
+        "status_message": "Ready to crawl",
+        "jobs_discovered": 0,
+        "jobs_saved": 0,
+        "captchas_encountered": 0,
+        "started_at": None,
+        "finished_at": None,
+        "history": [],
+    }
+
+    await log_system_event(
+        "INFO",
+        "crawler",
+        f"Admin purged all career-crawled jobs ({del_res.deleted_count} removed, {del_matches} matches cleaned).",
+    )
+    return {
+        "ok": True,
+        "message": f"Successfully purged {del_res.deleted_count} crawled jobs. Ready to re-crawl.",
+        "purged_count": del_res.deleted_count,
+        "remaining_jobs": remaining,
+        "crawled_jobs": crawled_rem,
+    }
+
+
 @router.post("/jobs/seed")
 async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
     """Purge static jobs and sync 100% real live job postings in MongoDB from active sources."""

@@ -1,4 +1,6 @@
 import asyncio
+import os
+import sys
 from datetime import datetime, timezone
 from typing import Any
 import structlog
@@ -156,12 +158,16 @@ class CrawlerManager:
                 logger.info("Crawler starting company", company=comp_name, url=career_url, index=idx)
 
                 try:
+                    import os
+                    is_in_docker = os.path.exists('/.dockerenv') or not os.environ.get('DISPLAY')
+                    run_headless = True if is_in_docker else headless
+
                     jobs = await agent.crawl_career_portal(
                         company=comp_name,
                         start_url=career_url,
                         target_query=query_role,
-                        headless=headless,
-                        slow_mo=slow_mo,
+                        headless=run_headless,
+                        slow_mo=0 if run_headless else slow_mo,
                         limit=limit_per_company,
                     )
 

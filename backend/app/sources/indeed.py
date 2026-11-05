@@ -8,6 +8,7 @@ import httpx
 import html2text
 import structlog
 from app.sources.base import BaseJobSource, RawJobData
+from app.pipeline.role_search import expand_role_to_search_keywords
 from app.sources.company_ats import standardize_india_location
 
 logger = structlog.get_logger()
@@ -42,16 +43,21 @@ class IndeedJobSource(BaseJobSource):
     async def fetch_jobs(self, config: dict | None = None) -> list[RawJobData]:
         """Fetch live tech jobs from Indeed India public RSS feeds, targeting Delhi NCR tech hubs."""
         config = config or {}
-        roles = config.get("keywords") or [
-            "Software Engineer",
-            "Backend Developer",
-            "Full Stack Developer",
-            "Frontend Engineer",
-            "DevOps Engineer",
-            "Python Developer",
-        ]
-        if isinstance(roles, str):
-            roles = [roles]
+        raw_keywords = config.get("keywords")
+        if raw_keywords:
+            if isinstance(raw_keywords, str):
+                raw_keywords = [raw_keywords]
+            roles = expand_role_to_search_keywords(raw_keywords)
+        else:
+            roles = [
+                "Software Engineer",
+                "Full Stack Developer",
+                "Backend Developer",
+                "Frontend Engineer",
+                "Python Developer",
+                "DevOps Engineer",
+                "Quality Engineer",
+            ]
 
         delhi_ncr_only = config.get("delhi_ncr_only", True)
         if delhi_ncr_only:
@@ -77,7 +83,7 @@ class IndeedJobSource(BaseJobSource):
             for loc in locations:
                 if len(collected_jobs) >= max_jobs:
                     break
-                for role in roles:
+                for role in roles[:5]:
                     if len(collected_jobs) >= max_jobs:
                         break
                     try:

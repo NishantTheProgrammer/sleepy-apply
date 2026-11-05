@@ -10,6 +10,7 @@ from app.sources.playwright_crawler import PlaywrightJobCrawler
 from app.sources.base import RawJobData
 from app.pipeline.deduplicator import JobDeduplicator
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
+from app.pipeline.role_search import expand_role_to_search_keywords
 
 logger = structlog.get_logger()
 
@@ -35,6 +36,50 @@ class JobFetcherAgent:
         db = get_db()
         all_raw_jobs: list[RawJobData] = []
         source_clean = (source or "all").lower().strip()
+
+        # Resolve role keywords: prioritize passed user keywords; fallback to all active users' selected roles in DB
+        active_roles: list[str] = []
+        if keywords:
+            if isinstance(keywords, str):
+                keywords = [keywords]
+            active_roles = list(keywords)
+        else:
+            try:
+                cursor = db.profiles.find(
+                    {
+                        "$or": [
+                            {"target_role": {"$exists": True, "$nin": [None, ""]}},
+                            {"job_preferences.jobTitles": {"$exists": True, "$nin": [None, []]}},
+                            {"jobPreferences.jobTitles": {"$exists": True, "$nin": [None, []]}},
+                            {"suggested_roles": {"$exists": True, "$nin": [None, []]}},
+                        ]
+                    },
+                    {
+                        "target_role": 1,
+                        "job_preferences.jobTitles": 1,
+                        "jobPreferences.jobTitles": 1,
+                        "suggested_roles": 1,
+                    },
+                )
+                async for p in cursor:
+                    tr = p.get("target_role")
+                    if tr and isinstance(tr, str) and tr.strip():
+                        active_roles.append(tr.strip())
+                    for t in (p.get("job_preferences", {}).get("jobTitles") or []):
+                        if t and isinstance(t, str) and t.strip():
+                            active_roles.append(t.strip())
+                    for t in (p.get("jobPreferences", {}).get("jobTitles") or []):
+                        if t and isinstance(t, str) and t.strip():
+                            active_roles.append(t.strip())
+                    for t in (p.get("suggested_roles") or []):
+                        if t and isinstance(t, str) and t.strip():
+                            active_roles.append(t.strip())
+            except Exception as e:
+                logger.warning("Could not query active user roles for job discovery", error=str(e))
+
+        resolved_keywords = expand_role_to_search_keywords(active_roles) if active_roles else None
+        if resolved_keywords:
+            logger.info("Targeting user-selected roles for job fetching", keywords=resolved_keywords[:8], count=len(resolved_keywords))
 
         if custom_urls:
             try:
@@ -87,11 +132,11 @@ class JobFetcherAgent:
                 except Exception as e:
                     logger.error("Career ATS source error", error=str(e))
 
-            # 2. LinkedIn Job Fetcher (Targeting Delhi NCR tech hubs)
+            # 2. LinkedIn Job Fetcher (Targeting Delhi NCR tech hubs for user-selected roles)
             if source_clean in ["linkedin", "all"]:
                 try:
                     linkedin_jobs = await self.linkedin_source.fetch_jobs({
-                        "keywords": keywords,
+                        "keywords": resolved_keywords,
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
                         "limit": 25,
@@ -102,11 +147,11 @@ class JobFetcherAgent:
                 except Exception as e:
                     logger.error("LinkedIn source error", error=str(e))
 
-            # 3. Naukri Job Fetcher (Delhi & Noida XML Sitemaps)
+            # 3. Naukri Job Fetcher (Delhi & Noida XML Sitemaps for user-selected roles)
             if source_clean in ["naukri", "all"]:
                 try:
                     naukri_jobs = await self.naukri_source.fetch_jobs({
-                        "keyword": (keywords[0] if keywords else None),
+                        "keywords": resolved_keywords,
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
                         "limit": 25,
@@ -117,11 +162,11 @@ class JobFetcherAgent:
                 except Exception as e:
                     logger.error("Naukri source error", error=str(e))
 
-            # 4. Indeed Job Fetcher (Delhi NCR RSS)
+            # 4. Indeed Job Fetcher (Delhi NCR RSS for user-selected roles)
             if source_clean in ["indeed", "all"]:
                 try:
                     indeed_jobs = await self.indeed_source.fetch_jobs({
-                        "keywords": keywords,
+                        "keywords": resolved_keywords,
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
                         "limit": 25,

@@ -121,6 +121,12 @@ async def update_profile(request: Request):
         {"$set": update, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},
         upsert=True,
     )
+
+    # If job preferences or target role updated, trigger matching & discovery in background
+    if any(k in update for k in ["job_preferences", "jobPreferences", "target_role"]):
+        from app.graphs.job_pipeline_graph import job_pipeline
+        asyncio.create_task(job_pipeline.ainvoke({"user_id": str(user_id)}))
+
     doc = await db.profiles.find_one({"user_id": ObjectId(user_id)})
     doc["_id"] = str(doc["_id"])
     doc["user_id"] = str(doc["user_id"])
@@ -417,6 +423,29 @@ async def select_target_role(request: Request, body: SelectRoleRequest):
             }
         }
     )
+
+    # Immediately trigger on-demand job discovery and rematching for user's selected role
+    from app.graphs.job_pipeline_graph import job_pipeline
+    from app.agents.job_matcher import JobMatcherAgent
+
+    async def rematch_and_discover_for_role():
+        try:
+            # 1. Fast rematch existing jobs in repository against newly selected target role
+            matcher = JobMatcherAgent()
+            cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
+            async for j in cursor:
+                await matcher.match_user_and_job(user_id, str(j["_id"]), user_settings=user_settings, use_ai_reasoning=False)
+
+            # 2. Discover fresh postings across LinkedIn, Indeed, Naukri, and career sites for the selected role
+            await job_pipeline.ainvoke({
+                "user_id": str(user_id),
+                "custom_keywords": [chosen_role],
+            })
+            logger.info("Job discovery completed for selected role", user_id=user_id, role=chosen_role)
+        except Exception as err:
+            logger.warning("Background job discovery on role selection failed", user_id=user_id, role=chosen_role, error=str(err))
+
+    asyncio.create_task(rematch_and_discover_for_role())
 
     return {
         "ok": True,

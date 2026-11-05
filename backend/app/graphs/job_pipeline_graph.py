@@ -15,6 +15,7 @@ logger = structlog.get_logger()
 
 class JobPipelineState(TypedDict, total=False):
     user_id: str | None
+    custom_keywords: list[str] | None
     custom_urls: list[str] | None
     discovered_jobs: list[dict]
     enriched_jobs: list[dict]
@@ -25,18 +26,37 @@ class JobPipelineState(TypedDict, total=False):
 async def fetch_jobs_node(state: JobPipelineState) -> JobPipelineState:
     agent = JobFetcherAgent()
     try:
-        user_keywords = None
+        user_keywords: list[str] = []
+        if state.get("custom_keywords"):
+            raw_ck = state["custom_keywords"]
+            if isinstance(raw_ck, str):
+                raw_ck = [raw_ck]
+            user_keywords.extend(raw_ck)
+
         if state.get("user_id"):
             db = get_db()
             profile = await db.profiles.find_one({"user_id": ObjectId(state["user_id"])})
             if profile:
-                user_keywords = (
+                target_role = profile.get("target_role")
+                if target_role and target_role not in user_keywords:
+                    user_keywords.append(target_role)
+
+                titles = (
                     profile.get("job_preferences", {}).get("jobTitles")
                     or profile.get("jobPreferences", {}).get("jobTitles")
+                    or []
                 )
+                for t in titles:
+                    if t and t not in user_keywords:
+                        user_keywords.append(t)
+
+                for sr in profile.get("suggested_roles", []):
+                    if sr and sr not in user_keywords:
+                        user_keywords.append(sr)
+
         new_jobs = await agent.fetch_and_store_jobs(
             custom_urls=state.get("custom_urls"),
-            keywords=user_keywords,
+            keywords=user_keywords if user_keywords else None,
         )
         return {"discovered_jobs": new_jobs}
     except Exception as e:

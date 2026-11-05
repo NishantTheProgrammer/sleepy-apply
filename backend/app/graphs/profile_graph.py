@@ -124,9 +124,10 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         experiences=len(update_fields["experience"]),
     )
 
-    # Immediately calculate fresh job matches for this new candidate
+    # Immediately calculate fresh job matches and discover jobs for this new candidate
     import asyncio
     from app.agents.job_matcher import JobMatcherAgent
+    from app.graphs.job_pipeline_graph import job_pipeline
 
     async def match_fresh_jobs():
         try:
@@ -134,6 +135,9 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
             cursor = db.jobs.find({"is_active": True})
             async for j in cursor:
                 await matcher.match_user_and_job(user_id=user_id, job_id=str(j["_id"]), use_ai_reasoning=False)
+
+            # Discover fresh jobs matching the newly detected candidate roles
+            await job_pipeline.ainvoke({"user_id": str(user_id)})
         except Exception as err:
             logger.warning("Auto job match after resume save failed", error=str(err))
 

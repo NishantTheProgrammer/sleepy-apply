@@ -217,7 +217,25 @@ class NaukriJobSource(BaseJobSource):
         config = config or {}
         max_jobs = int(config.get("limit", 25))
         max_age_days = int(config.get("max_age_days", 14))
-        keyword = (config.get("keyword") or "").lower().strip()
+        
+        # Support both 'keywords' (list) and legacy 'keyword' (singular)
+        raw_keywords = config.get("keywords") or ([config["keyword"]] if config.get("keyword") else [])
+        if isinstance(raw_keywords, str):
+            raw_keywords = [raw_keywords]
+
+        target_slug_tokens: set[str] = set()
+        for kw in raw_keywords:
+            if not kw:
+                continue
+            clean = re.sub(r"[^a-zA-Z0-9\s-]", " ", kw.lower())
+            words = [w for w in clean.split() if len(w) >= 3 and w not in ["the", "and", "for", "with", "engineer", "developer"]]
+            for w in words:
+                target_slug_tokens.add(w)
+            # Add hyphenated phrase e.g. "full-stack", "etl-tester"
+            meaningful_words = [w for w in clean.split() if w not in ["the", "and", "for", "with"]]
+            if len(meaningful_words) >= 2:
+                target_slug_tokens.add("-".join(meaningful_words))
+
         delhi_ncr_only = config.get("delhi_ncr_only", False)
 
         cities_to_scan = ["Delhi", "Noida"] if delhi_ncr_only else SITEMAP_CITIES
@@ -269,8 +287,8 @@ class NaukriJobSource(BaseJobSource):
                                 pass
 
                         u_lower = u.lower()
-                        if keyword:
-                            if keyword not in u_lower:
+                        if target_slug_tokens:
+                            if not any(token in u_lower for token in target_slug_tokens):
                                 continue
                         else:
                             if not any(k in u_lower for k in TECH_KEYWORDS):

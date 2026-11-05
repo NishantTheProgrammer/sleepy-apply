@@ -6,6 +6,7 @@ import httpx
 import html2text
 import structlog
 from app.sources.base import BaseJobSource, RawJobData
+from app.pipeline.role_search import expand_role_to_search_keywords
 
 logger = structlog.get_logger()
 
@@ -78,21 +79,23 @@ class LinkedInJobSource(BaseJobSource):
     async def fetch_jobs(self, config: dict | None = None) -> list[RawJobData]:
         """Fetch fresh live tech jobs from LinkedIn guest API, applying strict recency filters and extracting posting dates."""
         config = config or {}
-        keywords_list = config.get("keywords") or [
-            "sdet",
-            "qa automation",
-            "quality engineer",
-            "test automation engineer",
-            "software engineer",
-            "backend engineer",
-            "full stack developer",
-            "frontend engineer",
-            "python developer",
-            "cloud engineer",
-            "devops engineer",
-        ]
-        if isinstance(keywords_list, str):
-            keywords_list = [keywords_list]
+        raw_keywords = config.get("keywords")
+        if raw_keywords:
+            if isinstance(raw_keywords, str):
+                raw_keywords = [raw_keywords]
+            keywords_list = expand_role_to_search_keywords(raw_keywords)
+        else:
+            keywords_list = [
+                "software engineer",
+                "full stack developer",
+                "backend engineer",
+                "frontend engineer",
+                "python developer",
+                "quality engineer",
+                "sdet",
+                "cloud engineer",
+                "devops engineer",
+            ]
 
         delhi_ncr_only = config.get("delhi_ncr_only", False)
         if delhi_ncr_only:
@@ -118,11 +121,14 @@ class LinkedInJobSource(BaseJobSource):
         seen_ids: set[str] = set()
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
+        search_keywords = keywords_list[:5]
+        rate_limited = False
+
         async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, headers=headers) as client:
             for loc in locations:
-                if len(collected_jobs) >= max_jobs:
+                if len(collected_jobs) >= max_jobs or rate_limited:
                     break
-                for kw in keywords_list:
+                for kw in search_keywords:
                     if len(collected_jobs) >= max_jobs:
                         break
                     try:
@@ -135,9 +141,9 @@ class LinkedInJobSource(BaseJobSource):
 
                         r = await client.get(search_url, headers=headers)
                         if r.status_code == 429:
-                            logger.warning("LinkedIn guest search rate limited (429), waiting briefly...", kw=kw, loc=loc)
-                            await asyncio.sleep(2.0)
-                            continue
+                            logger.warning("LinkedIn guest search rate limited (429)", kw=kw, loc=loc)
+                            rate_limited = True
+                            break
                         if r.status_code != 200:
                             logger.warning("LinkedIn guest search returned non-200", status=r.status_code, kw=kw, loc=loc)
                             continue

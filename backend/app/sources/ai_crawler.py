@@ -308,9 +308,13 @@ class AICareerCrawlerAgent:
                         cards.forEach(c => {
                             const link = c.querySelector('a') || (c.tagName === 'A' ? c : null);
                             const titleEl = c.querySelector('h2, h3, h4, [class*="title"]') || link || c;
-                            const locEl = c.querySelector('[class*="location"], [class*="loc"], [class*="city"]');
-                            const title = titleEl ? titleEl.innerText.trim().split('\\n')[0] : '';
-                            const loc = locEl ? locEl.innerText.trim() : '';
+                            const locEl = c.querySelector('.sort-by-location, span.location, [class*="location"], [class*="city"], [data-automation-id="locations"]');
+                            let loc = locEl ? locEl.innerText.trim() : '';
+                            const cat = c.querySelector('.posting-categories, .categories, .meta');
+                            if (cat && (!loc || /^(on-site|hybrid|remote)/i.test(loc) || loc.includes('—'))) {
+                                loc = cat.innerText.replace(/[\n\r\t]+/g, ' ').trim();
+                            }
+                            const title = titleEl ? titleEl.innerText.trim().split('\n')[0] : '';
                             const href = link ? link.href : window.location.href;
                             if (title && title.length >= 3 && title.length <= 110) {
                                 results.push({ title, location: loc, url: href });
@@ -382,19 +386,20 @@ class AICareerCrawlerAgent:
         return extracted
 
     async def _quick_check_target_jobs(self, page: Page, company: str, target_query: str) -> list[RawJobData]:
-        """Rapidly detects if any links on the current page already match the target query."""
+        """Rapidly detects if any links on the current page match tech engineering roles."""
         keywords = [w.lower() for w in target_query.split() if len(w) > 2]
-        if not keywords:
-            return []
 
         raw_items = await page.evaluate(
             """(kw) => {
                 const matches = [];
                 const anchors = Array.from(document.querySelectorAll('a[href*="/job"], a[href*="gh_jid"], a[href*="lever.co"], a[href*="workday"], a[class*="job"]'));
+                const techTokens = ['engineer', 'developer', 'sde', 'architect', 'full stack', 'backend', 'frontend', 'devops', 'sre', 'cloud', 'data', 'software', 'platform'];
                 for (const a of anchors) {
                     const txt = (a.innerText || '').trim();
                     const lower = txt.toLowerCase();
-                    if (kw.every(k => lower.includes(k))) {
+                    const matchesQuery = !kw || kw.length === 0 || kw.some(k => lower.includes(k));
+                    const isTech = techTokens.some(t => lower.includes(t));
+                    if (matchesQuery && isTech) {
                         matches.push({
                             title: txt.split('\\n')[0].trim(),
                             url: a.href,
@@ -443,8 +448,11 @@ class AICareerCrawlerAgent:
             return job
 
         try:
-            await page.goto(target_url, wait_until="domcontentloaded", timeout=20000)
-            await page.wait_for_timeout(1500)
+            try:
+                await page.goto(target_url, wait_until="domcontentloaded", timeout=12000)
+            except Exception:
+                pass  # DOM may already be partially parsed, proceed with extraction
+            await page.wait_for_timeout(1000)
 
             extracted = await page.evaluate("""() => {
                 const selectors = [

@@ -50,9 +50,9 @@ TARGET_COMPANIES = [
         "default_query": "Engineer",
     },
     {
-        "name": "Spinny",
-        "url": "https://www.spinny.com/careers/",
-        "default_query": "Engineer",
+        "name": "Meesho",
+        "url": "https://jobs.lever.co/meesho",
+        "default_query": "Software Engineer",
     },
     {
         "name": "BrowserStack",

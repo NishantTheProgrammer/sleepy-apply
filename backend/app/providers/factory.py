@@ -30,10 +30,13 @@ class AIProviderFactory:
 
         match provider:
             case "ollama":
+                import os
+                is_docker = os.path.exists("/.dockerenv")
+                default_ollama = "http://host.docker.internal:11434" if is_docker else "http://localhost:11434"
                 base_url = (
                     decrypt(settings.ai_base_url_encrypted)
                     if settings.ai_base_url_encrypted
-                    else "http://host.docker.internal:11434"
+                    else default_ollama
                 )
                 return OllamaProvider(base_url=base_url, model=model)
 

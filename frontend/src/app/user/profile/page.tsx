@@ -313,14 +313,14 @@ const sanitizeStr = (val: unknown): string => {
     setAnalyzingFilename(filename || "resume.pdf");
     setAnalysisSeconds(0);
     setUploadError("");
-    setUploadMsg("AI is parsing your resume: extracting all work experiences, projects, skills & education... (takes ~30-60s)");
+    setUploadMsg("AI is parsing your resume: extracting all work experiences, projects, skills & education... (takes ~10-25s)");
 
     timerIntervalRef.current = setInterval(() => {
       setAnalysisSeconds((prev) => prev + 1);
     }, 1000);
 
     let attempts = 0;
-    const maxAttempts = 60; // 60 * 2s = 120 seconds max
+    const maxAttempts = 15; // 15 * 1.5s = ~22 seconds max (prevents hanging)
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
       try {
@@ -328,10 +328,12 @@ const sanitizeStr = (val: unknown): string => {
         const p = updated?.profile;
         if (p) {
           // Auto-fill details continuously as each step parses data
+          const persObj = p.personal as Record<string, unknown> | undefined;
+          const skillsObj = p.skills as Record<string, unknown> | undefined;
           if (
-            p.personal?.fullName ||
+            persObj?.fullName ||
             (Array.isArray(p.experience) && p.experience.length > 0) ||
-            (p.skills && Object.keys(p.skills).length > 0)
+            (skillsObj && Object.keys(skillsObj).length > 0)
           ) {
             populateForm(p);
           }
@@ -361,7 +363,7 @@ const sanitizeStr = (val: unknown): string => {
       } catch {
         // Keep polling
       }
-    }, 2000);
+    }, 1500);
   };
 
   const load = async () => {
@@ -452,7 +454,10 @@ const sanitizeStr = (val: unknown): string => {
     startAnalysisTracking(file.name);
 
     try {
-      await profileApi.uploadResume(file);
+      const res = await profileApi.uploadResume(file);
+      if (res?.profile) {
+        populateForm(res.profile);
+      }
     } catch (err: unknown) {
       stopAnalysis();
       setUploadError(err instanceof Error ? err.message : "Upload failed");
@@ -857,49 +862,75 @@ const sanitizeStr = (val: unknown): string => {
             </div>
             <div className="text-right hidden sm:block">
               <span className="text-[11px] text-slate-400">Typical duration</span>
-              <p className="text-sm font-bold text-indigo-300 font-mono">~20 – 35 seconds</p>
+              <p className="text-sm font-bold text-indigo-300 font-mono">~10 – 20 seconds</p>
             </div>
           </div>
 
           {/* 4-Step Live Extraction Tracker */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 relative z-10">
+            {/* 1. Text & Layout */}
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 2 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/15 border-indigo-500/30 text-indigo-200"
+              Boolean(personal.fullName || analysisSeconds >= 1) ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/15 border-indigo-500/30 text-indigo-200 animate-pulse"
             }`}>
-              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              {Boolean(personal.fullName || analysisSeconds >= 1) ? (
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              )}
               <div>
                 <p className="font-semibold text-white">1. Text & Layout</p>
-                <p className="text-[10px] text-slate-400">Document parsed</p>
+                <p className="text-[10px] text-slate-400">{personal.fullName ? "Document parsed" : "Reading layout..."}</p>
               </div>
             </div>
 
+            {/* 2. Work History */}
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 10 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse"
+              (experience.length > 0 || analysisSeconds >= 3) ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : Boolean(personal.fullName || analysisSeconds >= 1) ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
             }`}>
-              {analysisSeconds >= 10 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />}
+              {(experience.length > 0 || analysisSeconds >= 3) ? (
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : Boolean(personal.fullName || analysisSeconds >= 1) ? (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />
+              )}
               <div>
                 <p className="font-semibold text-white">2. Work History</p>
-                <p className="text-[10px] text-slate-400">Roles & achievements</p>
+                <p className="text-[10px] text-slate-400">{experience.length > 0 ? `${experience.length} roles found` : "Roles & achievements"}</p>
               </div>
             </div>
 
+            {/* 3. Tech Stack */}
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 18 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : analysisSeconds >= 10 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+              (Object.values(skills).flat().length > 0 || analysisSeconds >= 6) ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : (experience.length > 0 || analysisSeconds >= 3) ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
             }`}>
-              {analysisSeconds >= 18 ? <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" /> : analysisSeconds >= 10 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              {(Object.values(skills).flat().length > 0 || analysisSeconds >= 6) ? (
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (experience.length > 0 || analysisSeconds >= 3) ? (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />
+              )}
               <div>
                 <p className="font-semibold text-white">3. Tech Stack</p>
-                <p className="text-[10px] text-slate-400">Skills & frameworks</p>
+                <p className="text-[10px] text-slate-400">{Object.values(skills).flat().length > 0 ? `${Object.values(skills).flat().length} skills mapped` : "Skills & frameworks"}</p>
               </div>
             </div>
 
+            {/* 4. Finalizing */}
             <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-              analysisSeconds >= 24 ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
+              !isAnalyzing ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : (Object.values(skills).flat().length > 0 || analysisSeconds >= 6) ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-200 animate-pulse" : "bg-white/[0.02] border-white/10 text-slate-500"
             }`}>
-              {analysisSeconds >= 24 ? <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" /> : <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />}
+              {!isAnalyzing ? (
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (Object.values(skills).flat().length > 0 || analysisSeconds >= 6) ? (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+              ) : (
+                <span className="w-4 h-4 rounded-full border border-slate-600 inline-block shrink-0" />
+              )}
               <div>
                 <p className="font-semibold text-white">4. Finalizing</p>
-                <p className="text-[10px] text-slate-400">Recruiter Q&A & ATS</p>
+                <p className="text-[10px] text-slate-400">{!isAnalyzing ? "ATS & Q&A ready" : "Recruiter Q&A & ATS"}</p>
               </div>
             </div>
           </div>

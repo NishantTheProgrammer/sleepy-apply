@@ -172,10 +172,14 @@ class ProfileCreatorAgent:
         resume_text: str,
         user_settings: UserSettings | None = None,
     ) -> dict[str, Any]:
-        extracted_data = None
-
         # Clean text slightly (collapse 3+ newlines to 2, strip null bytes)
         clean_text = re.sub(r"\n{3,}", "\n\n", resume_text.replace("\x00", "")).strip()
+
+        # Step 0: Pre-compute immediate heuristic baseline
+        fast_baseline = self._heuristic_parse(clean_text)
+        fast_baseline = self._normalize_extracted_data(fast_baseline)
+
+        extracted_data = None
 
         # 1. Try LLM extraction (defaulting to local Ollama llama3.2 if no user_settings configured)
         if not user_settings:
@@ -186,8 +190,8 @@ class ProfileCreatorAgent:
                 ai_model="llama3.2:latest",
             )
 
-        # Prepare extraction prompt with large context limit (up to 35,000 characters)
-        prompt = EXTRACTION_PROMPT + clean_text[:35000]
+        # Prepare extraction prompt with focused context limit (up to 15,000 characters)
+        prompt = EXTRACTION_PROMPT + clean_text[:15000]
 
         app_prefs = user_settings.application_preferences if user_settings else None
         extract_temp = float(getattr(app_prefs, "extraction_temperature", 0.1) if app_prefs else 0.1)
@@ -202,41 +206,21 @@ class ProfileCreatorAgent:
                     num_ctx=4096,
                     format="json",
                 ),
-                timeout=35.0
+                timeout=15.0,
             )
             extracted_data = self._extract_json_from_response(resp)
         except Exception as e:
-            logger.warning("Primary AI extraction timed out or failed, falling back to fast parsing", error=str(e))
-            if user_settings.ai_provider != "ollama":
-                try:
-                    from bson import ObjectId
-                    local_settings = UserSettings(
-                        user_id=ObjectId(),
-                        ai_provider="ollama",
-                        ai_model="llama3.2:latest",
-                    )
-                    provider = AIProviderFactory.resolve(local_settings)
-                    resp = await asyncio.wait_for(
-                        provider.complete(
-                            [{"role": "user", "content": prompt}],
-                            temperature=extract_temp,
-                            num_ctx=4096,
-                            format="json",
-                        ),
-                        timeout=25.0
-                    )
-                    extracted_data = self._extract_json_from_response(resp)
-                except Exception as fallback_err:
-                    logger.warning("AI extraction fallback failed, using heuristic parser", error=str(fallback_err))
-            else:
-                logger.warning("Ollama AI extraction timed out, using heuristic parser", error=str(e))
+            logger.warning("Primary AI extraction timed out or failed, using heuristic baseline", error=str(e))
 
         # 2. Heuristic fallback
         if not extracted_data:
-            extracted_data = self._heuristic_parse(clean_text)
-
-        # 3. Normalize fields (populate both camelCase and snake_case for maximum compatibility)
-        extracted_data = self._normalize_extracted_data(extracted_data)
+            extracted_data = fast_baseline
+        else:
+            extracted_data = self._normalize_extracted_data(extracted_data)
+            # Merge any missing fields from fast_baseline if LLM skipped them
+            for key in ["experience", "education", "skills"]:
+                if not extracted_data.get(key) and fast_baseline.get(key):
+                    extracted_data[key] = fast_baseline[key]
 
         # 4. Detect gaps & generate questions
         missing_fields, questions = self._identify_gaps_and_questions(extracted_data)
@@ -434,10 +418,23 @@ class ProfileCreatorAgent:
     def _heuristic_parse(self, text: str) -> dict[str, Any]:
         """Robust regex and section parser when AI is offline or model key is unconfigured."""
         email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
-        phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text)
+        phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", text)
         linkedin_match = re.search(r"linkedin\.com/in/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
         github_match = re.search(r"github\.com/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
         
+        # Location heuristic: detect common cities and postal code
+        city_val = ""
+        postal_val = ""
+        city_match = re.search(
+            r"\b(new delhi|delhi|noida|gurugram|gurgaon|bangalore|bengaluru|mumbai|hyderabad|pune|chennai|kolkata|chandigarh|jaipur|san francisco|new york|remote)\b(?:\s+(\d{5,6}))?",
+            text,
+            re.IGNORECASE,
+        )
+        if city_match:
+            city_val = city_match.group(1).title()
+            if city_match.group(2):
+                postal_val = city_match.group(2)
+
         # Portfolio: avoid matching email domains like gmail.com or github.com
         portfolio_match = re.search(
             r"(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+\.(?:dev|me|io|app|tech|site|online))(?:\/[^\s]*)?",
@@ -449,7 +446,7 @@ class ProfileCreatorAgent:
         candidate_name = "Candidate"
         for line in lines[:6]:
             cleaned_line = re.sub(r"[\w\.-]+@[\w\.-]+\.\w+", "", line)
-            cleaned_line = re.sub(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", "", cleaned_line)
+            cleaned_line = re.sub(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", "", cleaned_line)
             cleaned_line = re.sub(r"(?:github\.com|linkedin\.com|leetcode\.com)[^\s]*", "", cleaned_line, flags=re.IGNORECASE)
             cleaned_line = re.sub(r"(?:email|mobile|phone|contact|github|linkedin|portfolio)\s*:", "", cleaned_line, flags=re.IGNORECASE)
             parts = re.split(r"(?:\s{2,}|[|•·/])", cleaned_line)
@@ -463,11 +460,17 @@ class ProfileCreatorAgent:
             if candidate_name != "Candidate":
                 break
 
-        backend_skills = ["Node.js", "Express", "Spring Boot", "FastAPI", "Django", "Go", "Java", "Python", "Microservices"]
+        backend_skills = [
+            "Node.js", "Express", "Spring Boot", "FastAPI", "Django", "Go", "Java", "Python",
+            "PySpark", "Spark SQL", "Spark", "Databricks", "Delta Lake", "ETL", "Microservices"
+        ]
         frontend_skills = ["React", "Next.js", "Angular", "Vue", "TypeScript", "JavaScript", "HTML", "CSS"]
-        database_skills = ["MongoDB", "PostgreSQL", "MySQL", "Redis"]
+        database_skills = ["MongoDB", "PostgreSQL", "MySQL", "Redis", "SQL", "Snowflake", "Oracle"]
         ui_skills = ["Tailwind", "Bootstrap", "Material UI"]
-        tool_skills = ["Docker", "Git", "Linux", "AWS", "Kubernetes", "Jest"]
+        tool_skills = [
+            "Docker", "Git", "Linux", "AWS", "Azure", "GCP", "Kubernetes", "Jest",
+            "Selenium", "Playwright", "Cypress", "Postman", "Airflow", "Kafka"
+        ]
 
         def find_in_text(skill_list):
             return [s for s in skill_list if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
@@ -478,8 +481,8 @@ class ProfileCreatorAgent:
             "databases": find_in_text(database_skills),
             "ui": find_in_text(ui_skills),
             "tools": find_in_text(tool_skills),
-            "languages": find_in_text(["JavaScript", "TypeScript", "Python", "Java", "Go", "C++"]),
-            "architecture": find_in_text(["Microservices", "REST APIs", "System Design"]),
+            "languages": find_in_text(["Python", "SQL", "JavaScript", "TypeScript", "Java", "Go", "C++", "Scala"]),
+            "architecture": find_in_text(["Microservices", "REST APIs", "System Design", "ETL Pipelines", "Data Quality"]),
         }
 
         # Extract summary block if present
@@ -487,6 +490,11 @@ class ProfileCreatorAgent:
         summary_match = re.search(r"(?:SUMMARY|PROFESSIONAL SUMMARY|OBJECTIVE)\s*\n+([\s\S]*?)(?=\n+[A-Z\s]{4,}|\Z)", text, re.IGNORECASE)
         if summary_match:
             summary_text = re.sub(r"\s+", " ", summary_match.group(1)).strip()
+        else:
+            # Fallback: intro paragraph after contact header before first section
+            lead_match = re.search(r"(?:\|\s*[\w\.-]+@[\w\.-]+\.\w+[^\n]*\n+)([\s\S]*?)(?=\n+(?:EXPERIENCE|WORK EXPERIENCE|SKILLS|EDUCATION|PROJECTS)\b)", text, re.IGNORECASE)
+            if lead_match:
+                summary_text = re.sub(r"\s+", " ", lead_match.group(1)).strip()
 
         # Extract experiences heuristically
         experience_list: list[dict[str, Any]] = []
@@ -595,7 +603,7 @@ class ProfileCreatorAgent:
                 "full_name": candidate_name,
                 "email": email_match.group(0) if email_match else "",
                 "phone": phone_match.group(0) if phone_match else "",
-                "location": {"address": "", "city": "", "postalCode": "", "country": ""},
+                "location": {"address": "", "city": city_val, "postalCode": postal_val, "country": "India" if postal_val and len(postal_val) == 6 else ""},
                 "linkedin": f"https://{linkedin_match.group(0)}" if linkedin_match else None,
                 "github": f"https://{github_match.group(0)}" if github_match else None,
                 "portfolio": portfolio_match.group(0) if portfolio_match else None,

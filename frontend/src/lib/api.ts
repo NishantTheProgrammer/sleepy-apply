@@ -103,7 +103,13 @@ export const profileApi = {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(err.detail ?? "Upload failed");
     }
-    return res.json();
+    return res.json() as Promise<{
+      ok: boolean;
+      is_analyzing: boolean;
+      message: string;
+      filename: string;
+      profile?: Record<string, unknown>;
+    }>;
   },
   getQuestions: () => request<{ questions: unknown[] }>("/api/profile/questions"),
   submitAnswers: (answers: { question_id: string; answer: string }[]) =>

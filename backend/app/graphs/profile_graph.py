@@ -35,11 +35,18 @@ async def parse_resume_node(state: ProfileState) -> ProfileState:
 
     agent = ProfileCreatorAgent()
     try:
-        parsed = await agent.analyze_resume(resume_text, user_settings=user_settings)
+        import asyncio
+        parsed = await asyncio.wait_for(
+            agent.analyze_resume(resume_text, user_settings=user_settings),
+            timeout=20.0,
+        )
         return {"parsed_data": parsed, "error": None}
     except Exception as e:
-        logger.error("Failed to parse resume in graph", error=str(e), user_id=user_id)
-        return {"error": str(e)}
+        logger.warning("Resume AI parsing timed out in graph, using fast heuristic parse", error=str(e), user_id=user_id)
+        fast_parsed = agent._heuristic_parse(resume_text)
+        fast_parsed = agent._normalize_extracted_data(fast_parsed)
+        fast_parsed["completion_score"] = agent._calculate_completion_score(fast_parsed)
+        return {"parsed_data": fast_parsed, "error": None}
 
 
 async def save_profile_node(state: ProfileState) -> ProfileState:
@@ -70,7 +77,7 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
                 target_role=suggested_roles[0] if suggested_roles else None,
                 user_settings=user_settings,
             ),
-            timeout=15.0
+            timeout=8.0
         )
     except Exception as q_err:
         logger.warning("Screening questions LLM call timed out, using dynamic fallback", error=str(q_err))

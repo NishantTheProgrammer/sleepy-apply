@@ -17,19 +17,25 @@ class OllamaProvider(BaseAIProvider):
         self.model = model
 
     def _candidate_urls(self) -> list[str]:
+        import os
+        is_docker = os.path.exists("/.dockerenv")
         candidates = []
-        if "host.docker.internal" in self.base_url:
-            # Inside Docker container, host.docker.internal reaches the host directly
-            candidates.append(self.base_url)
-            candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
-        elif "localhost" in self.base_url:
-            candidates.append(self.base_url)
-            candidates.append(self.base_url.replace("localhost", "host.docker.internal"))
-        elif "127.0.0.1" in self.base_url:
-            candidates.append(self.base_url)
-            candidates.append(self.base_url.replace("127.0.0.1", "host.docker.internal"))
+        if is_docker:
+            if "host.docker.internal" in self.base_url:
+                candidates.append(self.base_url)
+                candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
+            else:
+                candidates.append(self.base_url)
         else:
-            candidates.append(self.base_url)
+            # On host (macOS / Linux), localhost is directly reachable; avoid host.docker.internal DNS delay
+            if "host.docker.internal" in self.base_url:
+                candidates.append(self.base_url.replace("host.docker.internal", "localhost"))
+                candidates.append(self.base_url)
+            elif "127.0.0.1" in self.base_url:
+                candidates.append(self.base_url)
+                candidates.append(self.base_url.replace("127.0.0.1", "localhost"))
+            else:
+                candidates.append(self.base_url)
         return candidates
 
     async def complete(self, messages: list[dict], **kwargs) -> str:

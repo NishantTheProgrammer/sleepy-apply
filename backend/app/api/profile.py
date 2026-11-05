@@ -22,7 +22,7 @@ async def get_profile(request: Request):
     if not doc:
         return {"profile": None}
 
-    # Auto-recovery for stalled or interrupted resume analysis (> 60s)
+    # Auto-recovery for stalled or interrupted resume analysis (> 20s)
     if doc.get("is_analyzing"):
         started = doc.get("analysis_started_at")
         now = datetime.now(timezone.utc)
@@ -33,7 +33,7 @@ async def get_profile(request: Request):
         else:
             elapsed = 999
 
-        if elapsed > 60:
+        if elapsed > 20:
             logger.info("Auto-recovering stalled resume analysis", user_id=user_id, elapsed=elapsed)
             raw_text = doc.get("resume_raw_text") or ""
             if raw_text:
@@ -268,11 +268,23 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     asyncio.create_task(profile_pipeline.ainvoke({"user_id": user_id, "resume_text": cleaned_text}))
     logger.info("Resume uploaded and profile pipeline triggered", user_id=user_id, filename=file.filename, chars=len(cleaned_text))
 
+    # Prepare serialized response profile so UI auto-fills immediately on upload response
+    response_profile = dict(fresh_profile)
+    response_profile["_id"] = str(response_profile.get("_id", ""))
+    response_profile["user_id"] = str(response_profile.get("user_id", ""))
+    if isinstance(response_profile.get("created_at"), datetime):
+        response_profile["created_at"] = response_profile["created_at"].isoformat()
+    if isinstance(response_profile.get("updated_at"), datetime):
+        response_profile["updated_at"] = response_profile["updated_at"].isoformat()
+    if isinstance(response_profile.get("analysis_started_at"), datetime):
+        response_profile["analysis_started_at"] = response_profile["analysis_started_at"].isoformat()
+
     return {
         "ok": True,
         "is_analyzing": True,
         "message": "Resume uploaded. AI is analyzing your profile...",
         "filename": file.filename,
+        "profile": response_profile,
     }
 
 

@@ -5,12 +5,26 @@ import urllib.parse
 from typing import Any
 import httpx
 import structlog
-from playwright.async_api import Page, Browser, BrowserContext
+try:
+    from playwright.async_api import Page, Browser, BrowserContext
+except ImportError:
+    Page = Any  # type: ignore
+    Browser = Any  # type: ignore
+    BrowserContext = Any  # type: ignore
 
 from app.sources.base import RawJobData
 from app.sources.company_ats import standardize_india_location, is_delhi_ncr_job
+from app.core.system_logger import log_system_event
 
 logger = structlog.get_logger()
+
+
+class CaptchaDetectedException(Exception):
+    """Raised when an anti-bot or CAPTCHA challenge is detected on a career page."""
+    def __init__(self, message: str, captcha_type: str = "Unknown", url: str = ""):
+        super().__init__(message)
+        self.captcha_type = captcha_type
+        self.url = url
 
 
 class AICareerCrawlerAgent:
@@ -89,6 +103,63 @@ class AICareerCrawlerAgent:
             }""")
         except Exception:
             pass
+
+    async def detect_captcha(self, page: Page) -> tuple[bool, str]:
+        """
+        Actively checks if the page is blocked by CAPTCHA, Cloudflare Turnstile,
+        reCAPTCHA, hCaptcha, PerimeterX, or human verification barriers.
+        Returns (is_captcha, captcha_type).
+        """
+        try:
+            url = page.url.lower()
+            title = (await page.title()).lower()
+
+            # URL and title heuristics
+            if "challenges.cloudflare.com" in url or "cf-turnstile" in url:
+                return True, "Cloudflare Turnstile"
+            if "just a moment..." in title or "attention required! | cloudflare" in title:
+                return True, "Cloudflare Challenge"
+            if "datadome" in url:
+                return True, "DataDome"
+
+            captcha_type = await page.evaluate("""() => {
+                // Cloudflare Turnstile & Challenge
+                if (document.querySelector('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"], #challenge-stage, .cf-turnstile, [name="cf-turnstile-response"]')) {
+                    return 'Cloudflare Turnstile';
+                }
+                // Google reCAPTCHA
+                if (document.querySelector('iframe[src*="recaptcha"], iframe[src*="google.com/recaptcha"], .g-recaptcha, #recaptcha')) {
+                    return 'Google reCAPTCHA';
+                }
+                // hCaptcha
+                if (document.querySelector('iframe[src*="hcaptcha.com"], .h-captcha, [data-hcaptcha-widget-id]')) {
+                    return 'hCaptcha';
+                }
+                // PerimeterX / HUMAN Security
+                if (document.querySelector('#px-captcha, #px-block-container')) {
+                    return 'PerimeterX / HUMAN';
+                }
+                // DataDome / Arkose
+                if (document.querySelector('iframe[src*="datadome"], iframe[src*="geo.captcha-delivery.com"], iframe[src*="arkoselabs"]')) {
+                    return 'DataDome / Arkose';
+                }
+                // Textual human verification checks
+                const bodyText = (document.body ? document.body.innerText : '').slice(0, 2000).toLowerCase();
+                if (bodyText.includes('verify you are human') || 
+                    bodyText.includes('verify that you are a human') || 
+                    bodyText.includes('security check to continue') ||
+                    bodyText.includes('press & hold to confirm') ||
+                    bodyText.includes('complete the security check') ||
+                    bodyText.includes('enable javascript and cookies to continue')) {
+                    return 'Human Verification Challenge';
+                }
+                return null;
+            }""")
+            if captcha_type:
+                return True, captcha_type
+        except Exception as e:
+            logger.debug("Captcha detection check error", error=str(e))
+        return False, ""
 
     async def _observe_page(self, page: Page) -> tuple[list[dict[str, Any]], int]:
         """Inspect the current page to collect interactive elements and count visible job cards."""
@@ -403,9 +474,35 @@ class AICareerCrawlerAgent:
             except Exception as e:
                 print(f"⚠️ Initial navigation warning: {e}")
 
+            # 🛡️ CAPTCHA Barrier Check (Initial Navigation)
+            is_cap, cap_type = await self.detect_captcha(page)
+            if is_cap:
+                msg = f"CAPTCHA detected on {company} ({start_url}): {cap_type}. Aborting crawl."
+                print(f"🚨 {msg}")
+                await log_system_event(
+                    level="ERROR",
+                    category="crawler",
+                    message=msg,
+                    details={"company": company, "url": page.url, "captcha_type": cap_type, "aborted": True}
+                )
+                raise CaptchaDetectedException(msg, captcha_type=cap_type, url=page.url)
+
             for step in range(1, self.max_steps + 1):
                 cur_url = page.url
                 cur_title = await page.title()
+
+                # 🛡️ CAPTCHA Barrier Check (Step Navigation)
+                is_cap, cap_type = await self.detect_captcha(page)
+                if is_cap:
+                    msg = f"CAPTCHA challenge encountered on {company} at step {step}: {cap_type}. Aborting crawl."
+                    print(f"🚨 {msg}")
+                    await log_system_event(
+                        level="ERROR",
+                        category="crawler",
+                        message=msg,
+                        details={"company": company, "url": cur_url, "step": step, "captcha_type": cap_type, "aborted": True}
+                    )
+                    raise CaptchaDetectedException(msg, captcha_type=cap_type, url=cur_url)
 
                 print(f"\n🔍 [Step {step}/{self.max_steps}] Observing page: {cur_title}")
                 print(f"   URL: {cur_url}")

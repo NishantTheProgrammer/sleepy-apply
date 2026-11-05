@@ -7,6 +7,8 @@ from app.security.jwt import get_current_user_id
 from app.core.config import get_settings
 from app.db.seed_jobs import seed_jobs_collection
 from app.agents.job_fetcher import JobFetcherAgent
+from app.core.system_logger import get_system_logs, clear_system_logs, log_system_event
+from app.agents.crawler_manager import crawler_manager
 import structlog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -258,6 +260,7 @@ async def list_all_jobs_admin(
     remote_all = await db.jobs.count_documents({"is_remote": True})
     active_all = await db.jobs.count_documents({"is_active": True})
     career_all = await db.jobs.count_documents({"source": "career"})
+    career_crawled_all = await db.jobs.count_documents({"source": "career-crawled"})
     linkedin_all = await db.jobs.count_documents({"source": "linkedin"})
     naukri_all = await db.jobs.count_documents({"source": "naukri"})
 
@@ -272,6 +275,7 @@ async def list_all_jobs_admin(
             "remote_jobs": remote_all,
             "active_jobs": active_all,
             "career_jobs": career_all,
+            "career_crawled_jobs": career_crawled_all,
             "linkedin_jobs": linkedin_all,
             "naukri_jobs": naukri_all,
             "companies_count": len(distinct_companies),
@@ -353,20 +357,93 @@ async def admin_fetch_live_jobs(
 
     async def run():
         try:
-            logger.info("Admin triggered live job fetcher", source=source, delhi_ncr_only=delhi_ncr_only)
-            res = await fetcher.fetch_and_store_jobs(source=source, delhi_ncr_only=delhi_ncr_only)
-            logger.info("Live job fetcher completed", source=source, count=len(res))
+            if source == "career-crawled":
+                logger.info("Admin triggered AI browser crawler batch for 10 companies")
+                await crawler_manager.run_batch(headless=False)
+            else:
+                logger.info("Admin triggered live job fetcher", source=source, delhi_ncr_only=delhi_ncr_only)
+                res = await fetcher.fetch_and_store_jobs(source=source, delhi_ncr_only=delhi_ncr_only)
+                logger.info("Live job fetcher completed", source=source, count=len(res))
         except Exception as e:
             logger.error("Live job fetcher failed", source=source, error=str(e))
 
     background_tasks.add_task(run)
     source_labels = {
-        "all": "all sources (ATS APIs, LinkedIn, Naukri, Indeed, Custom)",
+        "all": "all sources (ATS APIs, AI Browser Crawler, LinkedIn, Naukri, Indeed, Custom)",
         "career": "Company Career Portals (Greenhouse, Lever, Ashby, Workday, Darwinbox, SmartRecruiters, Keka)",
+        "career-crawled": "AI Browser Crawled Portals (10 Target Companies)",
         "linkedin": "LinkedIn Jobs (Delhi NCR tech)",
         "naukri": "Naukri Jobs (Delhi NCR tech)",
         "indeed": "Indeed Jobs (Delhi NCR tech)",
     }
     label = source_labels.get(source, source)
     return {"ok": True, "message": f"Live job fetching triggered for {label} (Delhi NCR: {delhi_ncr_only})"}
+
+
+class StartCrawlerRequest(BaseModel):
+    companies: list[str] | None = None
+    headless: bool = False
+    limit_per_company: int = 5
+
+
+@router.post("/crawler/start")
+async def start_crawler_batch(
+    body: StartCrawlerRequest | None = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    admin_id: str = Depends(require_admin),
+):
+    """Trigger background batch crawling of top target company career portals."""
+    status = crawler_manager.get_status()
+    if status.get("is_running"):
+        return {"ok": False, "message": "Crawler is already active and running."}
+
+    req = body or StartCrawlerRequest()
+
+    async def _runner():
+        await crawler_manager.run_batch(
+            companies=req.companies,
+            headless=req.headless,
+            limit_per_company=req.limit_per_company,
+        )
+
+    background_tasks.add_task(_runner)
+    return {
+        "ok": True,
+        "message": "AI Browser Crawler started across target companies.",
+        "status": crawler_manager.get_status(),
+    }
+
+
+@router.get("/crawler/status")
+async def get_crawler_status(admin_id: str = Depends(require_admin)):
+    """Retrieve live status and progress of the AI Browser Crawler."""
+    return crawler_manager.get_status()
+
+
+@router.get("/logs")
+async def list_admin_logs(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    level: str | None = Query("all"),
+    category: str | None = Query("all"),
+    search: str | None = None,
+    admin_id: str = Depends(require_admin),
+):
+    """Retrieve filtered system logs with levels and statistics."""
+    return await get_system_logs(
+        page=page,
+        limit=limit,
+        level=level,
+        category=category,
+        search=search,
+    )
+
+
+@router.delete("/logs/clear")
+async def clear_admin_logs(admin_id: str = Depends(require_admin)):
+    """Clear all system logs."""
+    deleted = await clear_system_logs()
+    await log_system_event("INFO", "system", f"Admin cleared system logs ({deleted} removed).")
+    return {"ok": True, "message": f"Successfully cleared {deleted} log entries.", "deleted_count": deleted}
+
 

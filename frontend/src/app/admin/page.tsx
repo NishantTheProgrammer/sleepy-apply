@@ -5,13 +5,13 @@ import {
   Users, Briefcase, Zap, Activity, ShieldCheck, ShieldAlert,
   Loader2, Sparkles, RefreshCw, CheckCircle, AlertCircle, ArrowUpRight,
   UserCheck, UserX, Clock, Globe, ChevronRight, Building2, ExternalLink,
-  Plus, Search, Trash2, Check, X, Filter
+  Plus, Search, Trash2, Check, X, Filter, ScrollText, AlertTriangle, Terminal, ChevronDown
 } from "lucide-react";
-import { adminApi, companiesApi, TargetCompany } from "@/lib/api";
+import { adminApi, companiesApi, TargetCompany, SystemLogRecord } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
-type TabType = "overview" | "users" | "jobs" | "matches" | "companies";
+type TabType = "overview" | "users" | "jobs" | "matches" | "companies" | "logs";
 
 interface UserRecord {
   _id: string;
@@ -183,6 +183,60 @@ export default function AdminPage() {
     }
   };
 
+  // ── System Logs State ──
+  const [logs, setLogs] = useState<SystemLogRecord[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsLevel, setLogsLevel] = useState("all");
+  const [logsCategory, setLogsCategory] = useState("all");
+  const [logsSearch, setLogsSearch] = useState("");
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logsStats, setLogsStats] = useState({ total: 0, errors: 0, warnings: 0, crawler: 0 });
+  const [clearingLogs, setClearingLogs] = useState(false);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  const loadLogs = async (
+    p = logsPage,
+    lvl = logsLevel,
+    cat = logsCategory,
+    q = logsSearch
+  ) => {
+    setLoadingLogs(true);
+    try {
+      const res = await adminApi.getLogs({
+        page: p,
+        limit: 50,
+        level: lvl !== "all" ? lvl : undefined,
+        category: cat !== "all" ? cat : undefined,
+        search: q || undefined,
+      });
+      setLogs(res.items || []);
+      setLogsTotal(res.total || 0);
+      if (res.stats) {
+        setLogsStats(res.stats);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to load system logs", err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    if (!confirm("Are you sure you want to clear all system logs from MongoDB?")) return;
+    setClearingLogs(true);
+    try {
+      const res = await adminApi.clearLogs();
+      setDiscoveryMsg(`Cleared ${res.deleted_count} system logs.`);
+      setTimeout(() => setDiscoveryMsg(""), 3500);
+      loadLogs(1, logsLevel, logsCategory, logsSearch);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to clear logs");
+    } finally {
+      setClearingLogs(false);
+    }
+  };
+
   const loadAll = async () => {
     setLoading(true);
     setError(null);
@@ -196,7 +250,7 @@ export default function AdminPage() {
       setUsers((uRes.users as UserRecord[]) || []);
       setRecentJobs((aRes.recent_jobs as RecentJob[]) || []);
       setRecentMatches((aRes.recent_matches as RecentMatch[]) || []);
-      await loadCompanies();
+      await Promise.all([loadCompanies(), loadLogs(1, "all", "all", "")]);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load admin data";
       setError(msg);
@@ -206,14 +260,24 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    // Check if ?tab=... is present in URL
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const urlTab = p.get("tab") as TabType;
+      if (urlTab && ["overview", "users", "jobs", "matches", "companies", "logs"].includes(urlTab)) {
+        setTab(urlTab);
+      }
+    }
     loadAll();
   }, []);
 
   useEffect(() => {
     if (tab === "companies") {
       loadCompanies(selectedGrade, companySearch);
+    } else if (tab === "logs") {
+      loadLogs(logsPage, logsLevel, logsCategory, logsSearch);
     }
-  }, [tab, selectedGrade]);
+  }, [tab, selectedGrade, logsPage, logsLevel, logsCategory]);
 
   const handleToggleUserRole = async (targetUser: UserRecord) => {
     const nextRole = targetUser.role === "admin" ? "user" : "admin";
@@ -427,6 +491,26 @@ export default function AdminPage() {
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 font-bold">
             {companyCounts.all || companies.length}
           </span>
+        </button>
+        <button
+          onClick={() => setTab("logs")}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+            tab === "logs"
+              ? "bg-amber-600/25 text-amber-200 border border-amber-500/40 shadow-sm"
+              : "text-slate-400 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+          System Logs
+          {logsStats.errors > 0 ? (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
+              {logsStats.errors}
+            </span>
+          ) : (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 font-bold">
+              {logsStats.total || logs.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1104,6 +1188,267 @@ export default function AdminPage() {
                 </div>
               )}
             </AnimatePresence>
+          </motion.div>
+        )}
+
+        {/* ── System Logs Tab ── */}
+        {tab === "logs" && (
+          <motion.div
+            key="logs"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="space-y-6"
+          >
+            {/* Header & Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ScrollText className="w-5 h-5 text-amber-400" />
+                  System & Crawler Audit Logs
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Real-time audit trail of AI crawler navigation, anti-bot CAPTCHA detections, scrapers, and platform operations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => loadLogs(logsPage, logsLevel, logsCategory, logsSearch)}
+                  disabled={loadingLogs}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? "animate-spin" : ""}`} /> Refresh
+                </button>
+                <button
+                  onClick={handleClearLogs}
+                  disabled={clearingLogs || logs.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/20 transition-all cursor-pointer disabled:opacity-50"
+                  title="Purge all system logs from MongoDB"
+                >
+                  {clearingLogs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-rose-400" />}
+                  Clear Logs
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="glass rounded-2xl p-4">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Events</span>
+                <p className="text-2xl font-black text-white mt-1">{logsStats.total || logsTotal}</p>
+                <span className="text-[10px] text-slate-500">Persisted in MongoDB</span>
+              </div>
+              <div className="glass rounded-2xl p-4 border-rose-500/20 bg-rose-950/10">
+                <span className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider">Errors & Captchas</span>
+                <p className="text-2xl font-black text-rose-400 mt-1">{logsStats.errors}</p>
+                <span className="text-[10px] text-rose-400/80">Requires review</span>
+              </div>
+              <div className="glass rounded-2xl p-4 border-amber-500/20">
+                <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Warnings</span>
+                <p className="text-2xl font-black text-amber-400 mt-1">{logsStats.warnings}</p>
+                <span className="text-[10px] text-amber-500/80">Non-fatal issues</span>
+              </div>
+              <div className="glass rounded-2xl p-4 border-fuchsia-500/20 bg-fuchsia-950/10">
+                <span className="text-[10px] font-semibold text-fuchsia-400 uppercase tracking-wider">Crawler Events</span>
+                <p className="text-2xl font-black text-fuchsia-400 mt-1">{logsStats.crawler}</p>
+                <span className="text-[10px] text-fuchsia-400/80">AI browser runs</span>
+              </div>
+            </div>
+
+            {/* Filter Toolbar */}
+            <div className="glass rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={logsSearch}
+                  onChange={(e) => setLogsSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && loadLogs(1, logsLevel, logsCategory, logsSearch)}
+                  placeholder="Search logs by message, company, or URL..."
+                  className="w-full pl-9 pr-10 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+                />
+                {logsSearch && (
+                  <button
+                    onClick={() => {
+                      setLogsSearch("");
+                      loadLogs(1, logsLevel, logsCategory, "");
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Level Filter */}
+              <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
+                {["all", "ERROR", "WARNING", "INFO"].map((lvl) => (
+                  <button
+                    key={lvl}
+                    onClick={() => {
+                      setLogsLevel(lvl);
+                      loadLogs(1, lvl, logsCategory, logsSearch);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      logsLevel === lvl
+                        ? lvl === "ERROR"
+                          ? "bg-rose-600 text-white shadow-sm"
+                          : lvl === "WARNING"
+                          ? "bg-amber-600 text-white shadow-sm"
+                          : lvl === "INFO"
+                          ? "bg-sky-600 text-white shadow-sm"
+                          : "bg-white/15 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Filter */}
+              <select
+                value={logsCategory}
+                onChange={(e) => {
+                  setLogsCategory(e.target.value);
+                  loadLogs(1, logsLevel, e.target.value, logsSearch);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50 shrink-0"
+              >
+                <option value="all">All Categories</option>
+                <option value="crawler">Crawler</option>
+                <option value="scraper">Scraper</option>
+                <option value="pipeline">Pipeline</option>
+                <option value="matching">Matching</option>
+                <option value="auth">Auth</option>
+                <option value="system">System</option>
+              </select>
+            </div>
+
+            {/* Log Stream / List */}
+            <div className="glass rounded-2xl overflow-hidden border border-white/10">
+              {loadingLogs ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                  <p className="text-xs text-slate-400">Loading system log stream…</p>
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="text-center py-16 text-slate-500">
+                  <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-40 text-amber-400" />
+                  <p className="text-xs font-semibold text-slate-400">No log entries found</p>
+                  <p className="text-[11px] text-slate-600 mt-1">Try resetting your filters or run a crawler task to generate activity.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5 font-mono text-xs">
+                  {logs.map((log) => {
+                    const isError = log.level === "ERROR" || log.level === "CRITICAL";
+                    const isWarn = log.level === "WARNING";
+                    const isCaptcha = log.message?.toLowerCase().includes("captcha");
+                    const isExpanded = expandedLogId === log._id;
+
+                    return (
+                      <div
+                        key={log._id}
+                        className={`p-3.5 transition-colors ${
+                          isCaptcha
+                            ? "bg-rose-950/20 hover:bg-rose-950/30"
+                            : isError
+                            ? "bg-rose-950/10 hover:bg-rose-950/15"
+                            : isWarn
+                            ? "bg-amber-950/10 hover:bg-amber-950/15"
+                            : "hover:bg-white/[0.02]"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            {/* Level Badge */}
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                                isError
+                                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                  : isWarn
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                  : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                              }`}
+                            >
+                              {isError ? (
+                                <AlertTriangle className="w-3 h-3 text-rose-400" />
+                              ) : isWarn ? (
+                                <AlertCircle className="w-3 h-3 text-amber-400" />
+                              ) : (
+                                <Activity className="w-3 h-3 text-sky-400" />
+                              )}
+                              {log.level}
+                            </span>
+
+                            {/* Category Badge */}
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10 shrink-0">
+                              {log.category}
+                            </span>
+
+                            {/* Message */}
+                            <div className="min-w-0 font-sans">
+                              <p className={`text-xs ${isError ? "text-rose-200 font-semibold" : isWarn ? "text-amber-200" : "text-slate-200"}`}>
+                                {isCaptcha && (
+                                  <span className="inline-block mr-1.5 px-1.5 py-0.2 rounded bg-rose-600 text-white text-[9px] font-black uppercase tracking-wider">
+                                    🛡️ CAPTCHA BARRIER
+                                  </span>
+                                )}
+                                {log.message}
+                              </p>
+                              {Boolean(log.details && (log.details.company || log.details.url)) && (
+                                <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 font-mono">
+                                  {Boolean(log.details?.company) && (
+                                    <span className="text-purple-300 font-semibold">
+                                      🏢 {String(log.details?.company)}
+                                    </span>
+                                  )}
+                                  {Boolean(log.details?.url) && (
+                                    <span className="text-slate-500 truncate max-w-sm">
+                                      🔗 {String(log.details?.url)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Timestamp & Toggle */}
+                          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto text-[11px] text-slate-500 font-mono">
+                            <span>{new Date(log.timestamp).toLocaleString()}</span>
+                            {log.details && Object.keys(log.details).length > 0 && (
+                              <button
+                                onClick={() => setExpandedLogId(isExpanded ? null : log._id)}
+                                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer"
+                                title="Toggle details JSON"
+                              >
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expandable JSON Details */}
+                        {isExpanded && log.details && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-3 p-3 rounded-xl bg-black/60 border border-white/10 overflow-x-auto text-[11px] text-emerald-400"
+                          >
+                            <pre className="font-mono leading-tight whitespace-pre-wrap">
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          </motion.div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

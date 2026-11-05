@@ -5,11 +5,11 @@ import {
   Briefcase, Building2, Search, Filter, Globe, ArrowUpRight,
   RefreshCw, Sparkles, Loader2, CheckCircle, ShieldCheck,
   ChevronLeft, ChevronRight, X, ExternalLink, MapPin, DollarSign,
-  Calendar, Layers, Check, Trash2, Zap
+  Calendar, Layers, Check, Trash2, Zap, Bot, AlertTriangle, ScrollText
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import { adminApi, AdminJobRecord } from "@/lib/api";
+import { adminApi, AdminJobRecord, CrawlerStatusResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 export default function AdminAllJobsPage() {
@@ -25,6 +25,7 @@ export default function AdminAllJobsPage() {
     active_jobs: 0,
     companies_count: 0,
     career_jobs: 0,
+    career_crawled_jobs: 0,
     linkedin_jobs: 0,
     naukri_jobs: 0,
   });
@@ -40,6 +41,53 @@ export default function AdminAllJobsPage() {
   const [actionMsg, setActionMsg] = useState("");
 
   const [selectedJob, setSelectedJob] = useState<AdminJobRecord | null>(null);
+
+  // ── AI Crawler Live Status ──
+  const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatusResponse | null>(null);
+  const [showProgressBanner, setShowProgressBanner] = useState(false);
+
+  const pollCrawlerStatus = useCallback(async () => {
+    try {
+      const s = await adminApi.getCrawlerStatus();
+      setCrawlerStatus(s);
+      if (s.is_running) {
+        setShowProgressBanner(true);
+      }
+      return s;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial check
+    pollCrawlerStatus();
+  }, [pollCrawlerStatus]);
+
+  useEffect(() => {
+    if (!crawlerStatus?.is_running) return;
+    const interval = setInterval(async () => {
+      const s = await pollCrawlerStatus();
+      if (s && !s.is_running) {
+        // Refresh jobs when crawler finishes
+        loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [crawlerStatus?.is_running, page, search, selectedCompany, selectedSource, remoteFilter, pollCrawlerStatus]);
+
+  const handleStartCrawler = async () => {
+    try {
+      setShowProgressBanner(true);
+      const res = await adminApi.startCrawler({ headless: false });
+      setActionMsg(res.message);
+      await pollCrawlerStatus();
+      setTimeout(() => setActionMsg(""), 6000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to start AI crawler";
+      alert(msg);
+    }
+  };
 
   const loadJobs = useCallback(async (
     p = page,
@@ -70,6 +118,7 @@ export default function AdminAllJobsPage() {
           active_jobs: res.stats.active_jobs || 0,
           companies_count: res.stats.companies_count || 0,
           career_jobs: res.stats.career_jobs || 0,
+          career_crawled_jobs: res.stats.career_crawled_jobs || 0,
           linkedin_jobs: res.stats.linkedin_jobs || 0,
           naukri_jobs: res.stats.naukri_jobs || 0,
         });
@@ -91,7 +140,7 @@ export default function AdminAllJobsPage() {
     loadJobs(1, search, selectedCompany, selectedSource, remoteFilter);
   };
 
-  const handleFetchSource = async (src: "all" | "career" | "linkedin" | "naukri") => {
+  const handleFetchSource = async (src: "all" | "career" | "career-crawled" | "linkedin" | "naukri") => {
     setFetchingSource(src);
     try {
       const res = await adminApi.fetchLiveJobs(src);
@@ -152,6 +201,14 @@ export default function AdminAllJobsPage() {
 
   const renderSourceBadge = (source?: string) => {
     const s = (source || "career").toLowerCase();
+    if (s === "career-crawled") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse"></span>
+          AI Crawled
+        </span>
+      );
+    }
     if (s === "linkedin") {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
@@ -231,6 +288,27 @@ export default function AdminAllJobsPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
 
+          {/* Sync Crawler Jobs */}
+          <button
+            onClick={handleStartCrawler}
+            disabled={crawlerStatus?.is_running}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-fuchsia-600/25 hover:bg-fuchsia-600/35 text-fuchsia-200 font-bold text-xs border border-fuchsia-500/40 shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50 cursor-pointer"
+            title="Run AI browser crawler across 10 top tech company career portals"
+          >
+            {crawlerStatus?.is_running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-fuchsia-400" />}
+            {crawlerStatus?.is_running ? "Crawling Portals..." : "Sync Crawler Jobs"}
+          </button>
+
+          {/* System Logs Link */}
+          <Link
+            href="/admin?tab=logs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer"
+            title="View system logs and CAPTCHA event history"
+          >
+            <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+            System Logs
+          </Link>
+
           <button
             onClick={handleSyncRealJobs}
             disabled={seeding}
@@ -304,8 +382,89 @@ export default function AdminAllJobsPage() {
         </div>
       )}
 
+      {/* ── AI Crawler Live Progress Banner ── */}
+      {showProgressBanner && crawlerStatus && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-900/90 to-fuchsia-950/70 border border-fuchsia-500/30 backdrop-blur-md shadow-xl"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center text-fuchsia-300 shrink-0">
+                {crawlerStatus.is_running ? <Loader2 className="w-5 h-5 animate-spin text-fuchsia-400" /> : <CheckCircle className="w-5 h-5 text-emerald-400" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-white">
+                    {crawlerStatus.is_running ? "AI Browser Crawler Active" : "AI Browser Crawl Complete"}
+                  </span>
+                  {crawlerStatus.is_running && crawlerStatus.current_company && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-fuchsia-500/25 text-fuchsia-200 border border-fuchsia-500/40 animate-pulse">
+                      🏢 Fetching: {crawlerStatus.current_company} ({crawlerStatus.current_index}/{crawlerStatus.total_companies})
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">{crawlerStatus.status_message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-xs bg-black/30 px-3 py-1.5 rounded-xl border border-white/5">
+                <span className="text-slate-400">
+                  Discovered: <strong className="text-fuchsia-300 font-bold">{crawlerStatus.jobs_discovered}</strong>
+                </span>
+                <span className="text-slate-500">•</span>
+                <span className="text-slate-400">
+                  Saved in DB: <strong className="text-emerald-300 font-bold">{crawlerStatus.jobs_saved}</strong>
+                </span>
+                {crawlerStatus.captchas_encountered > 0 && (
+                  <>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-rose-400 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      {crawlerStatus.captchas_encountered} CAPTCHA Aborted
+                    </span>
+                  </>
+                )}
+              </div>
+              {!crawlerStatus.is_running && (
+                <button
+                  onClick={() => setShowProgressBanner(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                  title="Dismiss banner"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-800/90 rounded-full h-2.5 overflow-hidden border border-white/10">
+            <div
+              className="bg-gradient-to-r from-purple-500 via-indigo-500 to-fuchsia-500 h-full rounded-full transition-all duration-500 shadow-sm shadow-fuchsia-500/50"
+              style={{ width: `${Math.max(crawlerStatus.percent, 3)}%` }}
+            />
+          </div>
+
+          {/* Captcha Alert Notice */}
+          {crawlerStatus.captchas_encountered > 0 && (
+            <div className="mt-3 pt-2.5 border-t border-rose-500/20 flex items-center justify-between text-xs text-rose-300">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                Anti-bot CAPTCHA barrier detected and aborted. Company skipped to protect pipeline and logged to System Logs.
+              </span>
+              <Link href="/admin?tab=logs" className="underline font-bold text-rose-200 hover:text-white shrink-0 ml-3">
+                Inspect System Logs →
+              </Link>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* ── KPI Stat Cards (With Source Breakdown) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
         {/* Total */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-slate-400 mb-1">
@@ -316,8 +475,18 @@ export default function AdminAllJobsPage() {
           <span className="text-[10px] text-slate-400">All sources</span>
         </motion.div>
 
+        {/* Career Crawled */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass rounded-2xl p-3.5 border-fuchsia-500/30 bg-fuchsia-950/10">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400">Career Crawled</span>
+            <Bot className="w-3.5 h-3.5 text-fuchsia-400" />
+          </div>
+          <p className="text-2xl font-black text-fuchsia-400">{stats.career_crawled_jobs || 0}</p>
+          <span className="text-[10px] text-fuchsia-400/80 font-medium">AI Browser Agent</span>
+        </motion.div>
+
         {/* Career ATS */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} className="glass rounded-2xl p-3.5 border-emerald-500/20">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-2xl p-3.5 border-emerald-500/20">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Career ATS</span>
             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -327,7 +496,7 @@ export default function AdminAllJobsPage() {
         </motion.div>
 
         {/* LinkedIn */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="glass rounded-2xl p-3.5 border-sky-500/20">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="glass rounded-2xl p-3.5 border-sky-500/20">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">LinkedIn</span>
             <Briefcase className="w-3.5 h-3.5 text-sky-400" />
@@ -347,7 +516,7 @@ export default function AdminAllJobsPage() {
         </motion.div>
 
         {/* Remote Positions */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }} className="glass rounded-2xl p-3.5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider">Remote</span>
             <Globe className="w-3.5 h-3.5 text-indigo-400" />
@@ -357,7 +526,7 @@ export default function AdminAllJobsPage() {
         </motion.div>
 
         {/* Companies */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass rounded-2xl p-3.5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="glass rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider">Companies</span>
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
@@ -391,6 +560,7 @@ export default function AdminAllJobsPage() {
         <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap">
           {[
             { id: "all", label: `All (${stats.total_jobs})` },
+            { id: "career-crawled", label: `Career Crawled (${stats.career_crawled_jobs || 0})` },
             { id: "career", label: `Career ATS (${stats.career_jobs || 0})` },
             { id: "linkedin", label: `LinkedIn (${stats.linkedin_jobs || 0})` },
             { id: "naukri", label: `Naukri (${stats.naukri_jobs || 0})` },
@@ -403,7 +573,9 @@ export default function AdminAllJobsPage() {
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedSource === s.id
-                  ? s.id === "linkedin"
+                  ? s.id === "career-crawled"
+                    ? "bg-fuchsia-600 text-white shadow-sm"
+                    : s.id === "linkedin"
                     ? "bg-sky-600 text-white shadow-sm"
                     : s.id === "naukri"
                     ? "bg-amber-600 text-white shadow-sm"
@@ -772,7 +944,9 @@ export default function AdminAllJobsPage() {
                     target="_blank"
                     rel="noreferrer"
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md transition-all ${
-                        selectedJob.source === "linkedin"
+                        selectedJob.source === "career-crawled"
+                          ? "bg-fuchsia-600 hover:bg-fuchsia-500 shadow-fuchsia-600/30"
+                          : selectedJob.source === "linkedin"
                           ? "bg-sky-600 hover:bg-sky-500 shadow-sky-600/30"
                           : selectedJob.source === "naukri"
                           ? "bg-amber-600 hover:bg-amber-500 shadow-amber-600/30"
@@ -780,7 +954,9 @@ export default function AdminAllJobsPage() {
                       }`}
                     >
                       <span>
-                        {selectedJob.source === "linkedin"
+                        {selectedJob.source === "career-crawled"
+                          ? "Apply on Career Portal"
+                          : selectedJob.source === "linkedin"
                           ? "Apply on LinkedIn"
                           : selectedJob.source === "naukri"
                           ? "Apply on Naukri"

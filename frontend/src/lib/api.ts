@@ -232,6 +232,7 @@ export const adminApi = {
         remote_jobs: number;
         active_jobs: number;
         career_jobs?: number;
+        career_crawled_jobs?: number;
         linkedin_jobs?: number;
         naukri_jobs?: number;
         companies_count: number;
@@ -242,9 +243,71 @@ export const adminApi = {
     request<{ ok: boolean; message: string; total_jobs: number }>("/api/admin/jobs/seed", { method: "POST" }),
   purgeStaticJobs: () =>
     request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number }>("/api/admin/jobs/purge-static", { method: "POST" }),
-  fetchLiveJobs: (source: "all" | "career" | "linkedin" | "naukri" = "all") =>
+  fetchLiveJobs: (source: "all" | "career" | "career-crawled" | "linkedin" | "naukri" = "all") =>
     request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
+  // Crawler Sync & Status
+  startCrawler: (options?: { companies?: string[]; headless?: boolean; limit_per_company?: number }) =>
+    request<{ ok: boolean; message: string }>("/api/admin/crawler/start", { method: "POST", body: JSON.stringify(options || {}) }),
+  getCrawlerStatus: () =>
+    request<CrawlerStatusResponse>("/api/admin/crawler/status"),
+  // System Logs
+  getLogs: (params?: { page?: number; limit?: number; level?: string; category?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.level && params.level !== "all") q.set("level", params.level);
+    if (params?.category && params.category !== "all") q.set("category", params.category);
+    if (params?.search) q.set("search", params.search);
+    return request<LogsResponse>(`/api/admin/logs?${q}`);
+  },
+  clearLogs: () =>
+    request<{ ok: boolean; message: string; deleted_count: number }>("/api/admin/logs/clear", { method: "DELETE" }),
 };
+
+export interface CrawlerHistoryItem {
+  company: string;
+  status: "SUCCESS" | "NO_JOBS" | "CAPTCHA_ABORTED" | "ERROR";
+  reason?: string;
+  jobs_found: number;
+  new_saved: number;
+}
+
+export interface CrawlerStatusResponse {
+  is_running: boolean;
+  current_company: string | null;
+  current_index: number;
+  total_companies: number;
+  percent: number;
+  status_message: string;
+  jobs_discovered: number;
+  jobs_saved: number;
+  captchas_encountered: number;
+  started_at: string | null;
+  finished_at: string | null;
+  history: CrawlerHistoryItem[];
+}
+
+export interface SystemLogRecord {
+  _id: string;
+  timestamp: string;
+  level: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+  category: "crawler" | "scraper" | "auth" | "matching" | "pipeline" | "system" | string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface LogsResponse {
+  items: SystemLogRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: {
+    total: number;
+    errors: number;
+    warnings: number;
+    crawler: number;
+  };
+}
 
 export interface AdminJobRecord {
   _id: string;

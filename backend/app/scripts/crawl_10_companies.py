@@ -17,7 +17,8 @@ if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
 from app.db.client import connect_db, get_db
-from app.sources.ai_crawler import AICareerCrawlerAgent
+from app.sources.ai_crawler import AICareerCrawlerAgent, CaptchaDetectedException
+from app.core.system_logger import log_system_event
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.deduplicator import JobDeduplicator
 from app.agents.job_matcher import JobMatcherAgent
@@ -227,6 +228,21 @@ async def main():
             })
 
             print(f"     ✅ Completed {comp_name}: {len(jobs)} found ({new_count} newly added to DB).")
+
+        except CaptchaDetectedException as ce:
+            print(f"     🚨 CAPTCHA DETECTED on {comp_name}: {ce.captcha_type}. Crawl aborted as requested.")
+            summary_report.append({
+                "company": comp_name,
+                "found": 0,
+                "new": 0,
+                "status": f"CAPTCHA: {ce.captcha_type[:15]}",
+            })
+            await log_system_event(
+                level="ERROR",
+                category="crawler",
+                message=f"Aborted crawl on {comp_name}: {ce.captcha_type} encountered.",
+                details={"company": comp_name, "url": ce.url, "captcha_type": ce.captcha_type, "aborted": True}
+            )
 
         except Exception as e:
             logger.error("Failed to crawl company", company=comp_name, error=str(e))

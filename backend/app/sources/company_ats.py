@@ -100,6 +100,72 @@ def is_delhi_ncr_or_remote_job(location: str, title: str = "", text_snippet: str
     return False
 
 
+NON_TECH_ROLE_REGEX = re.compile(
+    r"\b("
+    r"sales|business development|bd\b|account executive|account manager|telesales|field sales|"
+    r"collection manager|collections|credit manager|debt collection|"
+    r"hr\b|human resources|recruiter|recruitment|talent acquisition|talent discovery|hrbp|people partner|talent partner|"
+    r"marketing|field marketing|social media|seo\b|sem\b|content writer|brand manager|campaign manager|pr\b|public relations|"
+    r"warehouse|logistics|store manager|retail|store associate|delivery associate|ground operations|branch manager|"
+    r"finance|accountant|accounts payable|accounts receivable|taxation|auditor|audit\b|legal|compliance"
+    r")\b",
+    re.IGNORECASE,
+)
+
+TECH_ROLE_REGEX = re.compile(
+    r"\b("
+    r"software|developer|engineer|engineering|sde|sde-?\d|programmer|coder|"
+    r"full\s*stack|backend|frontend|front-end|back-end|web\s*developer|"
+    r"devops|sre\b|reliability|infrastructure|cloud|platform|database|dba\b|sysadmin|"
+    r"data\s*engineer|data\s*scientist|machine\s*learning|ml\b|ai\b|nlp|computer\s*vision|"
+    r"qa\b|sdet\b|test\s*engineer|automation\s*engineer|quality\s*assurance|"
+    r"architect|tech\s*lead|technical\s*lead|engineering\s*manager|cto\b"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def is_relevant_tech_job(title: str, target_query: str = "") -> bool:
+    """
+    Check if a job posting title is genuinely a technical / software role,
+    and matches the target technical query while filtering out sales, HR, marketing,
+    operations, and generic vague non-tech titles (e.g. 'Senior Associate', 'Manager').
+    """
+    title_clean = (title or "").strip().lower()
+    if not title_clean or len(title_clean) < 3:
+        return False
+
+    # 1. Reject non-tech titles (sales, HR, marketing, logistics, collections)
+    if NON_TECH_ROLE_REGEX.search(title_clean):
+        # Allow only if it is explicitly an engineering title like "Salesforce Developer" or "Marketing Tech Engineer"
+        if not any(k in title_clean for k in ["engineer", "developer", "sde", "architect"]):
+            return False
+        # Specific known non-tech patterns
+        if any(role in title_clean for role in [
+            "business partner", "collection manager", "team lead - paytm", "user growth",
+            "sales/ bd", "account executive", "recruiter", "talent acquisition", "field marketing"
+        ]):
+            return False
+
+    # 2. Must contain at least one positive technical indicator
+    has_tech_keyword = bool(TECH_ROLE_REGEX.search(title_clean))
+    if not has_tech_keyword:
+        return False
+
+    # 3. If target_query has specific technical words, check relevance
+    if target_query:
+        query_words = [
+            w.lower() for w in re.split(r"[^a-zA-Z0-9]+", target_query)
+            if len(w) > 2 and w.lower() not in ["senior", "junior", "lead", "staff", "principal", "intern", "the", "and", "for", "with"]
+        ]
+        if query_words:
+            has_word_match = any(qw in title_clean for qw in query_words)
+            if not (has_word_match or has_tech_keyword):
+                return False
+
+    return True
+
+
 def is_indian_job(company: str, location: str, text_snippet: str = "") -> bool:
     """Check if a job posting is in India or remote within India."""
     comp_lower = company.strip().lower()

@@ -18,7 +18,7 @@ if backend_root not in sys.path:
 
 from app.db.client import connect_db, get_db
 from app.sources.ai_crawler import AICareerCrawlerAgent, CaptchaDetectedException
-from app.sources.company_ats import is_delhi_ncr_or_remote_job
+from app.sources.company_ats import is_delhi_ncr_or_remote_job, is_relevant_tech_job
 from app.core.system_logger import log_system_event
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.deduplicator import JobDeduplicator
@@ -27,17 +27,42 @@ from app.pipeline.role_search import get_unique_user_selected_roles
 
 logger = structlog.get_logger()
 
-# 10 Curated Top Tech Companies
+# 10 Curated Top Delhi NCR & Remote India Tech Companies
 TARGET_COMPANIES = [
     {
-        "name": "MongoDB",
-        "url": "https://www.mongodb.com/careers",
+        "name": "Paytm",
+        "url": "https://jobs.lever.co/paytm",
         "default_query": "Software Engineer",
     },
     {
-        "name": "EXL Service",
-        "url": "https://www.exlservice.com/careers",
-        "default_query": "Lead Assistant Manager",
+        "name": "Delhivery",
+        "url": "https://www.delhivery.com/careers",
+        "default_query": "Engineer",
+    },
+    {
+        "name": "Lenskart",
+        "url": "https://hiring.lenskart.com/",
+        "default_query": "Engineer",
+    },
+    {
+        "name": "Pine Labs",
+        "url": "https://www.pinelabs.com/careers",
+        "default_query": "Engineer",
+    },
+    {
+        "name": "Publicis Sapient",
+        "url": "https://careers.publicissapient.com/job-search",
+        "default_query": "Software Engineer",
+    },
+    {
+        "name": "Cars24",
+        "url": "https://www.cars24.com/careers/",
+        "default_query": "Engineer",
+    },
+    {
+        "name": "Spinny",
+        "url": "https://www.spinny.com/careers/",
+        "default_query": "Engineer",
     },
     {
         "name": "BrowserStack",
@@ -45,28 +70,8 @@ TARGET_COMPANIES = [
         "default_query": "Software Engineer",
     },
     {
-        "name": "OpenAI",
-        "url": "https://openai.com/careers",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "Anthropic",
-        "url": "https://www.anthropic.com/careers",
-        "default_query": "Engineer",
-    },
-    {
-        "name": "Stripe",
-        "url": "https://stripe.com/jobs",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "Cloudflare",
-        "url": "https://www.cloudflare.com/careers",
-        "default_query": "Systems Engineer",
-    },
-    {
-        "name": "Datadog",
-        "url": "https://www.datadoghq.com/careers",
+        "name": "MongoDB",
+        "url": "https://www.mongodb.com/careers",
         "default_query": "Software Engineer",
     },
     {
@@ -74,16 +79,15 @@ TARGET_COMPANIES = [
         "url": "https://www.uber.com/in/en/careers/",
         "default_query": "Software Engineer",
     },
-    {
-        "name": "Atlassian",
-        "url": "https://www.atlassian.com/company/careers",
-        "default_query": "Software Engineer",
-    },
 ]
 
 
 async def save_and_match_job(raw_job, db, users, matcher):
     """Normalize, persist to db.jobs with source='career-crawled', and compute matches."""
+    if not is_relevant_tech_job(raw_job.title):
+        logger.info("Skipping non-relevant non-tech job", company=raw_job.company, title=raw_job.title)
+        return False, {}
+
     if not is_delhi_ncr_or_remote_job(raw_job.location, raw_job.title, raw_job.description or ""):
         logger.info("Skipping non-Delhi-NCR non-Remote job", company=raw_job.company, title=raw_job.title, location=raw_job.location)
         return False, {}

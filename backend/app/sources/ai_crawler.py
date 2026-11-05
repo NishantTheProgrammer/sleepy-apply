@@ -15,7 +15,7 @@ except ImportError:
     BrowserContext = Any  # type: ignore
 
 from app.sources.base import RawJobData
-from app.sources.company_ats import standardize_india_location, is_delhi_ncr_job, is_delhi_ncr_or_remote_job
+from app.sources.company_ats import standardize_india_location, is_delhi_ncr_job, is_delhi_ncr_or_remote_job, is_relevant_tech_job
 from app.core.system_logger import log_system_event
 
 logger = structlog.get_logger()
@@ -352,6 +352,10 @@ class AICareerCrawlerAgent:
             if not title or len(title) < 3 or url in seen:
                 continue
 
+            # Check technical relevance: reject sales, HR, marketing, warehouse, non-tech roles
+            if not is_relevant_tech_job(title, target_query):
+                continue
+
             # When delhi_ncr_only is set, filter out any location that is definitely not Delhi NCR or Remote
             if delhi_ncr_only and loc:
                 if not is_delhi_ncr_or_remote_job(loc, title, item.get("snippet", "")):
@@ -412,6 +416,8 @@ class AICareerCrawlerAgent:
             url = r.get("url")
             if url and url not in seen:
                 seen.add(url)
+                if not is_relevant_tech_job(r["title"], target_query):
+                    continue
                 jobs.append(
                     RawJobData(
                         title=r["title"],
@@ -665,16 +671,10 @@ class AICareerCrawlerAgent:
                 if job_count >= 1:
                     print(f"💡 Found {job_count} visible job listings on page; evaluating extraction...")
                     jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
-                    # Check if extracted jobs match target_query
-                    matching = [j for j in jobs if any(w.lower() in j.title.lower() for w in target_query.split())]
+                    matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
                     if matching:
-                        print(f"🎉 Successfully extracted {len(matching)} matching jobs!")
+                        print(f"🎉 Successfully extracted {len(matching)} matching tech jobs!")
                         collected_jobs.extend(matching)
-                        break
-                    elif jobs and len(jobs) >= 3:
-                        print(f"📋 Extracted {len(jobs)} jobs from current page.")
-                        collected_jobs.extend(jobs)
-                        # If we already have what we need, finish
                         if len(collected_jobs) >= limit:
                             break
 
@@ -737,8 +737,9 @@ Return ONLY a valid JSON object matching this schema:
 
                 elif action == "extract":
                     jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
-                    print(f"✅ Extracted {len(jobs)} jobs on AI demand.")
-                    collected_jobs.extend(jobs)
+                    matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
+                    print(f"✅ Extracted {len(matching)} relevant tech jobs on AI demand.")
+                    collected_jobs.extend(matching)
                     break
 
                 elif action == "click":

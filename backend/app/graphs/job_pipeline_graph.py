@@ -9,6 +9,7 @@ from app.agents.job_enrichment import JobEnrichmentAgent
 from app.agents.job_matcher import JobMatcherAgent
 from app.agents.discord_bot import DiscordAgent
 from app.models.settings import UserSettings
+from app.pipeline.role_search import get_unique_user_selected_roles
 
 logger = structlog.get_logger()
 
@@ -26,37 +27,21 @@ class JobPipelineState(TypedDict, total=False):
 async def fetch_jobs_node(state: JobPipelineState) -> JobPipelineState:
     agent = JobFetcherAgent()
     try:
-        user_keywords: list[str] = []
+        db = get_db()
+        # Retrieve unique roles selected by the user (or all active users if user_id is None)
+        user_roles = await get_unique_user_selected_roles(db, user_id=state.get("user_id"))
+
         if state.get("custom_keywords"):
             raw_ck = state["custom_keywords"]
             if isinstance(raw_ck, str):
                 raw_ck = [raw_ck]
-            user_keywords.extend(raw_ck)
-
-        if state.get("user_id"):
-            db = get_db()
-            profile = await db.profiles.find_one({"user_id": ObjectId(state["user_id"])})
-            if profile:
-                target_role = profile.get("target_role")
-                if target_role and target_role not in user_keywords:
-                    user_keywords.append(target_role)
-
-                titles = (
-                    profile.get("job_preferences", {}).get("jobTitles")
-                    or profile.get("jobPreferences", {}).get("jobTitles")
-                    or []
-                )
-                for t in titles:
-                    if t and t not in user_keywords:
-                        user_keywords.append(t)
-
-                for sr in profile.get("suggested_roles", []):
-                    if sr and sr not in user_keywords:
-                        user_keywords.append(sr)
+            for k in raw_ck:
+                if k and k not in user_roles:
+                    user_roles.append(k)
 
         new_jobs = await agent.fetch_and_store_jobs(
             custom_urls=state.get("custom_urls"),
-            keywords=user_keywords if user_keywords else None,
+            keywords=user_roles if user_roles else None,
         )
         return {"discovered_jobs": new_jobs}
     except Exception as e:

@@ -10,7 +10,7 @@ from app.sources.playwright_crawler import PlaywrightJobCrawler
 from app.sources.base import RawJobData
 from app.pipeline.deduplicator import JobDeduplicator
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
-from app.pipeline.role_search import expand_role_to_search_keywords
+from app.pipeline.role_search import get_unique_user_selected_roles, format_roles_for_search_query
 
 logger = structlog.get_logger()
 
@@ -37,49 +37,17 @@ class JobFetcherAgent:
         all_raw_jobs: list[RawJobData] = []
         source_clean = (source or "all").lower().strip()
 
-        # Resolve role keywords: prioritize passed user keywords; fallback to all active users' selected roles in DB
-        active_roles: list[str] = []
+        # Resolve unique roles selected by users from db.profiles
         if keywords:
-            if isinstance(keywords, str):
-                keywords = [keywords]
-            active_roles = list(keywords)
+            user_roles = [keywords] if isinstance(keywords, str) else list(keywords)
         else:
-            try:
-                cursor = db.profiles.find(
-                    {
-                        "$or": [
-                            {"target_role": {"$exists": True, "$nin": [None, ""]}},
-                            {"job_preferences.jobTitles": {"$exists": True, "$nin": [None, []]}},
-                            {"jobPreferences.jobTitles": {"$exists": True, "$nin": [None, []]}},
-                            {"suggested_roles": {"$exists": True, "$nin": [None, []]}},
-                        ]
-                    },
-                    {
-                        "target_role": 1,
-                        "job_preferences.jobTitles": 1,
-                        "jobPreferences.jobTitles": 1,
-                        "suggested_roles": 1,
-                    },
-                )
-                async for p in cursor:
-                    tr = p.get("target_role")
-                    if tr and isinstance(tr, str) and tr.strip():
-                        active_roles.append(tr.strip())
-                    for t in (p.get("job_preferences", {}).get("jobTitles") or []):
-                        if t and isinstance(t, str) and t.strip():
-                            active_roles.append(t.strip())
-                    for t in (p.get("jobPreferences", {}).get("jobTitles") or []):
-                        if t and isinstance(t, str) and t.strip():
-                            active_roles.append(t.strip())
-                    for t in (p.get("suggested_roles") or []):
-                        if t and isinstance(t, str) and t.strip():
-                            active_roles.append(t.strip())
-            except Exception as e:
-                logger.warning("Could not query active user roles for job discovery", error=str(e))
+            user_roles = await get_unique_user_selected_roles(db)
 
-        resolved_keywords = expand_role_to_search_keywords(active_roles) if active_roles else None
+        resolved_keywords = format_roles_for_search_query(user_roles) if user_roles else None
         if resolved_keywords:
-            logger.info("Targeting user-selected roles for job fetching", keywords=resolved_keywords[:8], count=len(resolved_keywords))
+            logger.info("Targeting user-selected roles for job fetching", count=len(resolved_keywords), sample=resolved_keywords[:6])
+        else:
+            logger.info("No user-selected roles found in profiles; skipping role-based crawl")
 
         if custom_urls:
             try:

@@ -6,7 +6,8 @@ import httpx
 import html2text
 import structlog
 from app.sources.base import BaseJobSource, RawJobData
-from app.pipeline.role_search import expand_role_to_search_keywords
+from app.pipeline.role_search import format_roles_for_search_query, get_unique_user_selected_roles
+from app.db.client import get_db
 
 logger = structlog.get_logger()
 
@@ -80,22 +81,20 @@ class LinkedInJobSource(BaseJobSource):
         """Fetch fresh live tech jobs from LinkedIn guest API, applying strict recency filters and extracting posting dates."""
         config = config or {}
         raw_keywords = config.get("keywords")
-        if raw_keywords:
-            if isinstance(raw_keywords, str):
-                raw_keywords = [raw_keywords]
-            keywords_list = expand_role_to_search_keywords(raw_keywords)
-        else:
-            keywords_list = [
-                "software engineer",
-                "full stack developer",
-                "backend engineer",
-                "frontend engineer",
-                "python developer",
-                "quality engineer",
-                "sdet",
-                "cloud engineer",
-                "devops engineer",
-            ]
+        if not raw_keywords:
+            try:
+                db = get_db()
+                raw_keywords = await get_unique_user_selected_roles(db)
+            except Exception:
+                raw_keywords = []
+
+        if isinstance(raw_keywords, str):
+            raw_keywords = [raw_keywords]
+
+        keywords_list = format_roles_for_search_query(raw_keywords)
+        if not keywords_list:
+            logger.info("No user-selected roles available for LinkedIn search; skipping.")
+            return []
 
         delhi_ncr_only = config.get("delhi_ncr_only", False)
         if delhi_ncr_only:

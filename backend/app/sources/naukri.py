@@ -6,6 +6,8 @@ import httpx
 import html2text
 import structlog
 from app.sources.base import BaseJobSource, RawJobData
+from app.pipeline.role_search import get_unique_user_selected_roles
+from app.db.client import get_db
 
 logger = structlog.get_logger()
 
@@ -22,13 +24,6 @@ COMMON_TECH_SKILLS = [
     "TailwindCSS", "Elasticsearch", "CI/CD", "Git", "SQL"
 ]
 
-TECH_KEYWORDS = [
-    "sdet", "qa-engineer", "quality-engineer", "test-engineer", "test-automation", "automation-engineer",
-    "software-engineer", "software-developer", "backend", "frontend", "full-stack", "fullstack",
-    "python", "java", "react", "node", "golang", "devops", "cloud", "data-engineer",
-    "machine-learning", "ai-engineer", "sre", "platform-engineer", "systems-engineer",
-    "developer", "architect"
-]
 
 ROLE_TERMS = [
     "software development engineer in test", "sdet", "quality engineer", "test automation engineer",
@@ -220,6 +215,13 @@ class NaukriJobSource(BaseJobSource):
         
         # Support both 'keywords' (list) and legacy 'keyword' (singular)
         raw_keywords = config.get("keywords") or ([config["keyword"]] if config.get("keyword") else [])
+        if not raw_keywords:
+            try:
+                db = get_db()
+                raw_keywords = await get_unique_user_selected_roles(db)
+            except Exception:
+                raw_keywords = []
+
         if isinstance(raw_keywords, str):
             raw_keywords = [raw_keywords]
 
@@ -235,6 +237,10 @@ class NaukriJobSource(BaseJobSource):
             meaningful_words = [w for w in clean.split() if w not in ["the", "and", "for", "with"]]
             if len(meaningful_words) >= 2:
                 target_slug_tokens.add("-".join(meaningful_words))
+
+        if not target_slug_tokens:
+            logger.info("No user-selected roles available for Naukri search; skipping.")
+            return []
 
         delhi_ncr_only = config.get("delhi_ncr_only", False)
 
@@ -287,12 +293,8 @@ class NaukriJobSource(BaseJobSource):
                                 pass
 
                         u_lower = u.lower()
-                        if target_slug_tokens:
-                            if not any(token in u_lower for token in target_slug_tokens):
-                                continue
-                        else:
-                            if not any(k in u_lower for k in TECH_KEYWORDS):
-                                continue
+                        if not any(token in u_lower for token in target_slug_tokens):
+                            continue
 
                         if delhi_ncr_only and not any(nc in u_lower for nc in DELHI_NCR_CITIES):
                             continue

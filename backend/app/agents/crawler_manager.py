@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import re
 from datetime import datetime, timezone
 from typing import Any
 import structlog
@@ -148,7 +149,12 @@ class CrawlerManager:
             for idx, target in enumerate(targets, 1):
                 comp_name = target["name"]
                 career_url = target["url"]
-                query_role = primary_query or target.get("default_query", "Software Engineer")
+                # Sanitize query: strip parenthetical qualifications like "(Node.js & React)" so ATS search bars don't fail
+                if primary_query:
+                    clean_role = re.sub(r'\(.*?\)', '', primary_query).strip()
+                    query_role = clean_role if clean_role else "Software Engineer"
+                else:
+                    query_role = target.get("default_query", "Software Engineer")
 
                 percent = int(((idx - 1) / len(targets)) * 100)
                 self.state["current_company"] = comp_name

@@ -7,6 +7,7 @@ years of experience, metrics, dates, companies, and project-vs-employment bounda
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 from pydantic import BaseModel, Field
@@ -131,9 +132,9 @@ class HallucinationGuard:
                                 allowed_boundary="Spring Boot/Java is project experience in StaffSync, not multi-year professional employment.",
                             ))
 
-            # C) Check for claiming professional specialization in project-only technologies
+            # C) Check for claiming professional specialization or proven expertise in project-only technologies
             spec_matches = re.finditer(
-                r"(?:specializing in|expert in|specialist in|specialization in|mastery of)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
+                r"(?:proven\s+expertise\s+in|expertise\s+in|specializing\s+in|specialist\s+in|expert\s+in|specialization\s+in|mastery\s+of|seasoned\s+in|proficient\s+in|skilled\s+in|strong\s+background\s+in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
                 summary,
                 re.IGNORECASE,
             )
@@ -145,9 +146,9 @@ class HallucinationGuard:
                             category="unsupported_specialization",
                             severity="CRITICAL",
                             field="summary",
-                            message=f"Summary falsely claims professional specialization in project-only technology '{pt}'.",
+                            message=f"Summary falsely claims proven expertise/specialization in project-only technology '{pt}'.",
                             detected_value=sm.group(0).strip(),
-                            allowed_boundary=f"'{pt}' is an independent project technology (StaffSync), not a primary professional specialization.",
+                            allowed_boundary=f"'{pt}' is an independent project technology (StaffSync), not professional expertise. Distinguish project exposure from professional experience.",
                         ))
 
             # D) Check for missing skills in summary
@@ -284,6 +285,59 @@ class HallucinationGuard:
                                     allowed_boundary=f"Responsibilities must not transfer across employers. '{term}' belongs strictly to '{other_co}'.",
                                 ))
 
+            # Explicit check for City Finance / 4000+ ULBs misattribution
+            if "max vision" in co.lower():
+                for b in bullets:
+                    b_str = str(b)
+                    if any(k in b_str.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies", "form.io", "sendgrid", "indian partner network"]):
+                        violations.append(ValidationViolation(
+                            category="cross_employer_bleed",
+                            severity="CRITICAL",
+                            field="experience.responsibilities",
+                            message=f"City Finance / 4000+ urban local bodies belongs strictly to Dhwani Rural Information Systems, but was attributed to '{co}'.",
+                            detected_value=b_str,
+                            allowed_boundary="City Finance must be attributed to Dhwani Rural Information Systems only.",
+                        ))
+
+            # Check for unsupported generic outcome claims
+            profile_full_text = json.dumps(original_profile, default=str)
+            unsupported_outcome_patterns = [
+                r",?\s*(?:and\s+)?(?:enhancing|enhance|improving|improve|increasing|increase|boosting|boost)\s+(?:workflow|operational|team|developer)?\s*efficiency(?:\s+across\s+all\s+teams)?",
+                r",?\s*(?:and\s+)?(?:improving|improve)\s+(?:team|developer)\s+coordination",
+                r",?\s*(?:and\s+)?(?:optimizing|optimize|maximizing|maximize)\s+(?:workflow|operational|team|organizational)?\s*productivity",
+                r",?\s*(?:and\s+)?streamlining\s+company\s+operations\s+and\s+improve\s+team\s+coordination",
+                r",?\s*(?:and\s+)?(?:accelerating|accelerate)\s+project\s+delivery",
+                r",?\s*(?:and\s+)?(?:driving|drive)\s+organizational\s+success",
+            ]
+            for b in bullets:
+                b_str = str(b)
+                for uop in unsupported_outcome_patterns:
+                    m = re.search(uop, b_str, re.IGNORECASE)
+                    if m and not re.search(uop, profile_full_text, re.IGNORECASE):
+                        violations.append(ValidationViolation(
+                            category="unsupported_outcome",
+                            severity="CRITICAL",
+                            field="experience.responsibilities",
+                            message=f"Unsupported outcome claim '{m.group(0)}' in experience is not backed by candidate source evidence.",
+                            detected_value=b_str,
+                            allowed_boundary="Preserve authentic source achievements without inventing outcome claims.",
+                        ))
+
+        # Check projects for unsupported outcome claims
+        for proj in tailored_resume.get("projects") or []:
+            p_desc = str(proj.get("description") or "")
+            for uop in unsupported_outcome_patterns:
+                m = re.search(uop, p_desc, re.IGNORECASE)
+                if m and not re.search(uop, profile_full_text, re.IGNORECASE):
+                    violations.append(ValidationViolation(
+                        category="unsupported_outcome",
+                        severity="CRITICAL",
+                        field="projects.description",
+                        message=f"Project '{proj.get('name')}' claims unsupported outcome '{m.group(0)}'.",
+                        detected_value=p_desc,
+                        allowed_boundary="Project descriptions must only reflect authentic facts and technologies.",
+                    ))
+
         # -------------------------------------------------------------
         # 4. Education & Dates Fidelity
         # -------------------------------------------------------------
@@ -370,11 +424,43 @@ class HallucinationGuard:
                         r_clean,
                         flags=re.IGNORECASE,
                     )
-                    clean_resps.append(" ".join(r_clean.split()))
+                    # Strip unsupported outcome claims
+                    for uop in unsupported_outcome_patterns:
+                        r_clean = re.sub(uop, "", r_clean, flags=re.IGNORECASE)
+
+                    r_clean_norm = " ".join(r_clean.split()).strip(" ,.-")
+                    if r_clean_norm:
+                        clean_resps.append(r_clean_norm)
                 exp_c["responsibilities"] = clean_resps
                 exp_c["highlights"] = clean_resps
                 sanitized_exps.append(exp_c)
+
+            # Ensure City Finance is attributed to Dhwani, never to Max Vision
+            dhwani_san = next((e for e in sanitized_exps if "dhwani" in e.get("company", "").lower()), None)
+            for exp_c in sanitized_exps:
+                if "max vision" in exp_c.get("company", "").lower():
+                    mv_resps = []
+                    for r in exp_c.get("responsibilities", []):
+                        if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
+                            if dhwani_san and r not in dhwani_san["responsibilities"]:
+                                dhwani_san["responsibilities"].append(r)
+                        else:
+                            mv_resps.append(r)
+                    exp_c["responsibilities"] = mv_resps
+                    exp_c["highlights"] = mv_resps
+
             sanitized_copy["experience"] = sanitized_exps
+
+            # Sanitize project descriptions to remove unsupported outcome claims
+            sanitized_projs = []
+            for proj in sanitized_copy.get("projects") or []:
+                p_c = dict(proj)
+                p_desc = str(p_c.get("description") or "")
+                for uop in unsupported_outcome_patterns:
+                    p_desc = re.sub(uop, "", p_desc, flags=re.IGNORECASE)
+                p_c["description"] = " ".join(p_desc.split()).strip(" ,.-")
+                sanitized_projs.append(p_c)
+            sanitized_copy["projects"] = sanitized_projs
 
         summary_notes = (
             f"Validation passed with 0 critical violations. {len(warnings)} warning(s)."

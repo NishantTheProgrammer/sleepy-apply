@@ -617,3 +617,132 @@ def test_achievements_normalization_and_url_preservation():
     assert "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving" in lc_entry["title"]
     assert "https://leetcode.com/NishantTheProgrammer" in lc_entry["title"]
 
+
+def test_mentoring_retrieval_across_all_fields(candidate_profile, pocketpills_jd):
+    """Mentoring must be classified as MATCHED regardless of whether it appears in responsibilities, description, or summary."""
+    mapper = EvidenceMapper()
+
+    # Case A: Explicit responsibilities (standard profile)
+    res_a = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    m_a = next((m for m in res_a.mappings if "mentor" in m.requirement.lower()), None)
+    assert m_a is not None
+    assert m_a.status == "MATCHED"
+
+    # Case B: Mentoring text placed inside role description
+    profile_b = copy.deepcopy(candidate_profile)
+    profile_b["experience"][0]["responsibilities"] = ["Developing REST APIs and integrations."]
+    profile_b["experience"][0]["description"] = "SDE-2 Full Stack, mentored junior developers and conducted technical interviews."
+    res_b = mapper.map_evidence(profile_b, pocketpills_jd)
+    m_b = next((m for m in res_b.mappings if "mentor" in m.requirement.lower()), None)
+    assert m_b is not None
+    assert m_b.status == "MATCHED"
+
+    # Case C: Passed as an explicit required_skill "Mentoring" in JD
+    jd_c = copy.deepcopy(pocketpills_jd)
+    jd_c["required_skills"] = ["Java", "Mentoring"]
+    res_c = mapper.map_evidence(candidate_profile, jd_c)
+    m_c = next((m for m in res_c.mappings if m.requirement == "Mentoring"), None)
+    assert m_c is not None
+    assert m_c.status == "MATCHED"
+
+
+def test_proven_expertise_java_fails_semantic_validation(candidate_profile, pocketpills_jd):
+    """Summary claiming proven expertise in project-only Java/Spring Boot must fail validation (is_valid=False)."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    invalid_resume = {
+        "target_headline": "Senior Backend Engineer | Java, SQL",
+        "tailored_summary": "Seasoned Full Stack Developer with 5+ years of experience. Proven expertise in Java, Spring Boot, and backend systems.",
+        "experience": candidate_profile["experience"],
+        "education": candidate_profile["education"],
+    }
+
+    val_res = guard.validate_and_sanitize(invalid_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "unsupported_specialization" in categories
+
+    # Verify sanitization corrects it to project exposure
+    sanitized_summary = val_res.sanitized_content["summary"]
+    assert "proven expertise in java" not in sanitized_summary.lower()
+    assert "hands-on project experience in spring boot" in sanitized_summary.lower()
+
+
+def test_city_finance_attribution_to_max_vision_fails_validation(candidate_profile, pocketpills_jd):
+    """Attributing City Finance to Max Vision must fail semantic validation with is_valid=False and be corrected."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    misattributed_resume = {
+        "target_headline": "Senior Backend Engineer | Node.js, SQL",
+        "tailored_summary": "Full Stack Developer with 5 years experience.",
+        "experience": [
+            {
+                "company": "Dhwani Rural Information Systems",
+                "responsibilities": [
+                    "Enhanced platform performance through query optimization and materialized views.",
+                ],
+            },
+            {
+                "company": "Max Vision Solutions Pvt. Ltd.",
+                "responsibilities": [
+                    "City Finance: Implemented a bulk upload service handling data for 4000+ urban local bodies and their finance.",
+                ],
+            },
+        ],
+        "education": candidate_profile["education"],
+    }
+
+    val_res = guard.validate_and_sanitize(misattributed_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "cross_employer_bleed" in categories
+
+    # In sanitized output, City Finance must NOT remain under Max Vision
+    sanitized_mv = next((e for e in val_res.sanitized_content["experience"] if "max vision" in e["company"].lower()), None)
+    assert sanitized_mv is not None
+    assert not any("4000+" in r or "city finance" in r.lower() for r in sanitized_mv["responsibilities"])
+
+
+def test_unsupported_outcome_claims_fail_validation(candidate_profile, pocketpills_jd):
+    """Invented fluff such as 'enhancing workflow efficiency' must fail validation (is_valid=False) and be removed."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    fluff_resume = {
+        "target_headline": "Senior Backend Engineer | Node.js, SQL",
+        "tailored_summary": "Full Stack Developer with 5 years experience.",
+        "experience": [
+            {
+                "company": "Dhwani Rural Information Systems",
+                "responsibilities": [
+                    "Enhanced platform performance through query optimization, enhancing workflow efficiency across all teams.",
+                ],
+            }
+        ],
+        "projects": [
+            {
+                "name": "StaffSync",
+                "description": "Role-based workforce management system designed to streamline company operations and enhance workflow efficiency.",
+                "technologies": ["Spring Boot"],
+            }
+        ],
+        "education": candidate_profile["education"],
+    }
+
+    val_res = guard.validate_and_sanitize(fluff_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "unsupported_outcome" in categories
+
+    # In sanitized output, "enhancing workflow efficiency" must be removed
+    sanitized_bullet = val_res.sanitized_content["experience"][0]["responsibilities"][0]
+    assert "enhancing workflow efficiency" not in sanitized_bullet.lower()
+    sanitized_proj = val_res.sanitized_content["projects"][0]["description"]
+    assert "enhance workflow efficiency" not in sanitized_proj.lower()
+
+

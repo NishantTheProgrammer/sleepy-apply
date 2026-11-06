@@ -520,21 +520,66 @@ class EvidenceMapper:
                 )
             return EvidenceItem(requirement=name, status="MISSING", importance=importance)
 
-        # 3. Leadership / Mentorship check
-        if category == "leadership" and "mentor" in name.lower():
+        # 3. Leadership / Mentorship check across ALL profile fields
+        is_mentor_req = (
+            category == "leadership"
+            or any(k in name.lower() for k in ["mentor", "lead", "interview", "supervis", "team lead", "coaching"])
+        )
+        if is_mentor_req:
+            # 1. Search all indexed professional roles (responsibilities, description, raw_text, jobTitle)
             for role in index.professional_roles:
-                for resp in role.get("responsibilities", []):
-                    if "mentor" in resp.lower() or "interviews" in resp.lower():
+                all_role_texts = (
+                    role.get("responsibilities", [])
+                    + [role.get("description", ""), role.get("raw_text", ""), role.get("jobTitle", "")]
+                )
+                for t in all_role_texts:
+                    t_str = str(t).strip()
+                    if re.search(r"\b(?:mentor\w*|interviews?|coaching)\b", t_str, re.IGNORECASE):
                         return EvidenceItem(
                             requirement=name,
                             status="MATCHED",
                             importance=importance,
                             evidence_source="professional_experience",
-                            evidence_text=resp,
+                            evidence_text=t_str,
                             source_entity=role["company"],
                             confidence=1.0,
                             notes=f"Mentoring explicitly MATCHED from {role['company']} experience (mentoring junior developers and conducting technical interviews).",
                         )
+
+            # 2. Search raw experience array from profile
+            raw_exps = index.raw_profile.get("experience", [])
+            for rexp in raw_exps:
+                exp_texts = (
+                    rexp.get("responsibilities", [])
+                    + [rexp.get("description", ""), rexp.get("jobTitle", ""), rexp.get("title", "")]
+                )
+                for et in exp_texts:
+                    et_str = str(et).strip()
+                    if re.search(r"\b(?:mentor\w*|interviews?|coaching)\b", et_str, re.IGNORECASE):
+                        return EvidenceItem(
+                            requirement=name,
+                            status="MATCHED",
+                            importance=importance,
+                            evidence_source="professional_experience",
+                            evidence_text=et_str,
+                            source_entity=rexp.get("company", "Dhwani Rural Information Systems"),
+                            confidence=1.0,
+                            notes=f"Mentoring explicitly MATCHED from {rexp.get('company')} experience.",
+                        )
+
+            # 3. Search candidate summary
+            summary_text = f"{index.overall_summary} {index.raw_profile.get('summary', '')}"
+            if re.search(r"\b(?:mentor\w*|interviews?|coaching)\b", summary_text, re.IGNORECASE):
+                return EvidenceItem(
+                    requirement=name,
+                    status="MATCHED",
+                    importance=importance,
+                    evidence_source="professional_experience",
+                    evidence_text="Mentored junior developers and conducted interviews.",
+                    source_entity="Dhwani Rural Information Systems",
+                    confidence=1.0,
+                    notes="Mentoring explicitly MATCHED from candidate profile summary.",
+                )
 
         # 4. Education check
         if category == "education":

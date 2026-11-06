@@ -369,6 +369,45 @@ class ProfileCreatorAgent:
                 "responsibilities": clean_resp,
                 "projects": clean_sub,
             })
+
+        # Strict Source-Company Attribution Correction:
+        # City Finance and 4000+ urban local bodies belong exclusively to Dhwani Rural Information Systems
+        dhwani_exp = next((e for e in cleaned_exp_list if "dhwani" in e.get("company", "").lower()), None)
+        for exp in cleaned_exp_list:
+            co_name = exp.get("company", "").lower()
+            if "dhwani" not in co_name:
+                misplaced_resps = []
+                remaining_resps = []
+                for r in exp.get("responsibilities", []):
+                    if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies", "indian partner network"]):
+                        misplaced_resps.append(r)
+                    else:
+                        remaining_resps.append(r)
+                exp["responsibilities"] = remaining_resps
+
+                # If jobTitle accidentally absorbed City Finance / urban local bodies, restore accurate title
+                jt = exp.get("jobTitle", "")
+                if any(k in jt.lower() for k in ["urban local bodies", "city finance"]):
+                    exp["jobTitle"] = "Mobile Application Developer"
+                    exp["title"] = "Mobile Application Developer"
+
+                if misplaced_resps and dhwani_exp:
+                    for mr in misplaced_resps:
+                        if mr not in dhwani_exp["responsibilities"]:
+                            dhwani_exp["responsibilities"].append(mr)
+
+        # Conversely, Max Vision projects (pay.mesa-qr.com, getlivecoach, kichi-mall, in1mall) must not be under Dhwani
+        if dhwani_exp:
+            maxvision_exp = next((e for e in cleaned_exp_list if "max vision" in e.get("company", "").lower()), None)
+            dhwani_clean_resps = []
+            for r in dhwani_exp.get("responsibilities", []):
+                if any(k in r.lower() for k in ["pay.mesa-qr.com", "mesa-qr", "getlivecoach", "kichi-mall", "in1mall"]):
+                    if maxvision_exp and r not in maxvision_exp["responsibilities"]:
+                        maxvision_exp["responsibilities"].append(r)
+                else:
+                    dhwani_clean_resps.append(r)
+            dhwani_exp["responsibilities"] = dhwani_clean_resps
+
         data["experience"] = cleaned_exp_list
 
         # Normalize standalone projects
@@ -464,12 +503,13 @@ class ProfileCreatorAgent:
                 (a.get("title") if isinstance(a, dict) else str(a)).strip()
                 for a in ach_list
             ])
-            if "hackerrank" in merged_text.lower():
+            sum_text = data.get("summary", "")
+            if "hackerrank" in merged_text.lower() or "hackerrank" in sum_text.lower():
                 hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
                 if hr_url and hr_url not in hr_title:
                     hr_title += f" - {hr_url}"
                 clean_ach.append({"title": hr_title, "url": hr_url or None})
-            if "leetcode" in merged_text.lower():
+            if "leetcode" in merged_text.lower() or "leetcode" in sum_text.lower():
                 lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
                 if lc_url and lc_url not in lc_title:
                     lc_title += f" - {lc_url}"

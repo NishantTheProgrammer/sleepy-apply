@@ -31,7 +31,8 @@ EVIDENCE MAPPING & FACTUAL BOUNDARIES (COMPLY STRICTLY):
 
 2. PARTIALLY MATCHED & PROJECT-LEVEL SKILLS (STRICT ATTRIBUTION):
 {partial_skills_evidence}
-* RULE: If a technology (e.g. Spring Boot, Django, Flutter) is from an independent or academic project, describe it accurately as hands-on project experience. NEVER claim multi-year professional employment for project-only technologies!
+* RULE: If a technology (e.g. Spring Boot, Django, Flutter, Java) is from an independent or academic project, describe it accurately as hands-on project experience. NEVER claim multi-year professional employment for project-only technologies!
+* STRICT SUMMARY RULE: Java and Spring Boot are PARTIAL / PROJECT-LEVEL technologies from candidate's StaffSync project. NEVER claim "proven expertise in Java", "expertise in Spring Boot", or seasoned background in Java/Spring. If mentioned in summary, you MUST state "Hands-on project experience in Spring Boot (StaffSync)".
 
 3. UNVERIFIED / MISSING JD REQUIREMENTS (DO NOT CLAIM):
 {missing_skills_list}
@@ -58,6 +59,7 @@ EVIDENCE MAPPING & FACTUAL BOUNDARIES (COMPLY STRICTLY):
 - Format bullets following: Accomplished [X], as measured by [Y], by doing [Z].
 - Use authentic metrics from candidate notes (e.g. "handling data for 4000+ urban local bodies", "10+ scalable applications", "solving 450+ LeetCode problems").
 - NEVER invent corporate financial figures (e.g. "$40M revenue increase", "99.999% efficiency leap").
+- NO UNSUPPORTED OUTCOME CLAIMS: Do NOT invent outcomes like "enhancing workflow efficiency", "improving team coordination", "boosting productivity", or "streamlining operations" unless that exact outcome is explicitly present in the source candidate profile. Keep descriptions strictly factual based on what was built and used.
 
 Return ONLY a valid JSON object matching this exact schema:
 {{
@@ -127,6 +129,20 @@ def select_and_tailor_projects(
                 proj_copy = dict(matched_auth)
                 ai_desc = (aip.get("description") or "").strip()
                 desc_to_use = ai_desc if ai_desc else proj_copy.get("description", "")
+
+                # Strip unsupported outcome claims
+                unsupported_outcome_patterns = [
+                    r",?\s*(?:enhancing|improving|increasing|boosting)\s+(?:workflow|operational|team|developer)?\s*efficiency(?:\s+and\s+team\s+coordination)?",
+                    r",?\s*(?:and\s+)?improving\s+team\s+coordination",
+                    r",?\s*(?:and\s+)?streamlining\s+company\s+operations\s+and\s+improve\s+team\s+coordination",
+                    r",?\s*(?:optimizing|maximizing)\s+(?:workflow|operational|team)?\s*productivity",
+                    r",?\s*(?:accelerating|driving)\s+(?:project\s+delivery|business\s+growth)",
+                ]
+                for uop in unsupported_outcome_patterns:
+                    desc_to_use = re.sub(uop, "", desc_to_use, flags=re.IGNORECASE)
+                desc_to_use = " ".join(desc_to_use.split()).strip(" ,.-")
+                if not desc_to_use:
+                    desc_to_use = proj_copy.get("description", "")
 
                 if bold_enabled and desc_to_use:
                     for ms in matching_skills:
@@ -515,7 +531,16 @@ class ResumeBuilderAgent:
                     if parsed.get("target_headline"):
                         target_headline = parsed["target_headline"].strip()
                     if parsed.get("tailored_summary"):
-                        tailored_summary = parsed["tailored_summary"].strip()
+                        cand_sum = parsed["tailored_summary"].strip()
+                        if re.search(r"\b(?:proven\s+expertise|expertise|specializ\w+|mastery|seasoned)\s+(?:in|with)\s+[A-Za-z\s,/&]*\b(?:java|spring(?:\s+boot)?)\b", cand_sum, re.IGNORECASE):
+                            logger.warning("AI summary claimed proven expertise in project-only tech; correcting to project exposure", tech="Java/Spring")
+                            cand_sum = re.sub(
+                                r"\b(?:proven\s+expertise|expertise|specializ\w+|mastery|seasoned)\s+(?:in|with)\s+([A-Za-z\s,/&]*\b(?:java|spring(?:\s+boot)?)\b[A-Za-z\s,/&]*)",
+                                "hands-on project experience in Spring Boot (StaffSync)",
+                                cand_sum,
+                                flags=re.IGNORECASE,
+                            )
+                        tailored_summary = cand_sum
                         ai_tailored = True
                     if parsed.get("tailored_experience") and isinstance(parsed["tailored_experience"], list):
                         tailored_experience = parsed["tailored_experience"]

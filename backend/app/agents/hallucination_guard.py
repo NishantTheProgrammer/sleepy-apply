@@ -31,6 +31,7 @@ class ValidationResult(BaseModel):
     sanitized: bool = False
     sanitized_content: dict[str, Any] = Field(default_factory=dict)
     summary_notes: str = ""
+    initial_violations: list[ValidationViolation] = Field(default_factory=list)
 
 
 class HallucinationGuard:
@@ -46,21 +47,19 @@ class HallucinationGuard:
         "5", "10+", "450+", "4000+", "6th", "2020", "2021", "2022", "2023", "2024", "2025", "2026",
     }
 
-    def validate_and_sanitize(
+    def _run_checks(
         self,
         tailored_resume: dict[str, Any],
         original_profile: dict[str, Any],
         evidence_result: EvidenceMappingResult,
-    ) -> ValidationResult:
-        """Runs comprehensive deterministic & semantic checks against the candidate ground truth."""
+    ) -> tuple[list[ValidationViolation], list[ValidationViolation]]:
+        """Executes all deterministic and semantic checks against candidate ground truth."""
         violations: list[ValidationViolation] = []
         warnings: list[ValidationViolation] = []
 
         cand_index = evidence_result.candidate_index
         missing_skills_set = {s.lower() for s in evidence_result.skills_classification.missing_skills}
         all_known_tech_lower = {t.lower() for t in cand_index.all_known_technologies}
-
-        sanitized_copy = dict(tailored_resume)
 
         # -------------------------------------------------------------
         # 1. Target Headline Checks
@@ -78,16 +77,6 @@ class HallucinationGuard:
                         detected_value=headline,
                         allowed_boundary=f"Must only feature verified candidate technologies: {', '.join(sorted(cand_index.all_known_technologies))}",
                     ))
-
-            # Sanitize headline if it contains missing technologies
-            sanitized_headline = headline
-            for missing_tech in missing_skills_set:
-                pattern = re.compile(rf"\b{re.escape(missing_tech)}\b", re.IGNORECASE)
-                sanitized_headline = pattern.sub("", sanitized_headline)
-            # Clean up dangling delimiters like ' | ', ' & ', ', '
-            sanitized_headline = re.sub(r"[\s,&|]+$", "", sanitized_headline).strip()
-            sanitized_headline = re.sub(r"\|\s*\|", "|", sanitized_headline).strip()
-            sanitized_copy["target_headline"] = sanitized_headline
 
         # -------------------------------------------------------------
         # 2. Professional Summary Checks
@@ -430,181 +419,251 @@ class HallucinationGuard:
                     allowed_boundary="Preserve complete achievement record.",
                 ))
 
-        # -------------------------------------------------------------
-        # 6. Automated Remediation / Sanitization if Critical Violations
-        # -------------------------------------------------------------
+        return violations, warnings
+
+    def validate(
+        self,
+        tailored_resume: dict[str, Any],
+        original_profile: dict[str, Any],
+        evidence_result: EvidenceMappingResult,
+    ) -> ValidationResult:
+        """Runs comprehensive semantic and deterministic validation without sanitization."""
+        violations, warnings = self._run_checks(tailored_resume, original_profile, evidence_result)
         critical_violations = [v for v in violations if v.severity == "CRITICAL"]
         is_valid = len(critical_violations) == 0
-        sanitized = False
-
-        if not is_valid:
-            sanitized = True
-            # Sanitize summary if it had critical issues
-            clean_sum = summary
-            # Strip unverified missing technologies
-            for missing_tech in missing_skills_set:
-                if len(missing_tech) > 2:
-                    clean_sum = re.sub(rf"\b{re.escape(missing_tech)}\b", "", clean_sum, flags=re.IGNORECASE)
-            # Revert inflated years to authentic overall years
-            clean_sum = re.sub(r"\b(?:\d+)\+?\s*years?\b", f"{cand_index.overall_years:g} years", clean_sum, count=1, flags=re.IGNORECASE)
-            # Ensure Spring Boot is referenced cleanly without claiming 5+ years Java
-            if ("java" in clean_sum.lower() or "spring" in clean_sum.lower()) and cand_index.overall_years >= 5:
-                clean_sum = re.sub(
-                    r"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?Java(?:\s*,\s*(?:and\s*)?|\s+and\s+)?Spring Boot",
-                    "with hands-on project experience in Spring Boot",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-                clean_sum = re.sub(
-                    r"Proven expertise in Java, Spring Boot, and backend systems",
-                    "Proven expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in Spring Boot",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-            if "specializing in java" in clean_sum.lower() or "specializing in spring" in clean_sum.lower():
-                clean_sum = re.sub(
-                    r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
-                    "with hands-on project experience in Spring Boot (StaffSync).",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-            # Remove unsupported security expertise claims from summary
-            clean_sum = re.sub(
-                r",?\s*(?:with\s+a\s+focus\s+on\s+building\s+)?(?:robust\s+and\s+)?secure\s+applications?",
-                "",
-                clean_sum,
-                flags=re.IGNORECASE,
-            )
-            clean_sum = re.sub(
-                r",?\s*(?:proven\s+)?security\s+expert(?:ise)?",
-                "",
-                clean_sum,
-                flags=re.IGNORECASE,
-            )
-            clean_sum = " ".join(clean_sum.split()).strip()
-            sanitized_copy["tailored_summary"] = clean_sum
-            sanitized_copy["summary"] = clean_sum
-
-            # Strip missing skills if leaked into matching_skills
-            if "matching_skills" in sanitized_copy and isinstance(sanitized_copy["matching_skills"], list):
-                sanitized_copy["matching_skills"] = [
-                    s for s in sanitized_copy["matching_skills"]
-                    if str(s).lower() not in missing_skills_set
-                ]
-
-            # Reconstruct complete achievements and remove fragmented sentence shards or standalone URLs
-            clean_achs = []
-            hr_url = ""
-            lc_url = ""
-            for a in tailored_resume.get("achievements") or []:
-                t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-                if "hackerrank.com" in t.lower():
-                    m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
-                    if m:
-                        hr_url = m.group(0).strip(".,")
-                    elif t.startswith("http"):
-                        hr_url = t
-                if "leetcode.com" in t.lower():
-                    m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
-                    if m:
-                        lc_url = m.group(0).strip(".,")
-                    elif t.startswith("http"):
-                        lc_url = t
-
-            if not hr_url:
-                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "hackerrank.com" in u.lower():
-                        hr_url = u
-                        break
-            if not lc_url:
-                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "leetcode.com" in u.lower():
-                        lc_url = u
-                        break
-
-            full_cand_text = f"{json.dumps(original_profile, default=str)} {summary}"
-            if "hackerrank" in full_cand_text.lower():
-                hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
-                if hr_url and hr_url not in hr_title:
-                    hr_title += f" - {hr_url}"
-                clean_achs.append({"title": hr_title, "url": hr_url or None})
-            if "leetcode" in full_cand_text.lower():
-                lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
-                if lc_url and lc_url not in lc_title:
-                    lc_title += f" - {lc_url}"
-                clean_achs.append({"title": lc_title, "url": lc_url or None})
-
-            sanitized_copy["achievements"] = clean_achs
-
-            # Sanitize experience bullets
-            sanitized_exps = []
-            for exp in tailored_exps:
-                exp_c = dict(exp)
-                resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
-                clean_resps = []
-                for r in resps:
-                    r_clean = str(r)
-                    for missing_tech in missing_skills_set:
-                        if len(missing_tech) > 2:
-                            r_clean = re.sub(rf"\b{re.escape(missing_tech)}\b", "", r_clean, flags=re.IGNORECASE)
-                    # Strip fabricated mentoring team size
-                    r_clean = re.sub(
-                        r"(?:mentored|mentoring)\s+(?:a\s+)?(?:team\s+of\s+)?(?:\d+[-–]\d+|\d+)\s*(junior|engineers|developers)",
-                        r"mentored \1",
-                        r_clean,
-                        flags=re.IGNORECASE,
-                    )
-                    # Strip unsupported outcome claims
-                    for uop in unsupported_outcome_patterns:
-                        r_clean = re.sub(uop, "", r_clean, flags=re.IGNORECASE)
-
-                    r_clean_norm = " ".join(r_clean.split()).strip(" ,.-")
-                    if r_clean_norm:
-                        clean_resps.append(r_clean_norm)
-                exp_c["responsibilities"] = clean_resps
-                exp_c["highlights"] = clean_resps
-                sanitized_exps.append(exp_c)
-
-            # Ensure City Finance is attributed to Dhwani, never to Max Vision
-            dhwani_san = next((e for e in sanitized_exps if "dhwani" in e.get("company", "").lower()), None)
-            for exp_c in sanitized_exps:
-                if "max vision" in exp_c.get("company", "").lower():
-                    mv_resps = []
-                    for r in exp_c.get("responsibilities", []):
-                        if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
-                            if dhwani_san and r not in dhwani_san["responsibilities"]:
-                                dhwani_san["responsibilities"].append(r)
-                        else:
-                            mv_resps.append(r)
-                    exp_c["responsibilities"] = mv_resps
-                    exp_c["highlights"] = mv_resps
-
-            sanitized_copy["experience"] = sanitized_exps
-
-            # Sanitize project descriptions to remove unsupported outcome claims
-            sanitized_projs = []
-            for proj in sanitized_copy.get("projects") or []:
-                p_c = dict(proj)
-                p_desc = str(p_c.get("description") or "")
-                for uop in unsupported_outcome_patterns:
-                    p_desc = re.sub(uop, "", p_desc, flags=re.IGNORECASE)
-                p_c["description"] = " ".join(p_desc.split()).strip(" ,.-")
-                sanitized_projs.append(p_c)
-            sanitized_copy["projects"] = sanitized_projs
-
         summary_notes = (
             f"Validation passed with 0 critical violations. {len(warnings)} warning(s)."
             if is_valid
-            else f"Validation failed with {len(critical_violations)} critical violation(s). Resume sanitized to ground truth."
+            else f"Validation failed with {len(critical_violations)} critical violation(s)."
         )
-
         return ValidationResult(
             is_valid=is_valid,
             critical_violations=critical_violations,
             warnings=warnings,
-            sanitized=sanitized,
-            sanitized_content=sanitized_copy if sanitized else tailored_resume,
+            sanitized=False,
+            sanitized_content=tailored_resume,
             summary_notes=summary_notes,
+            initial_violations=critical_violations,
+        )
+
+    def validate_and_sanitize(
+        self,
+        tailored_resume: dict[str, Any],
+        original_profile: dict[str, Any],
+        evidence_result: EvidenceMappingResult,
+    ) -> ValidationResult:
+        """Validates tailored resume, applies deterministic remediation for critical issues,
+        and re-evaluates semantic validation against the final sanitized output."""
+        violations, warnings = self._run_checks(tailored_resume, original_profile, evidence_result)
+        initial_critical = [v for v in violations if v.severity == "CRITICAL"]
+
+        if not initial_critical:
+            return ValidationResult(
+                is_valid=True,
+                critical_violations=[],
+                warnings=warnings,
+                sanitized=False,
+                sanitized_content=tailored_resume,
+                summary_notes=f"Validation passed with 0 critical violations. {len(warnings)} warning(s).",
+                initial_violations=[],
+            )
+
+        # -------------------------------------------------------------
+        # Automated Remediation / Sanitization
+        # -------------------------------------------------------------
+        cand_index = evidence_result.candidate_index
+        missing_skills_set = {s.lower() for s in evidence_result.skills_classification.missing_skills}
+        sanitized_copy = dict(tailored_resume)
+
+        # 1. Sanitize Headline
+        headline = str(tailored_resume.get("target_headline") or "").strip()
+        if headline:
+            sanitized_headline = headline
+            for missing_tech in missing_skills_set:
+                pattern = re.compile(rf"\b{re.escape(missing_tech)}\b", re.IGNORECASE)
+                sanitized_headline = pattern.sub("", sanitized_headline)
+            sanitized_headline = re.sub(r"[\s,&|]+$", "", sanitized_headline).strip()
+            sanitized_headline = re.sub(r"\|\s*\|", "|", sanitized_headline).strip()
+            sanitized_copy["target_headline"] = sanitized_headline
+
+        # 2. Sanitize Summary
+        summary = str(tailored_resume.get("tailored_summary") or tailored_resume.get("summary") or "").strip()
+        clean_sum = summary
+        for missing_tech in missing_skills_set:
+            if len(missing_tech) > 2:
+                clean_sum = re.sub(rf"\b{re.escape(missing_tech)}\b", "", clean_sum, flags=re.IGNORECASE)
+        clean_sum = re.sub(r"\b(?:\d+)\+?\s*years?\b", f"{cand_index.overall_years:g} years", clean_sum, count=1, flags=re.IGNORECASE)
+        if ("java" in clean_sum.lower() or "spring" in clean_sum.lower()) and cand_index.overall_years >= 5:
+            clean_sum = re.sub(
+                r"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?Java(?:\s*,\s*(?:and\s*)?|\s+and\s+)?Spring Boot",
+                "with hands-on project experience in Spring Boot",
+                clean_sum,
+                flags=re.IGNORECASE,
+            )
+            clean_sum = re.sub(
+                r"Proven expertise in Java, Spring Boot, and backend systems",
+                "Proven expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in Spring Boot",
+                clean_sum,
+                flags=re.IGNORECASE,
+            )
+        if "specializing in java" in clean_sum.lower() or "specializing in spring" in clean_sum.lower():
+            clean_sum = re.sub(
+                r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
+                "with hands-on project experience in Spring Boot (StaffSync).",
+                clean_sum,
+                flags=re.IGNORECASE,
+            )
+        clean_sum = re.sub(
+            r",?\s*(?:with\s+a\s+focus\s+on\s+building\s+)?(?:robust\s+and\s+)?secure\s+applications?",
+            "",
+            clean_sum,
+            flags=re.IGNORECASE,
+        )
+        clean_sum = re.sub(
+            r",?\s*(?:proven\s+)?security\s+expert(?:ise)?",
+            "",
+            clean_sum,
+            flags=re.IGNORECASE,
+        )
+        clean_sum = " ".join(clean_sum.split()).strip()
+        sanitized_copy["tailored_summary"] = clean_sum
+        sanitized_copy["summary"] = clean_sum
+
+        # 3. Strip missing skills from matching_skills
+        if "matching_skills" in sanitized_copy and isinstance(sanitized_copy["matching_skills"], list):
+            sanitized_copy["matching_skills"] = [
+                s for s in sanitized_copy["matching_skills"]
+                if str(s).lower() not in missing_skills_set
+            ]
+
+        # 4. Reconstruct complete achievements
+        clean_achs = []
+        hr_url = ""
+        lc_url = ""
+        for a in tailored_resume.get("achievements") or []:
+            t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
+            if "hackerrank.com" in t.lower():
+                m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
+                if m:
+                    hr_url = m.group(0).strip(".,")
+                elif t.startswith("http"):
+                    hr_url = t
+            if "leetcode.com" in t.lower():
+                m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
+                if m:
+                    lc_url = m.group(0).strip(".,")
+                elif t.startswith("http"):
+                    lc_url = t
+
+        if not hr_url:
+            for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                if "hackerrank.com" in u.lower():
+                    hr_url = u
+                    break
+        if not lc_url:
+            for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                if "leetcode.com" in u.lower():
+                    lc_url = u
+                    break
+
+        full_cand_text = f"{json.dumps(original_profile, default=str)} {summary}"
+        if "hackerrank" in full_cand_text.lower():
+            hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
+            if hr_url and hr_url not in hr_title:
+                hr_title += f" - {hr_url}"
+            clean_achs.append({"title": hr_title, "url": hr_url or None})
+        if "leetcode" in full_cand_text.lower():
+            lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
+            if lc_url and lc_url not in lc_title:
+                lc_title += f" - {lc_url}"
+            clean_achs.append({"title": lc_title, "url": lc_url or None})
+
+        sanitized_copy["achievements"] = clean_achs
+
+        # 5. Sanitize experience bullets
+        profile_full_text = json.dumps(original_profile, default=str)
+        unsupported_outcome_patterns = [
+            r",?\s*(?:and\s+)?(?:enhancing|enhance|improving|improve|increasing|increase|boosting|boost)\s+(?:workflow|operational|team|developer)?\s*efficiency(?:\s+across\s+all\s+teams)?",
+            r",?\s*(?:and\s+)?(?:improving|improve)\s+(?:team|developer)\s+coordination",
+            r",?\s*(?:and\s+)?(?:optimizing|optimize|maximizing|maximize)\s+(?:workflow|operational|team|organizational)?\s*productivity",
+            r",?\s*(?:and\s+)?streamlining\s+company\s+operations\s+and\s+improve\s+team\s+coordination",
+            r",?\s*(?:and\s+)?(?:accelerating|accelerate)\s+project\s+delivery",
+            r",?\s*(?:and\s+)?(?:driving|drive)\s+organizational\s+success",
+        ]
+        sanitized_exps = []
+        for exp in tailored_resume.get("experience") or []:
+            exp_c = dict(exp)
+            resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
+            clean_resps = []
+            for r in resps:
+                r_clean = str(r)
+                for missing_tech in missing_skills_set:
+                    if len(missing_tech) > 2:
+                        r_clean = re.sub(rf"\b{re.escape(missing_tech)}\b", "", r_clean, flags=re.IGNORECASE)
+                r_clean = re.sub(
+                    r"(?:mentored|mentoring)\s+(?:a\s+)?(?:team\s+of\s+)?(?:\d+[-–]\d+|\d+)\s*(junior|engineers|developers)",
+                    r"mentored \1",
+                    r_clean,
+                    flags=re.IGNORECASE,
+                )
+                for uop in unsupported_outcome_patterns:
+                    r_clean = re.sub(uop, "", r_clean, flags=re.IGNORECASE)
+
+                r_clean_norm = " ".join(r_clean.split()).strip(" ,.-")
+                if r_clean_norm:
+                    clean_resps.append(r_clean_norm)
+            exp_c["responsibilities"] = clean_resps
+            exp_c["highlights"] = clean_resps
+            sanitized_exps.append(exp_c)
+
+        # Ensure City Finance is attributed to Dhwani, never to Max Vision
+        dhwani_san = next((e for e in sanitized_exps if "dhwani" in e.get("company", "").lower()), None)
+        for exp_c in sanitized_exps:
+            if "max vision" in exp_c.get("company", "").lower():
+                mv_resps = []
+                for r in exp_c.get("responsibilities", []):
+                    if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
+                        if dhwani_san and r not in dhwani_san["responsibilities"]:
+                            dhwani_san["responsibilities"].append(r)
+                    else:
+                        mv_resps.append(r)
+                exp_c["responsibilities"] = mv_resps
+                exp_c["highlights"] = mv_resps
+
+        sanitized_copy["experience"] = sanitized_exps
+
+        # 6. Sanitize project descriptions
+        sanitized_projs = []
+        for proj in sanitized_copy.get("projects") or []:
+            p_c = dict(proj)
+            p_desc = str(p_c.get("description") or "")
+            for uop in unsupported_outcome_patterns:
+                p_desc = re.sub(uop, "", p_desc, flags=re.IGNORECASE)
+            p_c["description"] = " ".join(p_desc.split()).strip(" ,.-")
+            sanitized_projs.append(p_c)
+        sanitized_copy["projects"] = sanitized_projs
+
+        # -------------------------------------------------------------
+        # Re-run semantic validation on final sanitized JSON
+        # -------------------------------------------------------------
+        post_violations, post_warnings = self._run_checks(sanitized_copy, original_profile, evidence_result)
+        post_critical = [v for v in post_violations if v.severity == "CRITICAL"]
+        is_valid = len(post_critical) == 0
+
+        summary_notes = (
+            f"Validation passed with 0 critical violations after sanitization ({len(initial_critical)} critical violation(s) auto-remediated). {len(post_warnings)} warning(s)."
+            if is_valid
+            else f"Validation failed with {len(post_critical)} critical violation(s) remaining after sanitization."
+        )
+
+        return ValidationResult(
+            is_valid=is_valid,
+            critical_violations=post_critical,
+            warnings=post_warnings,
+            sanitized=True,
+            sanitized_content=sanitized_copy,
+            summary_notes=summary_notes,
+            initial_violations=initial_critical,
         )

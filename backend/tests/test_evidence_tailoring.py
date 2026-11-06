@@ -251,17 +251,18 @@ def test_hallucination_guard_catches_unsupported_tech(candidate_profile, pocketp
         ],
     }
 
-    val_res = guard.validate_and_sanitize(hallucinated_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    assert len(val_res.critical_violations) >= 3
+    val_raw = guard.validate(hallucinated_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    assert len(val_raw.critical_violations) >= 3
 
     # Check detected categories
-    categories = [v.category for v in val_res.critical_violations]
+    categories = [v.category for v in val_raw.critical_violations]
     assert "unsupported_technology" in categories  # CI/CD, Jenkins
     assert "experience_inflation" in categories     # 6-8 years Java
     assert "invented_metric" in categories          # team of 4-6 junior engineers
 
     # Check sanitization fixes
+    val_res = guard.validate_and_sanitize(hallucinated_resume, candidate_profile, evidence_res)
     sanitized = val_res.sanitized_content
     assert "CI/CD" not in sanitized["target_headline"]
     assert "Jenkins" not in sanitized["tailored_summary"]
@@ -285,13 +286,15 @@ def test_summary_and_headline_factual_grounding(candidate_profile, pocketpills_j
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(resume_with_java_claim, candidate_profile, evidence_res)
+    val_raw = guard.validate(resume_with_java_claim, candidate_profile, evidence_res)
     # Guard must flag the 5+ years of Java claim as experience inflation
-    inflation_violation = next((v for v in val_res.critical_violations if v.category == "experience_inflation"), None)
+    inflation_violation = next((v for v in val_raw.critical_violations if v.category == "experience_inflation"), None)
     assert inflation_violation is not None
     assert "Spring Boot/Java is project experience" in inflation_violation.allowed_boundary
 
     # Sanitized summary must cleanly clarify hands-on project experience
+    val_res = guard.validate_and_sanitize(resume_with_java_claim, candidate_profile, evidence_res)
+    assert val_res.sanitized
     sanitized_sum = val_res.sanitized_content["summary"]
     assert "hands-on project experience in Spring Boot" in sanitized_sum
 
@@ -519,16 +522,18 @@ def test_hallucination_guard_semantic_and_bleed_checks(candidate_profile, pocket
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(faulty_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    # 1. Semantic validation catches all issues on raw faulty resume
+    val_raw = guard.validate(faulty_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
 
     # Verify all semantic checks fired
     assert "contradictory_evidence_mapping" in categories
     assert "cross_employer_bleed" in categories
     assert "unsupported_specialization" in categories
 
-    # Verify auto-sanitization cleaned the output
+    # 2. Verify auto-sanitization cleaned the output
+    val_res = guard.validate_and_sanitize(faulty_resume, candidate_profile, evidence_res)
     sanitized = val_res.sanitized_content
     assert "CI/CD" not in sanitized["matching_skills"]
     assert "specializing in Java" not in sanitized["summary"]
@@ -659,12 +664,14 @@ def test_proven_expertise_java_fails_semantic_validation(candidate_profile, pock
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(invalid_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    val_raw = guard.validate(invalid_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
     assert "unsupported_specialization" in categories
 
     # Verify sanitization corrects it to project exposure
+    val_res = guard.validate_and_sanitize(invalid_resume, candidate_profile, evidence_res)
+    assert val_res.sanitized
     sanitized_summary = val_res.sanitized_content["summary"]
     assert "proven expertise in java" not in sanitized_summary.lower()
     assert "hands-on project experience in spring boot" in sanitized_summary.lower()
@@ -696,12 +703,14 @@ def test_city_finance_attribution_to_max_vision_fails_validation(candidate_profi
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(misattributed_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    val_raw = guard.validate(misattributed_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
     assert "cross_employer_bleed" in categories
 
     # In sanitized output, City Finance must NOT remain under Max Vision
+    val_res = guard.validate_and_sanitize(misattributed_resume, candidate_profile, evidence_res)
+    assert val_res.sanitized
     sanitized_mv = next((e for e in val_res.sanitized_content["experience"] if "max vision" in e["company"].lower()), None)
     assert sanitized_mv is not None
     assert not any("4000+" in r or "city finance" in r.lower() for r in sanitized_mv["responsibilities"])
@@ -734,12 +743,14 @@ def test_unsupported_outcome_claims_fail_validation(candidate_profile, pocketpil
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(fluff_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    val_raw = guard.validate(fluff_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
     assert "unsupported_outcome" in categories
 
     # In sanitized output, "enhancing workflow efficiency" must be removed
+    val_res = guard.validate_and_sanitize(fluff_resume, candidate_profile, evidence_res)
+    assert val_res.sanitized
     sanitized_bullet = val_res.sanitized_content["experience"][0]["responsibilities"][0]
     assert "enhancing workflow efficiency" not in sanitized_bullet.lower()
     sanitized_proj = val_res.sanitized_content["projects"][0]["description"]
@@ -759,13 +770,15 @@ def test_security_expertise_claim_fails_validation(candidate_profile, pocketpill
         "education": candidate_profile["education"],
     }
 
-    val_res = guard.validate_and_sanitize(sec_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    val_raw = guard.validate(sec_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
     assert "unsupported_claim" in categories
-    assert any(w.category == "unsupported_claim" for w in val_res.warnings)
+    assert any(w.category == "unsupported_claim" for w in val_raw.warnings)
 
     # In sanitized summary, security expertise claims must be removed
+    val_res = guard.validate_and_sanitize(sec_resume, candidate_profile, evidence_res)
+    assert val_res.sanitized
     sanitized_sum = val_res.sanitized_content["summary"]
     assert "security expertise" not in sanitized_sum.lower()
     assert "secure applications" not in sanitized_sum.lower()
@@ -789,13 +802,18 @@ def test_fragmented_achievements_fail_validation(candidate_profile, pocketpills_
         ],
     }
 
-    val_res = guard.validate_and_sanitize(fragmented_resume, candidate_profile, evidence_res)
-    assert not val_res.is_valid
-    categories = [v.category for v in val_res.critical_violations]
+    val_raw = guard.validate(fragmented_resume, candidate_profile, evidence_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
     assert "fragmented_achievement" in categories
-    assert any(w.category == "fragmented_achievement" for w in val_res.warnings)
+    assert any(w.category == "fragmented_achievement" for w in val_raw.warnings)
 
-    # In sanitized output, must reconstruct 2 cohesive achievements with URLs attached, zero standalone URLs
+    # In sanitized output, must recalculate is_valid=True and reconstruct 2 cohesive achievements
+    val_res = guard.validate_and_sanitize(fragmented_resume, candidate_profile, evidence_res)
+    assert val_res.sanitized
+    assert val_res.is_valid is True
+    assert len(val_res.critical_violations) == 0
+
     sanitized_achs = val_res.sanitized_content["achievements"]
     assert len(sanitized_achs) == 2
     for sa in sanitized_achs:
@@ -804,6 +822,115 @@ def test_fragmented_achievements_fail_validation(candidate_profile, pocketpills_
         assert "back-end technologies." not in title
     assert any("HackerRank 6th Star Gold Badge" in sa["title"] and "https://www.hackerrank.com/profile/NishantThePro" in sa["title"] for sa in sanitized_achs)
     assert any("450+ LeetCode" in sa["title"] and "https://leetcode.com/NishantTheProgrammer" in sa["title"] for sa in sanitized_achs)
+
+
+def test_reconstructed_achievements_pass_final_validation(candidate_profile, pocketpills_jd):
+    """Properly reconstructed achievements pass semantic validation with is_valid=True and 0 critical violations."""
+    guard = HallucinationGuard()
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+
+    clean_resume = {
+        "target_headline": "Senior Backend Engineer | SQL, Node.js, PostgreSQL",
+        "tailored_summary": "Full Stack Developer with 5 years of overall experience with hands-on project experience in Spring Boot.",
+        "experience": candidate_profile["experience"],
+        "education": candidate_profile["education"],
+        "achievements": [
+            {
+                "title": "HackerRank 6th Star Gold Badge (Problem Solving) - https://www.hackerrank.com/profile/NishantThePro",
+                "url": "https://www.hackerrank.com/profile/NishantThePro",
+            },
+            {
+                "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving - https://leetcode.com/NishantTheProgrammer",
+                "url": "https://leetcode.com/NishantTheProgrammer",
+            },
+        ],
+    }
+
+    val_res = guard.validate(clean_resume, candidate_profile, evidence_res)
+    assert val_res.is_valid is True
+    assert len(val_res.critical_violations) == 0
+    assert "0 critical violations" in val_res.summary_notes
+
+
+def test_sql_evidence_mapping_company_isolation(candidate_profile, pocketpills_jd):
+    """SQL evidence mapping must isolate company boundaries and never leak other company names."""
+    # Introduce raw bleed where Max Vision was attached to Dhwani's bullet
+    profile_with_bleed = copy.deepcopy(candidate_profile)
+    profile_with_bleed["experience"][0]["responsibilities"].append(
+        "Which handles data for 4000+ urban local bodies and their finance. Max Vision Solutions Pvt. Ltd."
+    )
+
+    mapper = EvidenceMapper()
+    res = mapper.map_evidence(profile_with_bleed, pocketpills_jd)
+
+    sql_mapping = next((m for m in res.mappings if m.requirement.upper() == "SQL"), None)
+    assert sql_mapping is not None
+    assert sql_mapping.status == "MATCHED"
+    assert "Dhwani" in sql_mapping.source_entity
+    # Must NOT contain foreign company name
+    assert "Max Vision Solutions" not in sql_mapping.evidence_text
+    assert "Pvt. Ltd." not in sql_mapping.evidence_text
+
+
+def test_dhwani_preserves_formio_and_amplitude_analytics(pocketpills_jd):
+    """Tailoring Dhwani's experience for backend JD must retain Form.io dynamic assessment, Amplitude, and materialized views."""
+    from app.agents.resume_builder import preserve_and_prioritize_experience_bullets
+
+    dhwani_orig_bullets = [
+        "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services.",
+        "Indian Partner Network: Designed and developed a comprehensive full-stack NGO management platform, building robust backend systems with Node.js/Express and modern Angular frontend. Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation. Implemented personalized email automation using SendGrid with calendar integration, notification triggers, and reminder systems. Built real-time analytics with Amplitude tracking across web applications and WordPress directories. Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs.",
+        "City Finance: Worked on complex reactive forms, integrated geographical maps, added Google Analytics, and implemented a bulk upload service. Which handles data for 4000+ urban local bodies and their finance.",
+    ]
+
+    ai_short_bullets = [
+        "Designed and developed a comprehensive full-stack NGO management platform using Node.js/Express and modern Angular frontend.",
+        "Enhanced platform performance through query optimization across multiple tabs.",
+    ]
+
+    preserved = preserve_and_prioritize_experience_bullets(
+        company_name="Dhwani Rural Information Systems",
+        original_bullets=dhwani_orig_bullets,
+        ai_bullets=ai_short_bullets,
+        matching_skills=["Node.js", "Express", "SQL"],
+        missing_skills=["CI/CD", "Jenkins"],
+        job_title=pocketpills_jd["title"],
+        company=pocketpills_jd["company"],
+        job_description=pocketpills_jd["description"],
+    )
+
+    full_preserved_text = " ".join(preserved).lower()
+    # Must retain Form.io dynamic assessment / form solutions
+    assert "form.io" in full_preserved_text
+    assert "dynamic assessment" in full_preserved_text or "form solutions" in full_preserved_text
+    # Must retain Amplitude analytics tracking
+    assert "amplitude" in full_preserved_text
+    # Must retain materialized views
+    assert "materialized view" in full_preserved_text
+    # Must retain City Finance (4000+ ULBs)
+    assert "4000+" in full_preserved_text
+
+
+def test_schema_consolidation_and_backward_compatibility(candidate_profile, pocketpills_jd):
+    """Tailored resume JSON schema must consolidate duplicate fields without breaking consumer aliases."""
+    from app.agents.resume_builder import select_and_tailor_projects
+
+    projects = select_and_tailor_projects(
+        raw_projects=candidate_profile["projects"],
+        required_skills=["Java", "Spring Boot"],
+        matching_skills=["Java", "Spring Boot"],
+        job_title=pocketpills_jd["title"],
+        company=pocketpills_jd["company"],
+        max_projects=3,
+        filter_irrelevant=False,
+    )
+
+    for p in projects:
+        # Both canonical and backwards-compatible aliases must be synchronized
+        assert p.get("name") is not None
+        assert p.get("title") == p.get("name")
+        assert p.get("technologies") is not None
+        assert p.get("tech_stack") == p.get("technologies")
 
 
 def test_company_attribution_and_leak_prevention(candidate_profile, pocketpills_jd):

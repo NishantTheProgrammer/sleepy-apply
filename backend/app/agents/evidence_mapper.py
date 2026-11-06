@@ -151,6 +151,11 @@ class EvidenceMapper:
         # 1. Professional experience indexing
         raw_exp = profile.get("experience", [])
         prof_roles = []
+        all_companies = [
+            e.get("company", "").strip()
+            for e in raw_exp
+            if e.get("company", "").strip()
+        ]
         for exp in raw_exp:
             company = exp.get("company", "").strip()
             title = exp.get("jobTitle") or exp.get("title", "").strip()
@@ -158,7 +163,24 @@ class EvidenceMapper:
             end = "Present" if (exp.get("current") or exp.get("is_current")) else (exp.get("endDate") or exp.get("end_date", "")).strip()
             resps = exp.get("responsibilities") or exp.get("highlights") or []
             desc = exp.get("description", "")
-            full_text = f"{title} {desc} " + " ".join(resps)
+
+            # Scrub foreign employer names from responsibilities and description
+            other_companies = [c for c in all_companies if c.lower() != company.lower()]
+            clean_resps = []
+            for r in resps:
+                r_clean = str(r).strip()
+                for oc in other_companies:
+                    pat = re.compile(rf"\s*[-—–.]*\s*{re.escape(oc)}(?:\s+Pvt\.?\s+Ltd\.?)?\b", re.IGNORECASE)
+                    r_clean = pat.sub("", r_clean).strip(" .-\t")
+                if r_clean:
+                    clean_resps.append(r_clean)
+
+            desc_clean = str(desc).strip()
+            for oc in other_companies:
+                pat = re.compile(rf"\s*[-—–.]*\s*{re.escape(oc)}(?:\s+Pvt\.?\s+Ltd\.?)?\b", re.IGNORECASE)
+                desc_clean = pat.sub("", desc_clean).strip(" .-\t")
+
+            full_text = f"{title} {desc_clean} " + " ".join(clean_resps)
 
             techs_found = set()
             for raw_k, canon in self.TECH_CANONICAL_MAP.items():
@@ -193,8 +215,8 @@ class EvidenceMapper:
                 "company": company,
                 "title": title,
                 "dates": f"{start} – {end}",
-                "responsibilities": resps,
-                "description": desc,
+                "responsibilities": clean_resps,
+                "description": desc_clean,
                 "technologies": sorted(list(techs_found)),
                 "raw_text": full_text,
             })
@@ -451,6 +473,18 @@ class EvidenceMapper:
             additional_relevant_skills=additional_relevant[:10],
         )
 
+        # Enforce strict company-level isolation across all evidence mappings
+        known_companies = [r["company"] for r in index.professional_roles if r.get("company")]
+        for item in mappings:
+            if item.evidence_source == "professional_experience" and item.source_entity:
+                src_entity = item.source_entity
+                foreign_companies = [c for c in known_companies if c.lower() != src_entity.lower()]
+                cleaned_text = item.evidence_text
+                for fc in foreign_companies:
+                    pat = re.compile(rf"\s*[-—–.]*\s*{re.escape(fc)}(?:\s+Pvt\.?\s+Ltd\.?)?\b", re.IGNORECASE)
+                    cleaned_text = pat.sub("", cleaned_text).strip(" .-\t")
+                item.evidence_text = cleaned_text
+
         return EvidenceMappingResult(
             mappings=mappings,
             skills_classification=skills_cls,
@@ -617,8 +651,15 @@ class EvidenceMapper:
             source_co = "Dhwani Rural Information Systems"
             for role in index.professional_roles:
                 for r in role.get("responsibilities", []):
-                    if any(k in r.lower() for k in ["query optimization", "materialized views", "postgresql", "mysql", "database", "bulk upload"]):
-                        db_bullets.append(r)
+                    if any(k in r.lower() for k in ["query optimization", "materialized views", "postgresql", "mysql", "database"]):
+                        r_clean = str(r).strip()
+                        for other_role in index.professional_roles:
+                            oc = other_role.get("company", "").strip()
+                            if oc and oc.lower() != role.get("company", "").lower():
+                                pat = re.compile(rf"\s*[-—–.]*\s*{re.escape(oc)}(?:\s+Pvt\.?\s+Ltd\.?)?\b", re.IGNORECASE)
+                                r_clean = pat.sub("", r_clean).strip(" .-\t")
+                        if r_clean:
+                            db_bullets.append(r_clean)
                         source_co = role["company"]
 
             db_skills = [t for t in index.all_known_technologies if t in ["PostgreSQL", "MySQL", "SQL"]]

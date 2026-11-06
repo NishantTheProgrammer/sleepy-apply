@@ -384,6 +384,10 @@ class ProfileCreatorAgent:
                     deg = _clean_str(ed.get("degree"))
                     inst = _clean_str(ed.get("institution"))
                     yr = _clean_str(ed.get("year") or ed.get("graduation_year"))
+                    # Filter out URLs, link headers, or noise mistakenly categorized as education
+                    check_str = f"{deg or ''} {inst or ''}".lower()
+                    if any(bad in check_str for bad in ["http://", "https://", "www.", "links:", "linkedin", "github.com", ".com", ".org", ".io"]):
+                        continue
                     if deg or inst:
                         clean_edu.append({
                             "degree": deg or "",
@@ -628,11 +632,17 @@ class ProfileCreatorAgent:
 
         # 10. Education: capture all degrees
         education_list: list[dict[str, Any]] = []
-        edu_match = re.search(r"\b(?:EDUCATION)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:SKILLS|EXPERIENCE|PROJECTS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
+        edu_match = re.search(r"\b(?:EDUCATION)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:SKILLS|EXPERIENCE|PROJECTS|ACHIEVEMENTS|LINKS|CERTIFICATIONS)\b|\Z)", text, re.IGNORECASE)
         if edu_match:
             for line in edu_match.group(1).split("\n"):
                 line = line.strip()
                 if not line or len(line) < 5:
+                    continue
+                # Reject any line containing URLs, links headers, or domain markers
+                if re.search(r"https?://|www\.|links?\b|github\.com|linkedin\.com|\.(?:com|org|io|in|dev|net)", line, re.IGNORECASE):
+                    continue
+                # Reject lines that do not have education keywords
+                if not any(dk in line.lower() for dk in ["mca", "bca", "bachelor", "master", "b.tech", "m.tech", "degree", "diploma", "ignou", "university", "college", "school"]):
                     continue
                 yr_m = re.search(r"\(?(\b(?:19|20)\d{2}\b)\)?", line)
                 yr = yr_m.group(1) if yr_m else ""

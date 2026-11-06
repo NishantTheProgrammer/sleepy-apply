@@ -148,13 +148,13 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
 
     text = ""
     import io
+    extracted_links: list[str] = []
     if filename_lower.endswith(".pdf"):
         from pypdf import PdfReader
         try:
             reader = PdfReader(io.BytesIO(content))
             # Extract text preserving visual column layout
             pages_text = []
-            extracted_links = []
             for page in reader.pages:
                 try:
                     p_txt = page.extract_text(extraction_mode="layout")
@@ -176,8 +176,6 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
             if not text.strip():
                 # Fallback to plain extraction
                 text = "\n".join(page.extract_text() or "" for page in reader.pages)
-            if extracted_links:
-                text = text + "\n\nLINKS:\n" + "\n".join(extracted_links)
         except Exception as e:
             logger.error("Failed to extract PDF text", error=str(e), filename=file.filename)
             raise HTTPException(status_code=400, detail=f"Failed to read PDF: {str(e)}")
@@ -239,6 +237,27 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     from app.agents.profile_creator import ProfileCreatorAgent
     agent = ProfileCreatorAgent()
     fast_parsed = agent._heuristic_parse(cleaned_text)
+
+    # Enrich personal links from PDF annotations without polluting resume text
+    if extracted_links:
+        pers = fast_parsed.setdefault("personal", {})
+        if not pers.get("linkedin"):
+            for l in extracted_links:
+                if "linkedin.com/in/" in l.lower() or "linkedin.com" in l.lower():
+                    pers["linkedin"] = l
+                    break
+        if not pers.get("github"):
+            for l in extracted_links:
+                if "github.com/" in l.lower() and not any(r in l.lower() for r in ["/cbms", "/repo"]):
+                    pers["github"] = l
+                    break
+        if not pers.get("portfolio"):
+            for l in extracted_links:
+                if "nishanttheprogrammer" in l.lower() or re.search(r"\bhttps?://[a-zA-Z0-9-]+\.(?:dev|me|site|io|app|com)\b", l.lower()):
+                    if not any(k in l.lower() for k in ["linkedin", "github", "google", "leetcode", "hackerrank"]):
+                        pers["portfolio"] = l
+                        break
+
     fast_parsed = agent._normalize_extracted_data(fast_parsed)
     score = agent._calculate_completion_score(fast_parsed)
 

@@ -264,15 +264,21 @@ class ProfileCreatorAgent:
                 return None
             return s
 
+        from app.models.profile import CanonicalDict
+
         personal = data.setdefault("personal", {})
         for field in ["fullName", "full_name", "email", "phone", "linkedin", "github", "portfolio"]:
             if field in personal:
                 personal[field] = _clean_str(personal[field])
 
-        if "fullName" in personal and not personal.get("full_name"):
-            personal["full_name"] = personal["fullName"]
-        elif "full_name" in personal and not personal.get("fullName"):
-            personal["fullName"] = personal["full_name"]
+        cand_name = _clean_str(personal.get("full_name") or personal.get("fullName")) or ""
+        personal_clean = CanonicalDict({
+            **personal,
+            "full_name": cand_name,
+        })
+        if "fullName" in personal_clean:
+            del personal_clean["fullName"]
+        data["personal"] = personal_clean
 
         # Ensure location is structured
         loc = personal.get("location")
@@ -355,20 +361,20 @@ class ProfileCreatorAgent:
                             "achievements": clean_ach,
                         })
 
-            cleaned_exp_list.append({
+            exp_dict = CanonicalDict({
+                "id": f"exp_{len(cleaned_exp_list) + 1:03d}",
+                "company_id": f"comp_{len(cleaned_exp_list) + 1:03d}",
                 "company": company,
-                "jobTitle": job_title,
                 "title": job_title,
-                "startDate": start_date,
                 "start_date": start_date,
-                "endDate": end_date,
                 "end_date": end_date,
-                "current": is_current,
                 "is_current": is_current,
                 "description": description,
                 "responsibilities": clean_resp,
-                "projects": clean_sub,
             })
+            if clean_sub:
+                exp_dict["projects"] = clean_sub
+            cleaned_exp_list.append(exp_dict)
 
         # Generic Employer Isolation:
         # Scrub foreign company names that leaked into bullets or job titles
@@ -385,11 +391,10 @@ class ProfileCreatorAgent:
                     clean_resps.append(r_clean)
             exp["responsibilities"] = clean_resps
 
-            # If jobTitle accidentally absorbed a foreign company name or bullet text, restore it
-            jt = exp.get("jobTitle", "")
+            # If title accidentally absorbed a foreign company name or bullet text, restore it
+            jt = exp.get("title", "")
             for o_co in other_cos:
                 if o_co and o_co.lower() in jt.lower():
-                    exp["jobTitle"] = "Software Engineer"
                     exp["title"] = "Software Engineer"
 
         data["experience"] = cleaned_exp_list
@@ -422,11 +427,11 @@ class ProfileCreatorAgent:
                         if canon.lower() not in seen_t:
                             seen_t.add(canon.lower())
                             clean_tech.append(canon)
-                    clean_projects.append({
+                    clean_projects.append(CanonicalDict({
                         "name": p_name,
                         "description": p_desc,
                         "technologies": clean_tech,
-                    })
+                    }))
         data["projects"] = clean_projects
 
         # Normalize education
@@ -462,8 +467,8 @@ class ProfileCreatorAgent:
         # Sync jobPreferences
         if "jobPreferences" in data and not data.get("job_preferences"):
             data["job_preferences"] = data["jobPreferences"]
-        elif "job_preferences" in data and not data.get("jobPreferences"):
-            data["jobPreferences"] = data["job_preferences"]
+        if "jobPreferences" in data:
+            del data["jobPreferences"]
 
         # -------------------------------------------------------------
         # Phase 1: Structured Provenance & Entity ID Assignment
@@ -501,7 +506,9 @@ class ProfileCreatorAgent:
             co_slug = re.sub(r"[^a-zA-Z0-9]+", "_", exp.get("company", "").lower()).strip("_")
             co_id = f"company_{co_slug}" if co_slug else f"company_{exp_idx+1:03d}"
             exp["company_id"] = co_id
-            exp["role"] = exp.get("jobTitle") or exp.get("title") or "Software Engineer"
+            exp["title"] = exp.get("title") or exp.get("jobTitle") or exp.get("role") or "Software Engineer"
+            if "role" in exp:
+                del exp["role"]
             ev_list = []
             for b_idx, bullet in enumerate(exp.get("responsibilities", [])):
                 ev_list.append({
@@ -519,8 +526,10 @@ class ProfileCreatorAgent:
             prj["id"] = p_id
             p_techs = prj.get("technologies") or prj.get("tech_stack") or []
             prj["technologies"] = p_techs
-            prj["tech_stack"] = p_techs
-            prj["title"] = prj.get("name") or prj.get("title") or f"Project {p_idx+1}"
+            if "tech_stack" in prj:
+                del prj["tech_stack"]
+            if "title" in prj:
+                del prj["title"]
             prj["evidence"] = [
                 {
                     "id": f"{p_id}_ev_001",

@@ -10,6 +10,7 @@ from bson import ObjectId
 from app.db.client import get_db
 from app.templates.default import DefaultATSResumeTemplate
 from app.providers.factory import AIProviderFactory
+from app.models.profile import CanonicalDict
 from app.models.settings import UserSettings
 from app.agents.evidence_mapper import EvidenceMapper, EvidenceMappingResult
 from app.agents.hallucination_guard import HallucinationGuard, ValidationResult
@@ -167,11 +168,15 @@ def select_and_tailor_projects(
                             seen_t.add(c.lower())
                             clean_ai_tech.append(c)
                     proj_copy["technologies"] = clean_ai_tech
-                    proj_copy["tech_stack"] = clean_ai_tech
 
-                # Ensure backwards-compatible fields
-                proj_copy["title"] = proj_copy.get("name") or proj_copy.get("title")
-                matched_ai_projects.append(proj_copy)
+                clean_ai_p = CanonicalDict({
+                    "name": aip_name,
+                    "description": desc_to_use,
+                    "technologies": proj_copy.get("technologies") or [],
+                })
+                if proj_copy.get("url"):
+                    clean_ai_p["url"] = proj_copy["url"]
+                matched_ai_projects.append(clean_ai_p)
                 if len(matched_ai_projects) >= max_projects:
                     break
 
@@ -263,14 +268,16 @@ def select_and_tailor_projects(
                     desc = pattern.sub(f"**{ms}**", desc)
             p_copy["description"] = desc
 
-        # Backwards compatible aliases
         p_name = p_copy.get("name") or p_copy.get("title") or "Project"
-        p_copy["name"] = p_name
-        p_copy["title"] = p_name
         p_techs = p_copy.get("technologies") or p_copy.get("tech_stack") or []
-        p_copy["technologies"] = p_techs
-        p_copy["tech_stack"] = p_techs
-        final_projects.append(p_copy)
+        clean_p = CanonicalDict({
+            "name": p_name,
+            "description": desc,
+            "technologies": p_techs,
+        })
+        if p_copy.get("url"):
+            clean_p["url"] = p_copy["url"]
+        final_projects.append(clean_p)
 
     return final_projects
 
@@ -796,10 +803,17 @@ class ResumeBuilderAgent:
         # Deterministic Summary Synthesis
         # ------------------------------------------------------------------
         if not ai_tailored or not tailored_summary:
-            bold_matching = [f"**{s}**" for s in matching_skills[:4] if s.lower() not in {m.lower() for m in missing_skills}]
-            key_stack = ", ".join(bold_matching) if bold_matching else "**Node.js**, **REST APIs**, and **SQL databases**"
+            # 1. Candidate primary title from most recent professional role or headline
+            primary_title = cand_index.professional_roles[0]["title"] if cand_index.professional_roles else (profile.get("target_headline") or "Software Engineer")
+            if not primary_title or primary_title.lower() in ["company", "developer", "engineer"]:
+                primary_title = "Software Engineer"
 
-            # Dynamically derive project-level technology note from candidate projects
+            # 2. Key professional stack: only technologies candidate used professionally in cand_index.professional_technologies
+            prof_matching = [s for s in matching_skills if s.lower() in [pt.lower() for pt in cand_index.professional_technologies]]
+            bold_prof = [f"**{s}**" for s in prof_matching[:4]]
+            key_stack = ", ".join(bold_prof) if bold_prof else f"**{job_title}** core capabilities"
+
+            # 3. Dynamically derive project-level technology note from candidate projects
             project_tech_note = ""
             if partial_skills and cand_index.projects:
                 for ps in partial_skills[:2]:
@@ -809,33 +823,36 @@ class ResumeBuilderAgent:
                     )
                     if matching_p:
                         p_name = matching_p.get("name") or matching_p.get("title") or "independent project"
-                        p_desc = matching_p.get("description", "").strip()
-                        scope_phrase = ""
-                        if "role-based workforce management" in p_desc.lower() or "streamline company operations" in p_desc.lower():
-                            scope_phrase = "developing role-based workforce management services "
-                        else:
-                            m_scope = re.search(r"^([A-Za-z0-9\-\s]{10,50})\s+(?:designed|built|developed|using|to)\b", p_desc, re.IGNORECASE)
-                            if m_scope:
-                                scope_phrase = f"developing {m_scope.group(1).lower().strip()} "
-
                         # Collect matching technologies from the project preferring specific (longer) names
                         proj_techs = sorted(matching_p.get("technologies") or [], key=len, reverse=True)
                         matched_techs = []
                         for s in partial_skills[:2]:
                             t_found = next((t for t in proj_techs if s.lower() in t.lower() or t.lower() in s.lower()), s)
-                            # Avoid adding substring duplicate if a longer version already exists
                             if not any(t_found.lower() != m.lower() and t_found.lower() in m.lower() for m in matched_techs):
                                 if t_found not in matched_techs:
                                     matched_techs.append(t_found)
                         matched_techs = sorted(matched_techs, key=lambda x: (len(x.split()), x), reverse=True)
                         proj_techs_formatted = " and ".join([f"**{s}**" for s in matched_techs])
-                        project_tech_note = f" Hands-on project experience {scope_phrase}with {proj_techs_formatted} through **{p_name}**."
+                        project_tech_note = f" Hands-on project experience with {proj_techs_formatted} through **{p_name}**."
                         break
 
+            # 4. Verified capabilities strictly substantiated by candidate's professional evidence text
+            all_prof_text = " ".join(r.get("raw_text", "") for r in cand_index.professional_roles).lower()
+            supported_caps = []
+            if any(k in all_prof_text for k in ["api", "apis", "rest"]):
+                supported_caps.append("high-performance APIs")
+            if any(k in all_prof_text for k in ["database", "sql", "query optimization", "query tuning", "materialized views"]):
+                supported_caps.append("database design & query tuning")
+            if any(k in all_prof_text for k in ["microservice", "microservices"]):
+                supported_caps.append("microservices architecture")
+            if any(k in all_prof_text for k in ["scalable", "scalability", "scale"]):
+                supported_caps.append("scalable systems")
+
+            caps_phrase = f" Core expertise in {', '.join(supported_caps)}." if supported_caps else ""
+
             tailored_summary = (
-                f"Full Stack Developer with **{cand_index.overall_years:g} years** of overall software development experience "
-                f"delivering scalable backend systems, high-performance APIs, and database optimizations. Proven professional track record in {key_stack}, "
-                f"query tuning, and microservices architecture.{project_tech_note}"
+                f"{primary_title} with **{cand_index.overall_years:g} years** of overall software development experience. "
+                f"Proven professional track record developing with {key_stack}.{caps_phrase}{project_tech_note}"
             )
 
         # ------------------------------------------------------------------
@@ -921,20 +938,20 @@ class ResumeBuilderAgent:
                 all_other_bullets=other_bs,
             )
 
-            if processed_bullets:
-                exp_copy["responsibilities"] = processed_bullets
-                exp_copy["highlights"] = processed_bullets
-
-            # Ensure backward-compatible title/date fields
-            exp_copy["title"] = exp_copy.get("jobTitle") or exp_copy.get("title") or "Software Engineer"
-            exp_copy["jobTitle"] = exp_copy["title"]
-            exp_copy["start_date"] = exp_copy.get("startDate") or exp_copy.get("start_date") or ""
-            exp_copy["startDate"] = exp_copy["start_date"]
-            exp_copy["end_date"] = exp_copy.get("endDate") or exp_copy.get("end_date") or ""
-            exp_copy["endDate"] = exp_copy["end_date"]
-            exp_copy["is_current"] = bool(exp_copy.get("current") or exp_copy.get("is_current"))
-            exp_copy["current"] = exp_copy["is_current"]
-            final_experience.append(exp_copy)
+            clean_exp_entry = CanonicalDict({
+                "id": exp_copy.get("id", ""),
+                "company_id": exp_copy.get("company_id", ""),
+                "company": co_name,
+                "title": exp_copy.get("title") or exp_copy.get("jobTitle") or "Software Engineer",
+                "start_date": exp_copy.get("start_date") or exp_copy.get("startDate") or "",
+                "end_date": exp_copy.get("end_date") or exp_copy.get("endDate") or "",
+                "is_current": bool(exp_copy.get("is_current", exp_copy.get("current", False))),
+                "description": exp_copy.get("description", ""),
+                "responsibilities": processed_bullets or exp_copy.get("responsibilities", []),
+            })
+            if exp_copy.get("projects"):
+                clean_exp_entry["projects"] = exp_copy["projects"]
+            final_experience.append(clean_exp_entry)
 
         # ------------------------------------------------------------------
         # Filter & Prioritize Matching Projects
@@ -989,11 +1006,10 @@ class ResumeBuilderAgent:
             },
             "evidence_mappings": [m.model_dump() for m in evidence_result.mappings],
             "required_skills": required_skills,
-            "personal": {
-                **personal_data,
-                "fullName": cand_name,
+            "personal": CanonicalDict({
+                **{k: v for k, v in personal_data.items() if k != "fullName"},
                 "full_name": cand_name,
-            },
+            }),
             "skills": tailored_skills if tailored_skills else raw_skills,
             "experience": final_experience,
             "education": profile.get("education", []),

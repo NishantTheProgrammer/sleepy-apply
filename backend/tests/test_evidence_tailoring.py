@@ -1425,6 +1425,138 @@ def test_dynamic_jd_analysis_arbitrary_domains():
     assert "FastAPI" in res.skills_classification.matched_skills
 
 
+# ==============================================================================
+# Version 8.1 Targeted Corrections Verification
+# ==============================================================================
+
+def test_version_8_1_targeted_corrections(candidate_profile, pocketpills_jd):
+    """Verifies all 6 requirements of Version 8.1:
+    1. Experience duration classification: separate overall tenure from project-level tech exposure
+    2. Education matching: exact vs related vs missing qualifications with preserved original degree
+    3. Canonical schema: single canonical field per concept without duplicate fields in keys
+    4. Project relationships: no empty projects arrays in employment records; independent projects separate
+    5. Summary accuracy: evidence-backed claims only; no unsupported broad buzzwords
+    6. Regression: all core capabilities preserved
+    """
+    from app.agents.profile_creator import ProfileCreatorAgent
+    from app.agents.resume_builder import ResumeBuilderAgent
+
+    creator = ProfileCreatorAgent()
+    norm_profile = creator._normalize_extracted_data(candidate_profile)
+
+    # 1. Experience duration classification
+    mapper = EvidenceMapper()
+    ev_res = mapper.map_evidence(norm_profile, pocketpills_jd)
+
+    tech_dur_mapping = next(
+        (m for m in ev_res.mappings if m.requirement == "06 to 08 years Core Java and with the spring framework"),
+        None,
+    )
+    assert tech_dur_mapping is not None
+    # Must NOT claim 5 years overall experience as 5 years of Spring/Java
+    assert tech_dur_mapping.status == "PARTIAL"
+    assert tech_dur_mapping.evidence_source == "project"
+    assert "StaffSync" in tech_dur_mapping.source_entity
+    assert "5 years overall software development tenure" in tech_dur_mapping.evidence_text
+    assert "project-level" in tech_dur_mapping.evidence_text
+    assert "StaffSync" in tech_dur_mapping.evidence_text
+
+    # 2. Education matching
+    edu_mapping = next(
+        (m for m in ev_res.mappings if "b.tech" in m.requirement.lower() or m.evidence_source == "education"),
+        None,
+    )
+    assert edu_mapping is not None
+    assert edu_mapping.status == "PARTIAL"  # Related technical qualification, NOT exact match
+    assert edu_mapping.evidence_source == "education"
+    assert "MCA" in edu_mapping.evidence_text or "computer applications" in edu_mapping.evidence_text.lower()
+    assert "IGNOU" in edu_mapping.source_entity
+
+    # Exact qualification match test
+    exact_btech_cand = copy.deepcopy(norm_profile)
+    exact_btech_cand["education"] = [{"degree": "B.Tech in Computer Science and Engineering", "institution": "IIT Delhi", "year": "2019"}]
+    res_exact = mapper.map_evidence(exact_btech_cand, pocketpills_jd)
+    exact_edu = next((m for m in res_exact.mappings if m.evidence_source == "education"), None)
+    assert exact_edu.status == "MATCHED"
+
+    # Unmatched education test
+    arts_cand = copy.deepcopy(norm_profile)
+    arts_cand["education"] = [{"degree": "Bachelor of Arts in History", "institution": "Delhi University", "year": "2019"}]
+    res_unmatched = mapper.map_evidence(arts_cand, pocketpills_jd)
+    unmatched_edu = next((m for m in res_unmatched.mappings if "b.tech" in m.requirement.lower()), None)
+    assert unmatched_edu.status == "MISSING"
+
+    # 3. Canonical schema
+    # Personal info has only canonical full_name in keys
+    assert "full_name" in norm_profile["personal"]
+    assert "fullName" not in norm_profile["personal"]
+    assert norm_profile["personal"].get("fullName") == norm_profile["personal"]["full_name"]
+
+    # Experience has only canonical fields in keys
+    for exp in norm_profile["experience"]:
+        keys = list(exp.keys())
+        assert "title" in keys
+        assert "jobTitle" not in keys
+        assert "role" not in keys
+        assert "start_date" in keys
+        assert "startDate" not in keys
+        assert "end_date" in keys
+        assert "endDate" not in keys
+        assert "is_current" in keys
+        assert "current" not in keys
+        assert "responsibilities" in keys
+        assert "highlights" not in keys
+
+        # Backward compatibility aliases resolve
+        assert exp.get("jobTitle") == exp.get("title")
+        assert exp.get("startDate") == exp.get("start_date")
+        assert exp.get("highlights") == exp.get("responsibilities")
+
+    # Projects have only canonical technologies and name in keys
+    for proj in norm_profile["projects"]:
+        p_keys = list(proj.keys())
+        assert "name" in p_keys
+        assert "title" not in p_keys
+        assert "technologies" in p_keys
+        assert "tech_stack" not in p_keys
+
+        # Backward compatibility aliases resolve
+        assert proj.get("title") == proj.get("name")
+        assert proj.get("tech_stack") == proj.get("technologies")
+
+    # 4. Project relationships
+    # No empty projects arrays inside employment records
+    for exp in norm_profile["experience"]:
+        assert "projects" not in exp or len(exp["projects"]) > 0
+
+    # Independent projects remain top-level
+    assert any(p["name"] == "StaffSync" for p in norm_profile["projects"])
+    for exp in norm_profile["experience"]:
+        if "projects" in exp:
+            assert not any(sub["name"] == "StaffSync" for sub in exp["projects"])
+
+    # 5. Summary accuracy
+    guard = HallucinationGuard()
+    # Test that ungrounded broad claims fail validation
+    fake_summary_resume = {
+        "target_headline": "Senior Backend Engineer",
+        "tailored_summary": "Full Stack Developer with 5 years experience delivering scalable, secure, and robust systems with expert architecture.",
+        "experience": norm_profile["experience"],
+        "education": norm_profile["education"],
+    }
+    val = guard.validate(fake_summary_resume, norm_profile, ev_res)
+    assert not val.is_valid
+    buzzword_violations = [v for v in val.critical_violations if v.category == "unsupported_claim"]
+    assert len(buzzword_violations) > 0
+
+    # Auto-sanitization cleans unsupported buzzwords
+    val_clean = guard.validate_and_sanitize(fake_summary_resume, norm_profile, ev_res)
+    assert val_clean.sanitized
+    clean_text = val_clean.sanitized_content["summary"].lower()
+    for bz in ["secure", "robust", "expert"]:
+        assert bz not in clean_text
+
+
 
 
 

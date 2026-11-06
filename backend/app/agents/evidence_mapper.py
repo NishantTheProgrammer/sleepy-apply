@@ -8,6 +8,7 @@ or self-reported skill).
 
 from __future__ import annotations
 
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -139,6 +140,32 @@ class EvidenceMapper:
         clean = tech.strip().lower()
         return cls.TECH_CANONICAL_MAP.get(clean, tech.strip())
 
+    @staticmethod
+    def _calc_role_years(dates_str: str) -> float:
+        parts = re.split(r"\s*(?:-|–|—|\bto\b)\s*", dates_str.strip())
+        if len(parts) >= 2:
+            def _parse_d(s: str):
+                s_c = s.strip().lower()
+                if not s_c or s_c in ["present", "current", "now"]:
+                    return (datetime.now().year, datetime.now().month)
+                m = re.search(r"([a-z]{3,9})[\s,]+(\d{4})", s_c)
+                if m:
+                    m_map = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+                    return (int(m.group(2)), m_map.get(m.group(1)[:3], 1))
+                m_iso = re.search(r"(\d{4})[-/](\d{1,2})", s_c)
+                if m_iso:
+                    return (int(m_iso.group(1)), int(m_iso.group(2)))
+                m_yr = re.search(r"\b(\d{4})\b", s_c)
+                if m_yr:
+                    return (int(m_yr.group(1)), 1)
+                return None
+            d1 = _parse_d(parts[0])
+            d2 = _parse_d(parts[1])
+            if d1 and d2:
+                months = (d2[0] - d1[0]) * 12 + (d2[1] - d1[1])
+                return max(0.2, round(max(0, months) / 12.0, 1))
+        return 1.5
+
     def build_candidate_index(self, profile: dict[str, Any]) -> CandidateEvidenceIndex:
         """Indexes candidate profile into clean, distinct evidence layers."""
         prof_hash = self._compute_hash(profile)
@@ -221,10 +248,13 @@ class EvidenceMapper:
                     prof_known.add(c)
                     all_known.add(c)
 
+            dates_str = f"{start} – {end}"
+            role_years = self._calc_role_years(dates_str)
             prof_roles.append({
                 "company": company,
                 "title": title,
-                "dates": f"{start} – {end}",
+                "dates": dates_str,
+                "years": role_years,
                 "responsibilities": clean_resps,
                 "description": desc_clean,
                 "technologies": sorted(list(techs_found)),
@@ -554,8 +584,87 @@ class EvidenceMapper:
         """Determines MATCHED, PARTIAL, MISSING, or UNVERIFIED with supporting evidence."""
         # 1. Experience duration check
         if category == "experience_duration":
-            m = re.search(r"(\d+)", name)
+            m = re.search(r"(\d+(?:\.\d+)?)", name)
             req_years = float(m.group(1)) if m else 5.0
+
+            # Distinguish technology-specific duration requirements from overall tenure requirements
+            target_techs = []
+            combined_req_text = f"{name} {raw_text}".lower()
+            for raw_k, canon in self.TECH_CANONICAL_MAP.items():
+                if len(raw_k) >= 3 and re.search(r"\b" + re.escape(raw_k) + r"\b", combined_req_text):
+                    if canon not in target_techs:
+                        target_techs.append(canon)
+
+            if target_techs:
+                # A) Check professional employment experience in these specific technologies
+                matching_roles = []
+                for role in index.professional_roles:
+                    role_techs = [t.lower() for t in role.get("technologies", [])]
+                    if any(tt.lower() in role_techs or re.search(r"\b" + re.escape(tt) + r"\b", role.get("raw_text", ""), re.IGNORECASE) for tt in target_techs):
+                        matching_roles.append(role)
+
+                tech_str = " and ".join(target_techs)
+                if matching_roles:
+                    prof_tech_years = sum(r.get("years", 1.5) for r in matching_roles)
+                    source_cos = ", ".join(dict.fromkeys(r["company"] for r in matching_roles))
+                    if prof_tech_years >= req_years:
+                        return EvidenceItem(
+                            requirement=name,
+                            status="MATCHED",
+                            importance=importance,
+                            evidence_source="professional_experience",
+                            evidence_text=f"Candidate has {prof_tech_years:g} years professional experience in {tech_str} at {source_cos}.",
+                            source_entity=source_cos,
+                            confidence=0.95,
+                            notes=f"Meets professional {tech_str} experience requirement ({prof_tech_years:g} yrs >= {req_years:g} yrs at {source_cos}).",
+                        )
+                    else:
+                        return EvidenceItem(
+                            requirement=name,
+                            status="PARTIAL",
+                            importance=importance,
+                            evidence_source="professional_experience",
+                            evidence_text=f"Candidate has {prof_tech_years:g} years professional experience in {tech_str} at {source_cos} (target was {name}).",
+                            source_entity=source_cos,
+                            confidence=0.85,
+                            notes=f"Candidate has {prof_tech_years:g} years professional experience in {tech_str} vs {name} demanded. Do not fabricate extra years.",
+                        )
+
+                # B) Check independent / academic projects for technology exposure
+                matching_projects = []
+                for proj in index.projects:
+                    proj_techs = [t.lower() for t in (proj.get("technologies") or proj.get("tech_stack") or [])]
+                    if any(tt.lower() in proj_techs or re.search(r"\b" + re.escape(tt) + r"\b", proj.get("raw_text", ""), re.IGNORECASE) for tt in target_techs):
+                        matching_projects.append(proj)
+
+                if matching_projects:
+                    p = matching_projects[0]
+                    p_name = p.get("name") or p.get("title") or "Project"
+                    source_type = "academic_project" if p.get("is_academic") else "project"
+                    return EvidenceItem(
+                        requirement=name,
+                        status="PARTIAL",
+                        importance=importance,
+                        evidence_source=source_type,
+                        evidence_text=f"Candidate has {index.overall_years:g} years overall software development tenure, but technology exposure to {tech_str} is project-level in {p_name}. Candidate does not have {req_years:g} years of professional enterprise employment in {tech_str}.",
+                        source_entity=p_name,
+                        confidence=0.85,
+                        notes=f"Candidate has hands-on project exposure to {tech_str} in {p_name}, not multi-year professional employment tenure. Do not represent overall experience as {tech_str} tenure.",
+                    )
+
+                # C) Missing entirely
+                return EvidenceItem(
+                    requirement=name,
+                    status="MISSING",
+                    importance=importance,
+                    evidence_source="none",
+                    evidence_text="",
+                    source_entity="",
+                    confidence=0.0,
+                    notes=f"No evidence for {tech_str} found in candidate professional experience or projects.",
+                )
+
+            # Overall experience duration check (no specific technologies targeted)
             if index.overall_years >= req_years:
                 return EvidenceItem(
                     requirement=name,
@@ -573,10 +682,10 @@ class EvidenceMapper:
                     status="PARTIAL",
                     importance=importance,
                     evidence_source="professional_experience",
-                    evidence_text=f"Candidate has {index.overall_years:g} years overall experience (target was {name}).",
+                    evidence_text=f"Candidate has {index.overall_years:g} years overall software development experience (target was {name}).",
                     source_entity="Candidate Profile",
                     confidence=0.8,
-                    notes=f"Candidate has {index.overall_years:g} years overall full-stack experience vs {name} demanded. Do not fabricate extra years.",
+                    notes=f"Candidate has {index.overall_years:g} years overall experience vs {name} demanded. Do not fabricate extra years.",
                 )
 
         # 2. Domain checks (e.g. eCommerce)
@@ -669,19 +778,36 @@ class EvidenceMapper:
 
         # 4. Education check
         if category == "education":
-            degrees = [e["degree"] for e in index.education]
+            degrees = [e.get("degree", "").strip() for e in index.education if e.get("degree")]
             deg_str = ", ".join(degrees)
             primary_inst = index.education[0].get("institution", "University") if index.education else "University"
             deg_lower = deg_str.lower()
-            name_lower = name.lower()
+            name_lower = f"{name} {raw_text}".lower()
 
-            # Exact or direct level match
-            is_direct_match = (
-                ("b.tech" in name_lower and ("b.tech" in deg_lower or "b.e" in deg_lower))
-                or ("master" in name_lower and ("master" in deg_lower or "mca" in deg_lower or "m.tech" in deg_lower or "ms" in deg_lower))
-                or ("bachelor" in name_lower and ("bachelor" in deg_lower or "bca" in deg_lower or "b.tech" in deg_lower or "bs" in deg_lower))
+            if not degrees:
+                return EvidenceItem(
+                    requirement=name,
+                    status="MISSING",
+                    importance=importance,
+                    evidence_source="none",
+                    evidence_text="",
+                    source_entity="",
+                    confidence=0.0,
+                    notes=f"Candidate profile does not list education qualifications matching {name}.",
+                )
+
+            # Check exact qualification match
+            is_exact = (
+                (("b.tech" in name_lower or "b.e" in name_lower) and ("b.tech" in deg_lower or "b.e" in deg_lower or "bachelor of technology" in deg_lower or "bachelor of engineering" in deg_lower))
+                or ("mca" in name_lower and ("mca" in deg_lower or "master of computer applications" in deg_lower))
+                or ("bca" in name_lower and ("bca" in deg_lower or "bachelor of computer applications" in deg_lower))
+                or (("m.tech" in name_lower or "m.e" in name_lower) and ("m.tech" in deg_lower or "m.e" in deg_lower))
+                or (("master" in name_lower and "science" in name_lower) and ("ms" in deg_lower or "m.s." in deg_lower or "master of science" in deg_lower))
+                or (("bachelor" in name_lower and "science" in name_lower) and ("bs" in deg_lower or "b.s." in deg_lower or "bachelor of science" in deg_lower))
+                or ("master" in name_lower and not any(k in name_lower for k in ["b.tech", "b.e", "bachelor"]) and any(k in deg_lower for k in ["master", "mca", "m.tech", "ms"]))
+                or ("bachelor" in name_lower and not any(k in name_lower for k in ["b.tech", "b.e", "engineering"]) and any(k in deg_lower for k in ["bachelor", "bca", "b.tech", "bs"]))
             )
-            if is_direct_match:
+            if is_exact:
                 return EvidenceItem(
                     requirement=name,
                     status="MATCHED",
@@ -690,28 +816,35 @@ class EvidenceMapper:
                     evidence_text=deg_str,
                     source_entity=primary_inst,
                     confidence=1.0,
-                    notes=f"Candidate holds verified degree: {deg_str}.",
+                    notes=f"Candidate holds verified exact degree match: {deg_str}.",
                 )
 
-            # Related technical degree equivalent (e.g. MCA/BCA vs B.Tech/BE)
-            has_cs = any("mca" in d.lower() or "bca" in d.lower() or "computer" in d.lower() or "science" in d.lower() or "engineering" in d.lower() for d in degrees)
-            if has_cs:
-                notes_msg = (
-                    f"Candidate holds {deg_str} rather than B.Tech/BE. Highlight exact degrees authentically."
-                    if "b.tech" in name_lower or "b.e" in name_lower
-                    else f"Candidate holds {deg_str} (technical discipline equivalent). Highlight exact degrees authentically."
-                )
+            # Check related technical qualification match
+            is_related = any(
+                k in deg_lower for k in ["mca", "bca", "computer", "engineering", "information technology", "science", "software"]
+            )
+            if is_related:
                 return EvidenceItem(
                     requirement=name,
                     status="PARTIAL",
                     importance=importance,
                     evidence_source="education",
-                    evidence_text=f"Candidate holds {deg_str} (Computer Applications degree equivalent).",
+                    evidence_text=deg_str,
                     source_entity=primary_inst,
                     confidence=0.85,
-                    notes=notes_msg,
+                    notes=f"Candidate holds {deg_str} (related technical qualification equivalent to target: {name}). Original qualification preserved authentically.",
                 )
-            return EvidenceItem(requirement=name, status="MISSING", importance=importance)
+
+            return EvidenceItem(
+                requirement=name,
+                status="MISSING",
+                importance=importance,
+                evidence_source="education",
+                evidence_text=deg_str,
+                source_entity=primary_inst,
+                confidence=0.5,
+                notes=f"Candidate holds {deg_str}, which is unrelated to target {name}.",
+            )
 
         # 5. Technology checks
         # Special semantic mappings for SQL / Relational Databases (Checked BEFORE generic text fallback)

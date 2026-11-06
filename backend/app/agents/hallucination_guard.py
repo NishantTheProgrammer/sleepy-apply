@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.agents.evidence_mapper import EvidenceMappingResult, CandidateEvidenceIndex
+from app.models.profile import CanonicalDict
 
 
 class ValidationViolation(BaseModel):
@@ -180,7 +181,21 @@ class HallucinationGuard:
                     allowed_boundary="Remove security expertise claims.",
                 ))
 
-            # F) Banned AI buzzwords
+            # F) Check for unsupported broad claims in summary: scalable, secure, robust, expert
+            profile_text_lower = json.dumps(original_profile, default=str).lower()
+            for buzzword in ["scalable", "secure", "robust", "expert"]:
+                if re.search(r"\b" + re.escape(buzzword) + r"\b", summary, re.IGNORECASE):
+                    if not re.search(r"\b" + re.escape(buzzword) + r"\b", profile_text_lower):
+                        violations.append(ValidationViolation(
+                            category="unsupported_claim",
+                            severity="CRITICAL",
+                            field="summary",
+                            message=f"Summary makes unsupported claim of '{buzzword}' without backing evidence in candidate profile.",
+                            detected_value=buzzword,
+                            allowed_boundary=f"Remove '{buzzword}' unless backed by verified source evidence.",
+                        ))
+
+            # G) Banned AI buzzwords
             for bw in self.BANNED_BUZZWORDS:
                 if re.search(r"\b" + re.escape(bw) + r"\b", summary, re.IGNORECASE):
                     warnings.append(ValidationViolation(
@@ -237,6 +252,17 @@ class HallucinationGuard:
                         detected_value=co,
                         allowed_boundary="Personal projects belong in PROJECTS section only.",
                     ))
+
+            # Check that employment records do not have empty projects arrays
+            if "projects" in exp and isinstance(exp["projects"], list) and len(exp["projects"]) == 0:
+                warnings.append(ValidationViolation(
+                    category="empty_project_array",
+                    severity="WARNING",
+                    field=f"experience.{co}.projects",
+                    message=f"Employment record for '{co}' contains an empty projects array.",
+                    detected_value="projects: []",
+                    allowed_boundary="Omit projects array from employment record when no sub-projects exist.",
+                ))
 
             # Inspect responsibilities / highlights for missing tech or hallucinated metrics
             bullets = exp.get("responsibilities") or exp.get("highlights") or []
@@ -512,6 +538,7 @@ class HallucinationGuard:
         # -------------------------------------------------------------
         cand_index = evidence_result.candidate_index
         missing_skills_set = {s.lower() for s in evidence_result.skills_classification.missing_skills}
+        profile_full_text = json.dumps(original_profile, default=str)
         sanitized_copy = dict(tailored_resume)
 
         # 1. Sanitize Headline
@@ -579,7 +606,13 @@ class HallucinationGuard:
             clean_sum,
             flags=re.IGNORECASE,
         )
-        clean_sum = " ".join(clean_sum.split()).strip()
+        # Sanitize unsupported broad claims in summary if not present in original profile
+        for buzzword in ["scalable", "secure", "robust", "expert"]:
+            if re.search(r"\b" + re.escape(buzzword) + r"\b", clean_sum, re.IGNORECASE):
+                if not re.search(r"\b" + re.escape(buzzword) + r"\b", profile_full_text.lower()):
+                    clean_sum = re.sub(rf",?\s*(?:and\s+)?(?:proven\s+)?{re.escape(buzzword)}(?:\s+applications?|\s+systems?|\s+in\s+[a-zA-Z\s]+)?", "", clean_sum, flags=re.IGNORECASE)
+                    clean_sum = re.sub(rf"\b{re.escape(buzzword)}\b\s*", "", clean_sum, flags=re.IGNORECASE)
+        clean_sum = " ".join(clean_sum.split()).strip(" ,.-")
         sanitized_copy["tailored_summary"] = clean_sum
         sanitized_copy["summary"] = clean_sum
 
@@ -611,7 +644,7 @@ class HallucinationGuard:
         ]
         sanitized_exps = []
         for exp in tailored_resume.get("experience") or []:
-            exp_c = dict(exp)
+            exp_c = CanonicalDict(exp)
             resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
             clean_resps = []
             for r in resps:
@@ -639,7 +672,6 @@ class HallucinationGuard:
                 if r_clean_norm:
                     clean_resps.append(r_clean_norm)
             exp_c["responsibilities"] = clean_resps
-            exp_c["highlights"] = clean_resps
             sanitized_exps.append(exp_c)
 
         # Ensure cross-company experience attribution integrity generically
@@ -696,14 +728,20 @@ class HallucinationGuard:
                 else:
                     kept_resps.append(r)
             exp_c["responsibilities"] = kept_resps
-            exp_c["highlights"] = kept_resps
+            if "highlights" in exp_c:
+                del exp_c["highlights"]
+            if "projects" in exp_c and isinstance(exp_c["projects"], list) and len(exp_c["projects"]) == 0:
+                del exp_c["projects"]
 
         for exp_c in sanitized_exps:
             c_key = exp_c.get("company", "").strip().lower()
             for r_add in all_reassigned_resps.get(c_key, []):
                 if r_add not in exp_c["responsibilities"]:
                     exp_c["responsibilities"].append(r_add)
-                    exp_c["highlights"].append(r_add)
+            if "highlights" in exp_c:
+                del exp_c["highlights"]
+            if "projects" in exp_c and isinstance(exp_c["projects"], list) and len(exp_c["projects"]) == 0:
+                del exp_c["projects"]
 
         sanitized_copy["experience"] = sanitized_exps
 

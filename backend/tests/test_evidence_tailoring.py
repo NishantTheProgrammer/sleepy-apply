@@ -613,14 +613,16 @@ def test_achievements_normalization_and_url_preservation():
     # Check HackerRank entry
     hr_entry = next((a for a in achievements if "hackerrank" in a["title"].lower()), None)
     assert hr_entry is not None
-    assert "HackerRank 6th Star Gold Badge (Problem Solving)" in hr_entry["title"]
-    assert "https://www.hackerrank.com/profile/NishantThePro" in hr_entry["title"]
+    assert hr_entry["title"] == "HackerRank 6th Star Gold Badge (Problem Solving)"
+    assert hr_entry["url"] == "https://www.hackerrank.com/profile/NishantThePro"
+    assert "https://" not in hr_entry["title"]
 
     # Check LeetCode entry
     lc_entry = next((a for a in achievements if "leetcode" in a["title"].lower()), None)
     assert lc_entry is not None
-    assert "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving" in lc_entry["title"]
-    assert "https://leetcode.com/NishantTheProgrammer" in lc_entry["title"]
+    assert lc_entry["title"] == "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
+    assert lc_entry["url"] == "https://leetcode.com/NishantTheProgrammer"
+    assert "https://" not in lc_entry["title"]
 
 
 def test_mentoring_retrieval_across_all_fields(candidate_profile, pocketpills_jd):
@@ -819,9 +821,10 @@ def test_fragmented_achievements_fail_validation(candidate_profile, pocketpills_
     for sa in sanitized_achs:
         title = sa["title"]
         assert not title.startswith("http://") and not title.startswith("https://")
+        assert "http://" not in title and "https://" not in title
         assert "back-end technologies." not in title
-    assert any("HackerRank 6th Star Gold Badge" in sa["title"] and "https://www.hackerrank.com/profile/NishantThePro" in sa["title"] for sa in sanitized_achs)
-    assert any("450+ LeetCode" in sa["title"] and "https://leetcode.com/NishantTheProgrammer" in sa["title"] for sa in sanitized_achs)
+    assert any(sa["title"] == "HackerRank 6th Star Gold Badge (Problem Solving)" and sa.get("url") == "https://www.hackerrank.com/profile/NishantThePro" for sa in sanitized_achs)
+    assert any(sa["title"] == "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving" and sa.get("url") == "https://leetcode.com/NishantTheProgrammer" for sa in sanitized_achs)
 
 
 def test_reconstructed_achievements_pass_final_validation(candidate_profile, pocketpills_jd):
@@ -832,16 +835,16 @@ def test_reconstructed_achievements_pass_final_validation(candidate_profile, poc
 
     clean_resume = {
         "target_headline": "Senior Backend Engineer | SQL, Node.js, PostgreSQL",
-        "tailored_summary": "Full Stack Developer with 5 years of overall experience with hands-on project experience in Spring Boot.",
+        "tailored_summary": "Full Stack Developer with 5 years of overall software development experience with hands-on project experience in Spring Boot through StaffSync.",
         "experience": candidate_profile["experience"],
         "education": candidate_profile["education"],
         "achievements": [
             {
-                "title": "HackerRank 6th Star Gold Badge (Problem Solving) - https://www.hackerrank.com/profile/NishantThePro",
+                "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
                 "url": "https://www.hackerrank.com/profile/NishantThePro",
             },
             {
-                "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving - https://leetcode.com/NishantTheProgrammer",
+                "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
                 "url": "https://leetcode.com/NishantTheProgrammer",
             },
         ],
@@ -956,6 +959,86 @@ def test_company_attribution_and_leak_prevention(candidate_profile, pocketpills_
     assert len(cleaned) == 1
     assert "Max Vision Solutions" not in cleaned[0]
     assert "4000+ urban local bodies" in cleaned[0]
+
+
+def test_clean_achievements_free_of_urls(candidate_profile, pocketpills_jd):
+    """Achievement titles must be strictly free of URLs; URLs must be stored only in url field."""
+    from app.agents.resume_builder import reconstruct_achievements
+
+    raw_fragmented = [
+        {"title": "back-end technologies. Demonstrated proficiency in problem-solving with a HackerRank 6th"},
+        {"title": "Star Gold Badge and a track record of solving 450+ LeetCode questions. Proven ability to"},
+        {"title": "https://www.hackerrank.com/profile/NishantThePro"},
+        {"title": "https://leetcode.com/NishantTheProgrammer"},
+    ]
+
+    achs = reconstruct_achievements(raw_fragmented, candidate_profile)
+    assert len(achs) == 2
+    for a in achs:
+        assert "http://" not in a["title"] and "https://" not in a["title"]
+        assert a.get("url") is not None
+        assert a["url"].startswith("http")
+
+    hr = next((a for a in achs if "HackerRank" in a["title"]), None)
+    assert hr is not None
+    assert hr["title"] == "HackerRank 6th Star Gold Badge (Problem Solving)"
+    assert hr["url"] == "https://www.hackerrank.com/profile/NishantThePro"
+
+    lc = next((a for a in achs if "LeetCode" in a["title"]), None)
+    assert lc is not None
+    assert lc["title"] == "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
+    assert lc["url"] == "https://leetcode.com/NishantTheProgrammer"
+
+
+@pytest.mark.anyio
+async def test_summary_accuracy_and_evidence_alignment(candidate_profile, pocketpills_jd):
+    """Generated tailored resume must retain 5 years overall software development experience,
+    distinguish professional backend from project-level StaffSync Java/Spring Boot, and avoid security fluff."""
+    from unittest.mock import AsyncMock, patch, MagicMock
+    from app.agents.resume_builder import ResumeBuilderAgent
+
+    cand_with_links = copy.deepcopy(candidate_profile)
+    cand_with_links["links"] = [
+        {"name": "HackerRank", "url": "https://www.hackerrank.com/profile/NishantThePro"},
+        {"name": "LeetCode", "url": "https://leetcode.com/NishantTheProgrammer"},
+    ]
+
+    mock_db = MagicMock()
+    mock_db.profiles.find_one = AsyncMock(return_value=cand_with_links)
+    mock_db.jobs.find_one = AsyncMock(return_value=pocketpills_jd)
+    mock_db.user_settings.find_one = AsyncMock(return_value=None)
+    mock_db.resumes.update_one = AsyncMock(return_value=MagicMock(upserted_id=candidate_profile["_id"]))
+    mock_db.job_matches.update_one = AsyncMock()
+
+    with patch("app.agents.resume_builder.get_db", return_value=mock_db):
+        builder = ResumeBuilderAgent()
+        tailored = await builder.build_tailored_resume(
+            user_id=str(candidate_profile["user_id"]),
+            job_id=str(pocketpills_jd["_id"]),
+        )
+
+    content = tailored["content"]
+    summary = content["summary"]
+
+    # 1. Retain 5 years of overall software development experience
+    assert "5 years" in summary
+    assert "overall software development experience" in summary.lower()
+
+    # 2. Distinguish professional experience from StaffSync project-level Java/Spring Boot
+    assert "staffsync" in summary.lower()
+    assert "spring boot" in summary.lower()
+    assert "project experience" in summary.lower()
+    assert "proven expertise in java" not in summary.lower()
+
+    # 3. No unsupported security claims
+    assert "security expertise" not in summary.lower()
+    assert "secure applications" not in summary.lower()
+
+    # 4. Clean achievements with URLs in url field only
+    for ach in content["achievements"]:
+        assert "https://" not in ach["title"]
+        assert ach.get("url") is not None
+
 
 
 

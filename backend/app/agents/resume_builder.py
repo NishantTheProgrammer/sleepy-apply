@@ -263,8 +263,12 @@ def select_and_tailor_projects(
             p_copy["description"] = desc
 
         # Backwards compatible aliases
-        p_copy["title"] = p_copy.get("name") or p_copy.get("title")
-        p_copy["tech_stack"] = p_copy.get("technologies") or p_copy.get("tech_stack")
+        p_name = p_copy.get("name") or p_copy.get("title") or "Project"
+        p_copy["name"] = p_name
+        p_copy["title"] = p_name
+        p_techs = p_copy.get("technologies") or p_copy.get("tech_stack") or []
+        p_copy["technologies"] = p_techs
+        p_copy["tech_stack"] = p_techs
         final_projects.append(p_copy)
 
     return final_projects
@@ -480,35 +484,44 @@ def reconstruct_achievements(
                 lc_url = t
 
     if not hr_url:
-        for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
-            u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-            if "hackerrank.com" in u.lower():
-                hr_url = u
-                break
+        hr_url = profile.get("personal", {}).get("hackerrank") or profile.get("hackerrank") or ""
+        if not hr_url:
+            for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
+                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                if "hackerrank.com" in u.lower():
+                    hr_url = u
+                    break
     if not lc_url:
-        for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
-            u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-            if "leetcode.com" in u.lower():
-                lc_url = u
-                break
+        lc_url = profile.get("personal", {}).get("leetcode") or profile.get("leetcode") or ""
+        if not lc_url:
+            for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
+                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                if "leetcode.com" in u.lower():
+                    lc_url = u
+                    break
 
     full_cand_text = f"{json.dumps(profile, default=str)} {summary}"
     if "hackerrank" in full_cand_text.lower():
-        hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
-        if hr_url and hr_url not in hr_title:
-            hr_title += f" - {hr_url}"
-        clean_achs.append({"title": hr_title, "url": hr_url or None})
+        clean_achs.append({
+            "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
+            "url": hr_url or None,
+        })
     if "leetcode" in full_cand_text.lower():
-        lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
-        if lc_url and lc_url not in lc_title:
-            lc_title += f" - {lc_url}"
-        clean_achs.append({"title": lc_title, "url": lc_url or None})
+        clean_achs.append({
+            "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
+            "url": lc_url or None,
+        })
 
     if not clean_achs:
         for a in raw_achs or []:
             t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-            if not t.startswith("http") and len(t) > 10:
-                clean_achs.append({"title": t, "url": None})
+            u = a.get("url") if isinstance(a, dict) else None
+            m = re.search(r"https?://\S+", t)
+            if m:
+                u = u or m.group(0).strip(".,- ")
+                t = re.sub(r"\s*[-—–:]*\s*https?://\S+", "", t).strip()
+            if t and not t.startswith("http") and len(t) > 10:
+                clean_achs.append({"title": t, "url": u})
 
     return clean_achs
 
@@ -680,12 +693,12 @@ class ResumeBuilderAgent:
             key_stack = ", ".join(bold_matching) if bold_matching else "**Node.js**, **REST APIs**, and **SQL databases**"
 
             project_tech_note = ""
-            if any("spring" in t.lower() for t in partial_skills):
-                project_tech_note = " Hands-on project experience developing role-based services with **Spring Boot**."
+            if any("spring" in t.lower() or "java" in t.lower() for t in partial_skills):
+                project_tech_note = " Hands-on project experience developing role-based workforce management services with **Java** and **Spring Boot** through **StaffSync**."
 
             tailored_summary = (
-                f"Full Stack Developer with **{cand_index.overall_years:g} years** of overall software engineering experience "
-                f"delivering scalable systems, high-performance APIs, and database optimizations. Proven track record in {key_stack}, "
+                f"Full Stack Developer with **{cand_index.overall_years:g} years** of overall software development experience "
+                f"delivering scalable backend systems, high-performance APIs, and database optimizations. Proven professional track record in {key_stack}, "
                 f"query tuning, and microservices architecture.{project_tech_note}"
             )
 

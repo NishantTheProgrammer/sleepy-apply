@@ -419,6 +419,25 @@ class HallucinationGuard:
                     allowed_boundary="Preserve complete achievement record.",
                 ))
 
+            # Achievement title containing a URL
+            if re.search(r"https?://\S+", t):
+                violations.append(ValidationViolation(
+                    category="url_in_achievement_title",
+                    severity="CRITICAL",
+                    field="achievements.title",
+                    message=f"Achievement title contains an embedded URL: '{t}'. Keep achievement titles free of URLs.",
+                    detected_value=t,
+                    allowed_boundary="Store URLs strictly in the url field; achievement title must contain descriptive text only.",
+                ))
+                warnings.append(ValidationViolation(
+                    category="url_in_achievement_title",
+                    severity="WARNING",
+                    field="achievements.title",
+                    message=f"Embedded URL found in achievement title '{t}'.",
+                    detected_value=t,
+                    allowed_boundary="Store URLs strictly in the url field.",
+                ))
+
         return violations, warnings
 
     def validate(
@@ -496,23 +515,30 @@ class HallucinationGuard:
         if ("java" in clean_sum.lower() or "spring" in clean_sum.lower()) and cand_index.overall_years >= 5:
             clean_sum = re.sub(
                 r"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?Java(?:\s*,\s*(?:and\s*)?|\s+and\s+)?Spring Boot",
-                "with hands-on project experience in Spring Boot",
+                "with hands-on project experience in Spring Boot and Java through StaffSync",
                 clean_sum,
                 flags=re.IGNORECASE,
             )
             clean_sum = re.sub(
                 r"Proven expertise in Java, Spring Boot, and backend systems",
-                "Proven expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in Spring Boot",
+                "Proven professional expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in Spring Boot and Java through StaffSync",
                 clean_sum,
                 flags=re.IGNORECASE,
             )
         if "specializing in java" in clean_sum.lower() or "specializing in spring" in clean_sum.lower():
             clean_sum = re.sub(
                 r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
-                "with hands-on project experience in Spring Boot (StaffSync).",
+                "with hands-on project experience in Spring Boot and Java (StaffSync).",
                 clean_sum,
                 flags=re.IGNORECASE,
             )
+        clean_sum = re.sub(
+            r"\b(?:\d+)\+?\s*years(?:\s+of)?(?:\s+overall)?\s+(?:software\s+engineering|software\s+development|development|full\s+stack)?\s*experience\b",
+            f"{cand_index.overall_years:g} years of overall software development experience",
+            clean_sum,
+            count=1,
+            flags=re.IGNORECASE,
+        )
         clean_sum = re.sub(
             r",?\s*(?:with\s+a\s+focus\s+on\s+building\s+)?(?:robust\s+and\s+)?secure\s+applications?",
             "",
@@ -542,6 +568,12 @@ class HallucinationGuard:
         lc_url = ""
         for a in tailored_resume.get("achievements") or []:
             t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
+            u = a.get("url") if isinstance(a, dict) else ""
+            if u:
+                if "hackerrank.com" in u.lower():
+                    hr_url = u
+                elif "leetcode.com" in u.lower():
+                    lc_url = u
             if "hackerrank.com" in t.lower():
                 m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
                 if m:
@@ -556,29 +588,33 @@ class HallucinationGuard:
                     lc_url = t
 
         if not hr_url:
-            for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                if "hackerrank.com" in u.lower():
-                    hr_url = u
-                    break
+            hr_url = original_profile.get("personal", {}).get("hackerrank") or original_profile.get("hackerrank") or ""
+            if not hr_url:
+                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "hackerrank.com" in u.lower():
+                        hr_url = u
+                        break
         if not lc_url:
-            for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                if "leetcode.com" in u.lower():
-                    lc_url = u
-                    break
+            lc_url = original_profile.get("personal", {}).get("leetcode") or original_profile.get("leetcode") or ""
+            if not lc_url:
+                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "leetcode.com" in u.lower():
+                        lc_url = u
+                        break
 
         full_cand_text = f"{json.dumps(original_profile, default=str)} {summary}"
         if "hackerrank" in full_cand_text.lower():
-            hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
-            if hr_url and hr_url not in hr_title:
-                hr_title += f" - {hr_url}"
-            clean_achs.append({"title": hr_title, "url": hr_url or None})
+            clean_achs.append({
+                "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
+                "url": hr_url or None,
+            })
         if "leetcode" in full_cand_text.lower():
-            lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
-            if lc_url and lc_url not in lc_title:
-                lc_title += f" - {lc_url}"
-            clean_achs.append({"title": lc_title, "url": lc_url or None})
+            clean_achs.append({
+                "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
+                "url": lc_url or None,
+            })
 
         sanitized_copy["achievements"] = clean_achs
 

@@ -505,15 +505,15 @@ class ProfileCreatorAgent:
             ])
             sum_text = data.get("summary", "")
             if "hackerrank" in merged_text.lower() or "hackerrank" in sum_text.lower():
-                hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
-                if hr_url and hr_url not in hr_title:
-                    hr_title += f" - {hr_url}"
-                clean_ach.append({"title": hr_title, "url": hr_url or None})
+                clean_ach.append({
+                    "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
+                    "url": hr_url or None,
+                })
             if "leetcode" in merged_text.lower() or "leetcode" in sum_text.lower():
-                lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
-                if lc_url and lc_url not in lc_title:
-                    lc_title += f" - {lc_url}"
-                clean_ach.append({"title": lc_title, "url": lc_url or None})
+                clean_ach.append({
+                    "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
+                    "url": lc_url or None,
+                })
 
             for ach in ach_list:
                 t = (ach.get("title") if isinstance(ach, dict) else str(ach)).strip()
@@ -803,16 +803,12 @@ class ProfileCreatorAgent:
             hr_m = re.search(r"(?:hackerrank\s+)?(\d+(?:st|nd|rd|th)?\s*star\s+gold\s+badge)", text, re.IGNORECASE)
             badge = hr_m.group(1) if hr_m else "6th Star Gold Badge"
             hr_title = f"HackerRank {badge} (Problem Solving)"
-            if hr_url:
-                hr_title += f" - {hr_url}"
             achievements_list.append({"title": hr_title, "url": hr_url or None})
 
         if "leetcode" in full_text_lower:
             lc_m = re.search(r"(\d+\+?\s*leetcode\s*questions?)", text, re.IGNORECASE)
             lc_count = lc_m.group(1) if lc_m else "450+ LeetCode questions"
             lc_title = f"Solved {lc_count} demonstrating strong algorithmic problem-solving"
-            if lc_url:
-                lc_title += f" - {lc_url}"
             achievements_list.append({"title": lc_title, "url": lc_url or None})
 
         # Also capture any other awards/certifications from dedicated achievements/certifications section if present

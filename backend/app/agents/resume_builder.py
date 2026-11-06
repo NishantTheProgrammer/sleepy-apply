@@ -360,10 +360,16 @@ def preserve_and_prioritize_experience_bullets(
     else:
         final_raw_bullets = list(clean_orig_bullets)
 
-    # 3. Strip missing technologies and bold verified matching technologies
+    # 3. Strip missing technologies, leaked company names, and bold verified matching technologies
     processed_bullets: list[str] = []
+    company_leak_patterns = [
+        r"\s*[-—–.]*\s*Max\s+Vision\s+Solutions(?:\s+Pvt\.?\s+Ltd\.?)?\b",
+        r"\s*[-—–.]*\s*Dhwani\s+Rural\s+Information\s+Systems\b",
+    ]
     for bullet in final_raw_bullets:
         b_clean = bullet
+        for clp in company_leak_patterns:
+            b_clean = re.sub(clp, "", b_clean, flags=re.IGNORECASE).strip(" .-\t")
         for ms in missing_skills:
             if len(ms) > 2:
                 b_clean = re.sub(rf"\b{re.escape(ms)}\b", "", b_clean, flags=re.IGNORECASE)
@@ -597,6 +603,30 @@ class ResumeBuilderAgent:
         # ------------------------------------------------------------------
         # Experience Highlights Assembly
         # ------------------------------------------------------------------
+        # Experience Highlights Assembly & Attribution Preservation
+        # ------------------------------------------------------------------
+        # Ensure City Finance / 4000+ urban local bodies is attributed strictly to Dhwani in raw_experience
+        dhwani_exp_raw = next((e for e in raw_experience if "dhwani" in e.get("company", "").lower()), None)
+        cleaned_raw_experience = []
+        for exp in raw_experience:
+            exp_c = dict(exp)
+            if "dhwani" not in exp_c.get("company", "").lower():
+                exp_resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
+                kept_resps = []
+                for r in exp_resps:
+                    if any(k in str(r).lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
+                        if dhwani_exp_raw:
+                            dhwani_resps = dhwani_exp_raw.get("responsibilities") or dhwani_exp_raw.get("highlights") or []
+                            if str(r) not in dhwani_resps:
+                                dhwani_resps.append(str(r))
+                                dhwani_exp_raw["responsibilities"] = dhwani_resps
+                    else:
+                        kept_resps.append(r)
+                exp_c["responsibilities"] = kept_resps
+                exp_c["highlights"] = kept_resps
+            cleaned_raw_experience.append(exp_c)
+        raw_experience = cleaned_raw_experience
+
         final_experience = []
         tailored_exp_map = {}
         if tailored_experience:

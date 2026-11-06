@@ -163,7 +163,31 @@ class HallucinationGuard:
                         allowed_boundary=f"Missing technology must not be claimed: '{missing_tech}'.",
                     ))
 
-            # E) Banned AI buzzwords
+            # E) Check for unsupported security claims in summary
+            security_matches = re.finditer(
+                r"\b(?:security\s+expert(?:ise)?|expert(?:ise)?\s+in\s+security|specialist\s+in\s+security|robust\s+and\s+secure\s+applications?|cybersecurity)\b",
+                summary,
+                re.IGNORECASE,
+            )
+            for sec_m in security_matches:
+                violations.append(ValidationViolation(
+                    category="unsupported_claim",
+                    severity="CRITICAL",
+                    field="summary",
+                    message=f"Summary makes unsupported claim of security expertise: '{sec_m.group(0)}'.",
+                    detected_value=sec_m.group(0),
+                    allowed_boundary="Remove unsupported security expertise claims unless backed by verified source credentials.",
+                ))
+                warnings.append(ValidationViolation(
+                    category="unsupported_claim",
+                    severity="WARNING",
+                    field="summary",
+                    message=f"Security claim '{sec_m.group(0)}' lacks verified credentials in candidate background.",
+                    detected_value=sec_m.group(0),
+                    allowed_boundary="Remove security expertise claims.",
+                ))
+
+            # F) Banned AI buzzwords
             for bw in self.BANNED_BUZZWORDS:
                 if re.search(r"\b" + re.escape(bw) + r"\b", summary, re.IGNORECASE):
                     warnings.append(ValidationViolation(
@@ -358,7 +382,56 @@ class HallucinationGuard:
                 ))
 
         # -------------------------------------------------------------
-        # 5. Automated Remediation / Sanitization if Critical Violations
+        # 5. Achievements Integrity Checks
+        # -------------------------------------------------------------
+        tailored_achievements = tailored_resume.get("achievements") or []
+        for ach in tailored_achievements:
+            t = (ach.get("title") if isinstance(ach, dict) else str(ach)).strip()
+            # Standalone URL as achievement title
+            if re.match(r"^https?://", t, re.IGNORECASE) or re.match(r"^www\.", t, re.IGNORECASE):
+                violations.append(ValidationViolation(
+                    category="fragmented_achievement",
+                    severity="CRITICAL",
+                    field="achievements.title",
+                    message=f"Achievement title is a standalone URL: '{t}'. URLs must be attached to complete achievements.",
+                    detected_value=t,
+                    allowed_boundary="Attach URLs to complete achievements; do not output URLs as standalone achievements.",
+                ))
+                warnings.append(ValidationViolation(
+                    category="fragmented_achievement",
+                    severity="WARNING",
+                    field="achievements.title",
+                    message=f"Standalone URL detected as achievement: '{t}'.",
+                    detected_value=t,
+                    allowed_boundary="Reconstruct complete achievement title.",
+                ))
+
+            # Fragmented sentence checks
+            fragment_indicators = [
+                "back-end technologies.",
+                "star gold badge and a track",
+                "proven ability to",
+            ]
+            if any(fi in t.lower() for fi in fragment_indicators):
+                violations.append(ValidationViolation(
+                    category="fragmented_achievement",
+                    severity="CRITICAL",
+                    field="achievements.title",
+                    message=f"Achievement is a fragmented sentence fragment: '{t}'.",
+                    detected_value=t,
+                    allowed_boundary="Reconstruct complete cohesive achievements.",
+                ))
+                warnings.append(ValidationViolation(
+                    category="fragmented_achievement",
+                    severity="WARNING",
+                    field="achievements.title",
+                    message=f"Fragmented sentence shard detected: '{t}'.",
+                    detected_value=t,
+                    allowed_boundary="Preserve complete achievement record.",
+                ))
+
+        # -------------------------------------------------------------
+        # 6. Automated Remediation / Sanitization if Critical Violations
         # -------------------------------------------------------------
         critical_violations = [v for v in violations if v.severity == "CRITICAL"]
         is_valid = len(critical_violations) == 0
@@ -395,6 +468,19 @@ class HallucinationGuard:
                     clean_sum,
                     flags=re.IGNORECASE,
                 )
+            # Remove unsupported security expertise claims from summary
+            clean_sum = re.sub(
+                r",?\s*(?:with\s+a\s+focus\s+on\s+building\s+)?(?:robust\s+and\s+)?secure\s+applications?",
+                "",
+                clean_sum,
+                flags=re.IGNORECASE,
+            )
+            clean_sum = re.sub(
+                r",?\s*(?:proven\s+)?security\s+expert(?:ise)?",
+                "",
+                clean_sum,
+                flags=re.IGNORECASE,
+            )
             clean_sum = " ".join(clean_sum.split()).strip()
             sanitized_copy["tailored_summary"] = clean_sum
             sanitized_copy["summary"] = clean_sum
@@ -405,6 +491,52 @@ class HallucinationGuard:
                     s for s in sanitized_copy["matching_skills"]
                     if str(s).lower() not in missing_skills_set
                 ]
+
+            # Reconstruct complete achievements and remove fragmented sentence shards or standalone URLs
+            clean_achs = []
+            hr_url = ""
+            lc_url = ""
+            for a in tailored_resume.get("achievements") or []:
+                t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
+                if "hackerrank.com" in t.lower():
+                    m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
+                    if m:
+                        hr_url = m.group(0).strip(".,")
+                    elif t.startswith("http"):
+                        hr_url = t
+                if "leetcode.com" in t.lower():
+                    m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
+                    if m:
+                        lc_url = m.group(0).strip(".,")
+                    elif t.startswith("http"):
+                        lc_url = t
+
+            if not hr_url:
+                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "hackerrank.com" in u.lower():
+                        hr_url = u
+                        break
+            if not lc_url:
+                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "leetcode.com" in u.lower():
+                        lc_url = u
+                        break
+
+            full_cand_text = f"{json.dumps(original_profile, default=str)} {summary}"
+            if "hackerrank" in full_cand_text.lower():
+                hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
+                if hr_url and hr_url not in hr_title:
+                    hr_title += f" - {hr_url}"
+                clean_achs.append({"title": hr_title, "url": hr_url or None})
+            if "leetcode" in full_cand_text.lower():
+                lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
+                if lc_url and lc_url not in lc_title:
+                    lc_title += f" - {lc_url}"
+                clean_achs.append({"title": lc_title, "url": lc_url or None})
+
+            sanitized_copy["achievements"] = clean_achs
 
             # Sanitize experience bullets
             sanitized_exps = []

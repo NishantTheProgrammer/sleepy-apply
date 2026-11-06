@@ -746,3 +746,89 @@ def test_unsupported_outcome_claims_fail_validation(candidate_profile, pocketpil
     assert "enhance workflow efficiency" not in sanitized_proj.lower()
 
 
+def test_security_expertise_claim_fails_validation(candidate_profile, pocketpills_jd):
+    """Unsupported security expertise claims in summary must fail validation with is_valid=False and warning."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    sec_resume = {
+        "target_headline": "Senior Backend Engineer | Node.js, SQL",
+        "tailored_summary": "Seasoned Full Stack Developer with 5+ years experience and proven security expertise, with a focus on building robust and secure applications.",
+        "experience": candidate_profile["experience"],
+        "education": candidate_profile["education"],
+    }
+
+    val_res = guard.validate_and_sanitize(sec_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "unsupported_claim" in categories
+    assert any(w.category == "unsupported_claim" for w in val_res.warnings)
+
+    # In sanitized summary, security expertise claims must be removed
+    sanitized_sum = val_res.sanitized_content["summary"]
+    assert "security expertise" not in sanitized_sum.lower()
+    assert "secure applications" not in sanitized_sum.lower()
+
+
+def test_fragmented_achievements_fail_validation(candidate_profile, pocketpills_jd):
+    """Standalone URLs as titles or fragmented achievement shards must fail validation with is_valid=False and warning."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    fragmented_resume = {
+        "target_headline": "Senior Backend Engineer | Node.js, SQL",
+        "tailored_summary": "Full Stack Developer with 5 years experience.",
+        "experience": candidate_profile["experience"],
+        "education": candidate_profile["education"],
+        "achievements": [
+            {"title": "back-end technologies. Demonstrated proficiency in problem-solving with a HackerRank 6th"},
+            {"title": "https://www.hackerrank.com/profile/NishantThePro"},
+            {"title": "https://leetcode.com/NishantTheProgrammer"},
+        ],
+    }
+
+    val_res = guard.validate_and_sanitize(fragmented_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "fragmented_achievement" in categories
+    assert any(w.category == "fragmented_achievement" for w in val_res.warnings)
+
+    # In sanitized output, must reconstruct 2 cohesive achievements with URLs attached, zero standalone URLs
+    sanitized_achs = val_res.sanitized_content["achievements"]
+    assert len(sanitized_achs) == 2
+    for sa in sanitized_achs:
+        title = sa["title"]
+        assert not title.startswith("http://") and not title.startswith("https://")
+        assert "back-end technologies." not in title
+    assert any("HackerRank 6th Star Gold Badge" in sa["title"] and "https://www.hackerrank.com/profile/NishantThePro" in sa["title"] for sa in sanitized_achs)
+    assert any("450+ LeetCode" in sa["title"] and "https://leetcode.com/NishantTheProgrammer" in sa["title"] for sa in sanitized_achs)
+
+
+def test_company_attribution_and_leak_prevention(candidate_profile, pocketpills_jd):
+    """Company names leaking into bullet text must be stripped, and City Finance must belong exclusively to Dhwani."""
+    from app.agents.resume_builder import preserve_and_prioritize_experience_bullets
+
+    leaked_bullet = [
+        "Implemented a bulk upload service handling data for 4000+ urban local bodies and their finance. Max Vision Solutions Pvt. Ltd."
+    ]
+
+    cleaned = preserve_and_prioritize_experience_bullets(
+        company_name="Dhwani Rural Information Systems",
+        original_bullets=leaked_bullet,
+        ai_bullets=None,
+        matching_skills=["SQL"],
+        missing_skills=["CI/CD"],
+        job_title=pocketpills_jd["title"],
+        company=pocketpills_jd["company"],
+        job_description=pocketpills_jd["description"],
+    )
+
+    # Bullet must have stripped the leaked company name "Max Vision Solutions Pvt. Ltd."
+    assert len(cleaned) == 1
+    assert "Max Vision Solutions" not in cleaned[0]
+    assert "4000+ urban local bodies" in cleaned[0]
+
+
+

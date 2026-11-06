@@ -154,6 +154,7 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
             reader = PdfReader(io.BytesIO(content))
             # Extract text preserving visual column layout
             pages_text = []
+            extracted_links = []
             for page in reader.pages:
                 try:
                     p_txt = page.extract_text(extraction_mode="layout")
@@ -161,10 +162,22 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
                     p_txt = page.extract_text()
                 if p_txt:
                     pages_text.append(p_txt)
+                try:
+                    if "/Annots" in page:
+                        for annot in page["/Annots"]:
+                            obj = annot.get_object()
+                            if "/A" in obj and "/URI" in obj["/A"]:
+                                uri = str(obj["/A"]["/URI"]).strip()
+                                if uri and uri not in extracted_links:
+                                    extracted_links.append(uri)
+                except Exception:
+                    pass
             text = "\n".join(pages_text)
             if not text.strip():
                 # Fallback to plain extraction
                 text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            if extracted_links:
+                text = text + "\n\nLINKS:\n" + "\n".join(extracted_links)
         except Exception as e:
             logger.error("Failed to extract PDF text", error=str(e), filename=file.filename)
             raise HTTPException(status_code=400, detail=f"Failed to read PDF: {str(e)}")

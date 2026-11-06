@@ -16,6 +16,7 @@ export interface TailoredResumeContent {
   job_id?: string;
   job_title?: string;
   company?: string;
+  target_headline?: string;
   tailored_summary?: string;
   matching_skills?: string[];
   required_skills?: string[];

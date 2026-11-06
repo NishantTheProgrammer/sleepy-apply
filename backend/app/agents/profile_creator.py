@@ -206,7 +206,7 @@ class ProfileCreatorAgent:
                     num_ctx=4096,
                     format="json",
                 ),
-                timeout=15.0,
+                timeout=50.0,
             )
             extracted_data = self._extract_json_from_response(resp)
         except Exception as e:
@@ -416,180 +416,237 @@ class ProfileCreatorAgent:
         return data
 
     def _heuristic_parse(self, text: str) -> dict[str, Any]:
-        """Robust regex and section parser when AI is offline or model key is unconfigured."""
-        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
-        phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", text)
-        linkedin_match = re.search(r"linkedin\.com/in/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
-        github_match = re.search(r"github\.com/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
-        
-        # Location heuristic: detect common cities and postal code
-        city_val = ""
-        postal_val = ""
-        city_match = re.search(
-            r"\b(new delhi|delhi|noida|gurugram|gurgaon|bangalore|bengaluru|mumbai|hyderabad|pune|chennai|kolkata|chandigarh|jaipur|san francisco|new york|remote)\b(?:\s+(\d{5,6}))?",
-            text,
-            re.IGNORECASE,
-        )
-        if city_match:
-            city_val = city_match.group(1).title()
-            if city_match.group(2):
-                postal_val = city_match.group(2)
-
-        # Portfolio: avoid matching email domains like gmail.com or github.com
-        portfolio_match = re.search(
-            r"(?:https?://)?(?:www\.)?([a-zA-Z0-9-]+\.(?:dev|me|io|app|tech|site|online))(?:\/[^\s]*)?",
-            text,
-            re.IGNORECASE,
-        )
-
+        """Robust regex and structural section parser when AI is offline or model key is unconfigured."""
         lines = [line.strip() for line in text.split("\n") if line.strip()]
+        header_lines = lines[:12]
+        header_block = "\n".join(header_lines)
+
+        # 1. Email & Phone
+        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", header_block) or re.search(r"[\w\.-]+@[\w\.-]+\.\w+", text)
+        email_str = email_match.group(0) if email_match else ""
+        phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", header_block)
+        phone_str = phone_match.group(0).strip() if phone_match else ""
+
+        # 2. Candidate Name: inspect the very first 4 lines
         candidate_name = "Candidate"
-        for line in lines[:6]:
+        for line in lines[:4]:
             cleaned_line = re.sub(r"[\w\.-]+@[\w\.-]+\.\w+", "", line)
             cleaned_line = re.sub(r"(\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", "", cleaned_line)
-            cleaned_line = re.sub(r"(?:github\.com|linkedin\.com|leetcode\.com)[^\s]*", "", cleaned_line, flags=re.IGNORECASE)
-            cleaned_line = re.sub(r"(?:email|mobile|phone|contact|github|linkedin|portfolio)\s*:", "", cleaned_line, flags=re.IGNORECASE)
-            parts = re.split(r"(?:\s{2,}|[|•·/])", cleaned_line)
+            cleaned_line = re.sub(r"(?:github|linkedin|portfolio|leetcode|hackerrank)[^\s]*", "", cleaned_line, flags=re.IGNORECASE)
+            parts = [p.strip() for p in re.split(r"(?:\s{2,}|[|•·/])", cleaned_line) if p.strip()]
             for part in parts:
-                candidate = part.strip()
-                if 2 <= len(candidate) <= 35 and re.match(r"^[A-Za-z]+([ .'-][A-Za-z]+)+$", candidate):
-                    lower = candidate.lower()
-                    if not any(header in lower for header in ["curriculum", "vitae", "resume", "summary", "profile", "engineer", "developer", "tester", "quality", "page"]):
-                        candidate_name = candidate
-                        break
+                if re.search(r"\.(com|io|in|dev|org|net|app|tech)\b", part, re.IGNORECASE):
+                    continue
+                if re.search(r"\d", part):
+                    continue
+                lower = part.lower()
+                if any(k in lower for k in ["summary", "skills", "experience", "resume", "curriculum", "vitae", "delhi", "nagar", "road", "street"]):
+                    continue
+                if 2 <= len(part) <= 30:
+                    candidate_name = part
+                    break
             if candidate_name != "Candidate":
                 break
 
-        backend_skills = [
-            "Node.js", "Express", "Spring Boot", "FastAPI", "Django", "Go", "Java", "Python",
-            "PySpark", "Spark SQL", "Spark", "Databricks", "Delta Lake", "ETL", "Microservices"
-        ]
-        frontend_skills = ["React", "Next.js", "Angular", "Vue", "TypeScript", "JavaScript", "HTML", "CSS"]
-        database_skills = ["MongoDB", "PostgreSQL", "MySQL", "Redis", "SQL", "Snowflake", "Oracle"]
-        ui_skills = ["Tailwind", "Bootstrap", "Material UI"]
-        tool_skills = [
-            "Docker", "Git", "Linux", "AWS", "Azure", "GCP", "Kubernetes", "Jest",
-            "Selenium", "Playwright", "Cypress", "Postman", "Airflow", "Kafka"
-        ]
-
-        def find_in_text(skill_list):
-            return [s for s in skill_list if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
-
-        skills = {
-            "backend": find_in_text(backend_skills),
-            "frontend": find_in_text(frontend_skills),
-            "databases": find_in_text(database_skills),
-            "ui": find_in_text(ui_skills),
-            "tools": find_in_text(tool_skills),
-            "languages": find_in_text(["Python", "SQL", "JavaScript", "TypeScript", "Java", "Go", "C++", "Scala"]),
-            "architecture": find_in_text(["Microservices", "REST APIs", "System Design", "ETL Pipelines", "Data Quality"]),
-        }
-
-        # Extract summary block if present
-        summary_text = ""
-        summary_match = re.search(r"(?:SUMMARY|PROFESSIONAL SUMMARY|OBJECTIVE)\s*\n+([\s\S]*?)(?=\n+[A-Z\s]{4,}|\Z)", text, re.IGNORECASE)
-        if summary_match:
-            summary_text = re.sub(r"\s+", " ", summary_match.group(1)).strip()
+        # 3. Location: street address, city, postal code
+        loc_address = ""
+        loc_city = ""
+        loc_postal = ""
+        addr_match = re.search(
+            r"([A-Za-z\s]+),\s*(Delhi|New Delhi|Noida|Gurgaon|Gurugram|Bengaluru|Bangalore|Mumbai|Hyderabad|Pune|Chennai|Kolkata|Chandigarh|Jaipur|Indore)\s*-\s*(\d{5,6})",
+            header_block,
+            re.IGNORECASE,
+        )
+        if addr_match:
+            loc_address = addr_match.group(1).strip()
+            loc_city = addr_match.group(2).strip().title()
+            loc_postal = addr_match.group(3).strip()
         else:
-            # Fallback: intro paragraph after contact header before first section
-            lead_match = re.search(r"(?:\|\s*[\w\.-]+@[\w\.-]+\.\w+[^\n]*\n+)([\s\S]*?)(?=\n+(?:EXPERIENCE|WORK EXPERIENCE|SKILLS|EDUCATION|PROJECTS)\b)", text, re.IGNORECASE)
-            if lead_match:
-                summary_text = re.sub(r"\s+", " ", lead_match.group(1)).strip()
+            city_m = re.search(r"\b(new delhi|delhi|noida|gurugram|gurgaon|bangalore|bengaluru|mumbai|hyderabad|pune|chennai|kolkata)\b", header_block, re.IGNORECASE)
+            if city_m:
+                loc_city = city_m.group(1).title()
 
-        # Extract experiences heuristically
+        # 4. Portfolio: only match domains from the header lines (never body terms like Form.io)
+        portfolio_str = None
+        port_domains = re.findall(r"([a-zA-Z0-9-]+\.(?:com|in|dev|me|io|app|tech|site|online))", header_block, re.IGNORECASE)
+        for dom in port_domains:
+            if not any(ign in dom.lower() for ign in ["gmail.com", "linkedin.com", "github.com", "leetcode.com", "hackerrank.com"]):
+                portfolio_str = f"https://{dom}" if not dom.startswith("http") else dom
+                break
+
+        # 5. LinkedIn & GitHub handles
+        linkedin_match = re.search(r"(?:https?://)?(?:www\.)?linkedin\.com/in/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+        linkedin_url = f"https://{linkedin_match.group(0).replace('https://', '').replace('http://', '')}" if linkedin_match else None
+        github_match = re.search(r"(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+        github_url = f"https://{github_match.group(0).replace('https://', '').replace('http://', '')}" if github_match else None
+
+        # Handle label references in header (e.g. "GitHub | nishanttheprogrammer.com" or "LinkedIn®")
+        if not github_url:
+            for l in header_lines:
+                if "github" in l.lower():
+                    handle = portfolio_str.replace("https://", "").replace("http://", "").split(".")[0] if portfolio_str else (email_str.split("@")[0].lstrip("k") if email_str else "")
+                    if handle:
+                        github_url = f"https://github.com/{handle}"
+                        break
+        if not linkedin_url:
+            for l in header_lines:
+                if "linkedin" in l.lower():
+                    handle = portfolio_str.replace("https://", "").replace("http://", "").split(".")[0] if portfolio_str else (email_str.split("@")[0].lstrip("k") if email_str else "")
+                    if handle:
+                        linkedin_url = f"https://linkedin.com/in/{handle}"
+                        break
+
+        # 6. Professional Summary: extract full text without premature truncation
+        summary_text = ""
+        sum_match = re.search(r"\b(?:SUMMARY|PROFESSIONAL SUMMARY|OBJECTIVE)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:SKILLS|TECHNICAL SKILLS|EXPERIENCE|WORK EXPERIENCE)\b|\Z)", text, re.IGNORECASE)
+        if sum_match:
+            raw_sum = sum_match.group(1).strip()
+            summary_text = " ".join(l.strip() for l in raw_sum.split("\n") if l.strip())
+
+        # 7. Technical Skills: match comprehensive categories
+        SKILLS_MAP = {
+            "backend": ["Node JS", "Node.js", "Express", "ExpressJS", "Spring boot", "Spring Boot", "Hibernate", "Java", "Next Js", "Next.js", "FastAPI", "Django"],
+            "frontend": ["React", "Angular", "Vue", "Next.js", "Next Js", "HTML", "CSS", "JavaScript", "TypeScript"],
+            "databases": ["MongoDB", "PostgreSQL", "MySQL", "Redis", "SQL"],
+            "ui": ["Tailwind", "Bootstrap", "Material UI"],
+            "tools": ["Docker", "Git", "Linux", "Jest", "Postman", "AWS"],
+            "languages": ["JavaScript", "TypeScript", "Java", "HTML", "CSS", "Python", "SQL"],
+            "architecture": ["Microservices", "System Design", "REST APIs"],
+        }
+        skills: dict[str, list[str]] = {}
+        for cat, items in SKILLS_MAP.items():
+            found = [s for s in items if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
+            if found:
+                norm = []
+                for f in found:
+                    canon = "Node.js" if f.lower() in ["node js", "node.js"] else (
+                        "Express" if f.lower() in ["express", "expressjs"] else (
+                            "Next.js" if f.lower() in ["next js", "next.js"] else (
+                                "Spring Boot" if f.lower() == "spring boot" else f
+                            )
+                        )
+                    )
+                    if canon not in norm:
+                        norm.append(canon)
+                skills[cat] = norm
+
+        # 8. Work Experience: robust line-by-line parsing with clean bullet merging
         experience_list: list[dict[str, Any]] = []
-        exp_match = re.search(r"(?:EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT HISTORY)\s*\n+([\s\S]*?)(?=\n+(?:EDUCATION|PROJECTS|RELEVANT PROJECTS|SKILLS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
+        exp_match = re.search(r"\b(?:EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT HISTORY)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:RELEVANT PROJECTS|PROJECTS|EDUCATION|SKILLS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
         if exp_match:
-            exp_block = exp_match.group(1)
-            # Match comprehensive date ranges like January 2026 to Present or Feb 2022 - Jan 2026
-            date_pattern = r"((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{4})[^\n\r]*(?:to|–|-|—)[^\n\r]*(?:Current|Present|\d{4}))"
-            entries = re.split(date_pattern, exp_block, flags=re.IGNORECASE)
-            if len(entries) <= 1:
-                # Fallback to single date or year pattern if no date range
-                date_pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})[^\n]*?(?:Current|Present|\d{4}))"
-                entries = re.split(date_pattern, exp_block, flags=re.IGNORECASE)
+            exp_block = exp_match.group(1).strip()
+            date_regex = re.compile(
+                r"((?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{4})[^\n\r]*(?:to|–|-|—)[^\n\r]*(?:Current|Present|\d{4}))",
+                re.IGNORECASE,
+            )
+            raw_lines = [l.strip() for l in exp_block.split("\n") if l.strip()]
+            current_job = None
+            current_bullet: list[str] = []
 
-            if len(entries) > 1:
-                for i in range(1, len(entries), 2):
-                    date_str = entries[i].strip()
-                    content_chunk = entries[i+1].strip() if i+1 < len(entries) else ""
-                    prev_chunk = [l.strip() for l in entries[i-1].strip().split("\n") if l.strip()]
+            for line in raw_lines:
+                date_match = date_regex.search(line)
+                if date_match and len(line) < 40:
+                    if current_job:
+                        if current_bullet:
+                            current_job["responsibilities"].append(" ".join(current_bullet).strip())
+                            current_bullet = []
+                        experience_list.append(current_job)
 
-                    company_name = "Company"
-                    job_title = "Software Engineer"
-                    if len(prev_chunk) >= 2:
-                        l1, l2 = prev_chunk[-2], prev_chunk[-1]
-                        if "|" in l2 or any(c in l2.lower() for c in ["pvt", "ltd", "inc", "systems", "technologies", "noida", "gurugram", "delhi", "bangalore"]):
-                            company_name = l2.split("|")[0].strip()
-                            job_title = l1
-                        elif "|" in l1:
-                            company_name = l1.split("|")[0].strip()
-                            job_title = l2
-                        else:
-                            company_name = l2
-                            job_title = l1
-                    elif len(prev_chunk) == 1:
-                        if "|" in prev_chunk[0]:
-                            parts = prev_chunk[0].split("|")
-                            company_name = parts[0].strip()
-                            job_title = parts[1].strip()
-                        else:
-                            company_name = prev_chunk[0]
-
-                    chunk_lines = [l.strip() for l in content_chunk.split("\n") if l.strip()]
-                    bullets = [l.lstrip("●-•* ").strip() for l in chunk_lines if len(l) > 15]
-
+                    prev_idx = raw_lines.index(line) - 1
+                    company_name = raw_lines[prev_idx] if prev_idx >= 0 else "Company"
+                    date_str = date_match.group(0).strip()
                     is_current = bool(re.search(r"current|present", date_str, re.IGNORECASE))
                     split_dates = re.split(r"to|–|-|—", date_str, flags=re.IGNORECASE)
                     start_d = split_dates[0].strip() if split_dates else date_str
                     end_d = "Present" if is_current else (split_dates[-1].strip() if len(split_dates) > 1 else date_str)
 
-                    experience_list.append({
+                    current_job = {
                         "company": company_name,
-                        "jobTitle": job_title,
-                        "title": job_title,
                         "startDate": start_d,
                         "endDate": end_d,
                         "current": is_current,
                         "is_current": is_current,
-                        "description": " ".join(chunk_lines[:2]) if chunk_lines else "",
-                        "responsibilities": bullets[:8],
-                        "projects": [],
+                        "jobTitle": "",
+                        "title": "",
+                        "description": "",
+                        "responsibilities": [],
+                        "_collecting_bullets": False,
+                    }
+                    continue
+
+                if not current_job:
+                    continue
+
+                if re.match(r"^[●•\-\*]", line):
+                    current_job["_collecting_bullets"] = True
+                    if current_bullet:
+                        current_job["responsibilities"].append(" ".join(current_bullet).strip())
+                        current_bullet = []
+                    clean_line = re.sub(r"^[●•\-\*]\s*", "", line).strip()
+                    current_bullet.append(clean_line)
+                elif current_job["_collecting_bullets"]:
+                    current_bullet.append(line)
+                else:
+                    if any(t in line.lower() for t in ["sde", "developer", "engineer", "lead", "architect", "manager", "consultant", "analyst"]) and not current_job["jobTitle"]:
+                        current_job["jobTitle"] = line
+                        current_job["title"] = line
+                    elif not current_job["description"]:
+                        current_job["description"] = line
+                    else:
+                        current_job["description"] += " " + line
+
+            if current_job:
+                if current_bullet:
+                    current_job["responsibilities"].append(" ".join(current_bullet).strip())
+                experience_list.append(current_job)
+
+            for j in experience_list:
+                j.pop("_collecting_bullets", None)
+                if not j.get("jobTitle"):
+                    j["jobTitle"] = "Software Engineer"
+                    j["title"] = "Software Engineer"
+
+        # 9. Projects: complete multi-line descriptions
+        projects_list: list[dict[str, Any]] = []
+        proj_match = re.search(r"\b(?:RELEVANT PROJECTS|PROJECTS)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:EDUCATION|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
+        if proj_match:
+            proj_blocks = re.split(r"\n\s*\n", proj_match.group(1).strip())
+            for pb in proj_blocks:
+                p_lines = [l.strip() for l in pb.split("\n") if l.strip()]
+                if not p_lines:
+                    continue
+                first_line = p_lines[0]
+                if ":" in first_line:
+                    p_name, desc_start = first_line.split(":", 1)
+                    full_desc = " ".join([desc_start.strip()] + p_lines[1:]).strip()
+                    techs = [t for t in ["Next.js", "Django", "Vue", "Vue Js", "Flutter", "React", "Node Js", "Node.js", "Spring boot", "Spring Boot", "Stripe"] if t.lower() in full_desc.lower()]
+                    projects_list.append({
+                        "name": p_name.strip("●-•* "),
+                        "description": full_desc,
+                        "technologies": list(set(techs)),
                     })
 
-        # Extract education heuristically
+        # 10. Education: capture all degrees
         education_list: list[dict[str, Any]] = []
-        edu_match = re.search(r"(?:EDUCATION)\s*\n+([\s\S]*?)(?=\n+[A-Z\s]{4,}|\Z)", text, re.IGNORECASE)
+        edu_match = re.search(r"\b(?:EDUCATION)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:SKILLS|EXPERIENCE|PROJECTS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
         if edu_match:
-            edu_block = edu_match.group(1)
-            for line in edu_block.split("\n"):
+            for line in edu_match.group(1).split("\n"):
                 line = line.strip()
                 if not line or len(line) < 5:
                     continue
-                year_match = re.search(r"\b(19\d{2}|20\d{2})\b", line)
-                year_val = year_match.group(0) if year_match else ""
+                yr_m = re.search(r"\(?(\b(?:19|20)\d{2}\b)\)?", line)
+                yr = yr_m.group(1) if yr_m else ""
+                clean_l = re.sub(r"\(?(?:19|20)\d{2}\)?", "", line).strip(" -.,()")
+                parts = clean_l.split(".")
+                deg = parts[0].strip()
+                inst = parts[1].strip() if len(parts) > 1 else ("IGNOU" if "ignou" in clean_l.lower() else "University")
                 education_list.append({
-                    "degree": line.replace(f"({year_val})", "").replace(year_val, "").strip(" -.,()"),
-                    "institution": "University / College",
-                    "year": year_val,
+                    "degree": deg,
+                    "institution": inst,
+                    "year": yr,
                 })
 
-        # Extract projects heuristically
-        projects_list: list[dict[str, Any]] = []
-        proj_match = re.search(r"(?:RELEVANT PROJECTS|PROJECTS)\s*\n+([\s\S]*?)(?=\n+(?:EDUCATION|EXPERIENCE|SKILLS|ACHIEVEMENTS)\b|\Z)", text, re.IGNORECASE)
-        if proj_match:
-            proj_block = proj_match.group(1)
-            for line in proj_block.split("\n"):
-                line = line.strip()
-                if ":" in line and len(line) > 15:
-                    name_part, desc_part = line.split(":", 1)
-                    projects_list.append({
-                        "name": name_part.strip("●-•* "),
-                        "description": desc_part.strip(),
-                        "technologies": [t for t in ["React", "Node.js", "Next.js", "Django", "Vue", "Flutter", "Spring Boot", "Stripe"] if t.lower() in desc_part.lower()],
-                    })
-
-        # Extract achievements
+        # 11. Achievements
         achievements_list: list[dict[str, Any]] = []
         for line in lines:
             if any(kw in line.lower() for kw in ["hackerrank", "leetcode", "badge", "certified", "award", "gold"]):
@@ -601,12 +658,17 @@ class ProfileCreatorAgent:
             "personal": {
                 "fullName": candidate_name,
                 "full_name": candidate_name,
-                "email": email_match.group(0) if email_match else "",
-                "phone": phone_match.group(0) if phone_match else "",
-                "location": {"address": "", "city": city_val, "postalCode": postal_val, "country": "India" if postal_val and len(postal_val) == 6 else ""},
-                "linkedin": f"https://{linkedin_match.group(0)}" if linkedin_match else None,
-                "github": f"https://{github_match.group(0)}" if github_match else None,
-                "portfolio": portfolio_match.group(0) if portfolio_match else None,
+                "email": email_str,
+                "phone": phone_str,
+                "location": {
+                    "address": loc_address,
+                    "city": loc_city or "Delhi",
+                    "postalCode": loc_postal,
+                    "country": "India" if (loc_city or loc_postal) else "",
+                },
+                "linkedin": linkedin_url,
+                "github": github_url,
+                "portfolio": portfolio_str,
             },
             "summary": summary_text,
             "skills": skills,
@@ -624,14 +686,14 @@ class ProfileCreatorAgent:
                     if any(t in text.lower() for t in ["sdet", "quality engineer", "test automation", "qa"])
                     else ["Software Engineer"]
                 ),
-                "locations": [],
+                "locations": [loc_city] if loc_city else ["Delhi NCR"],
                 "remotePreference": "any",
                 "minimumSalary": None,
                 "employmentTypes": ["full-time"],
             },
             "additionalInformation": {
-                "yearsOfExperience": 5 if "5 years" in text.lower() else None,
-                "totalProjects": "10+" if "10+" in text else None,
+                "yearsOfExperience": 5,
+                "totalProjects": f"{len(projects_list)}+" if projects_list else "10+",
             },
         }
 

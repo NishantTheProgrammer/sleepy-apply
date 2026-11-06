@@ -38,7 +38,7 @@ async def parse_resume_node(state: ProfileState) -> ProfileState:
         import asyncio
         parsed = await asyncio.wait_for(
             agent.analyze_resume(resume_text, user_settings=user_settings),
-            timeout=20.0,
+            timeout=55.0,
         )
         return {"parsed_data": parsed, "error": None}
     except Exception as e:

@@ -422,7 +422,7 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
                 {/* Suggested options chips */}
                 {q.suggested_options && q.suggested_options.length > 0 && (
                   <div className="mt-3 mb-2 flex flex-wrap gap-1.5">
-                    {q.suggested_options.map((opt) => {
+                    {q.suggested_options.map((opt, optIdx) => {
                       const selectedList = selectedChips[q.id] || [];
                       const isMulti = q.type === "multiselect";
                       const isOptionSelected =
@@ -433,7 +433,7 @@ export default function ResumeScreeningQA({ onProfileUpdated }: ResumeScreeningQ
 
                       return (
                         <button
-                          key={opt}
+                          key={`${q.id}-opt-${opt}-${optIdx}`}
                           type="button"
                           onClick={() => handleToggleChip(q, opt)}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer text-left ${

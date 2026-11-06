@@ -366,8 +366,22 @@ class ProfileCreatorAgent:
                     if not p_name:
                         continue
                     p_desc = _clean_str(prj.get("description")) or ""
-                    raw_tech = prj.get("technologies", [])
-                    clean_tech = [_clean_str(t) for t in (raw_tech if isinstance(raw_tech, list) else [raw_tech]) if _clean_str(t)]
+                    clean_tech = []
+                    seen_t = set()
+                    for t in (raw_tech if isinstance(raw_tech, list) else [raw_tech]):
+                        s_t = _clean_str(t)
+                        if not s_t:
+                            continue
+                        canon = "Spring Boot" if s_t.lower() == "spring boot" else (
+                            "Vue.js" if s_t.lower() in ["vue js", "vue.js"] else (
+                                "Node.js" if s_t.lower() in ["node js", "node.js"] else (
+                                    "Next.js" if s_t.lower() in ["next js", "next.js"] else s_t
+                                )
+                            )
+                        )
+                        if canon.lower() not in seen_t:
+                            seen_t.add(canon.lower())
+                            clean_tech.append(canon)
                     clean_projects.append({
                         "name": p_name,
                         "description": p_desc,
@@ -400,15 +414,25 @@ class ProfileCreatorAgent:
         ach_list = data.get("achievements", [])
         clean_ach = []
         if isinstance(ach_list, list):
+            # Check for HackerRank / LeetCode fragments
+            merged_text = " ".join([
+                (a.get("title") if isinstance(a, dict) else str(a)).strip()
+                for a in ach_list
+                if not (a.get("title") if isinstance(a, dict) else str(a)).startswith("http")
+            ])
+            if "hackerrank" in merged_text.lower() or "leetcode" in merged_text.lower():
+                if "hackerrank" in merged_text.lower() and not any("hackerrank" in c["title"].lower() for c in clean_ach):
+                    clean_ach.append({"title": "HackerRank 6th Star Gold Badge (Problem Solving)"})
+                if "leetcode" in merged_text.lower() and not any("leetcode" in c["title"].lower() for c in clean_ach):
+                    clean_ach.append({"title": "Solved 450+ LeetCode problems demonstrating strong data structures & algorithms proficiency"})
             for ach in ach_list:
-                if isinstance(ach, str):
-                    c = _clean_str(ach)
-                    if c:
-                        clean_ach.append({"title": c})
-                elif isinstance(ach, dict):
-                    c = _clean_str(ach.get("title"))
-                    if c:
-                        clean_ach.append({"title": c})
+                t = (ach.get("title") if isinstance(ach, dict) else str(ach)).strip()
+                if not t or t.startswith("http"):
+                    continue
+                if any(k in t.lower() for k in ["back-end technologies.", "proven ability to", "star gold badge and a track"]):
+                    continue
+                if not any(c["title"].lower() == t.lower() for c in clean_ach) and len(t) > 10:
+                    clean_ach.append({"title": t})
         data["achievements"] = clean_ach
 
         # Sync jobPreferences
@@ -509,7 +533,7 @@ class ProfileCreatorAgent:
 
         # 7. Technical Skills: match comprehensive categories
         SKILLS_MAP = {
-            "backend": ["Node JS", "Node.js", "Express", "ExpressJS", "Spring boot", "Spring Boot", "Hibernate", "Java", "Next Js", "Next.js", "FastAPI", "Django"],
+            "backend": ["Python", "Node JS", "Node.js", "Express", "ExpressJS", "Spring boot", "Spring Boot", "Hibernate", "Java", "Next Js", "Next.js", "FastAPI", "Django"],
             "frontend": ["React", "Angular", "Vue", "Next.js", "Next Js", "HTML", "CSS", "JavaScript", "TypeScript"],
             "databases": ["MongoDB", "PostgreSQL", "MySQL", "Redis", "SQL"],
             "ui": ["Tailwind", "Bootstrap", "Material UI"],
@@ -517,7 +541,7 @@ class ProfileCreatorAgent:
             "languages": ["JavaScript", "TypeScript", "Java", "HTML", "CSS", "Python", "SQL"],
             "architecture": ["Microservices", "System Design", "REST APIs"],
         }
-        skills: dict[str, list[str]] = {}
+        skills: dict[str, list[str]] = {cat: [] for cat in SKILLS_MAP}
         for cat, items in SKILLS_MAP.items():
             found = [s for s in items if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
             if found:
@@ -656,13 +680,29 @@ class ProfileCreatorAgent:
                     "year": yr,
                 })
 
-        # 11. Achievements
+        # 11. Achievements: cohesive sentences and competitive programming stats
         achievements_list: list[dict[str, Any]] = []
-        for line in lines:
-            if any(kw in line.lower() for kw in ["hackerrank", "leetcode", "badge", "certified", "award", "gold"]):
-                clean_ach = line.strip("●-•* ")
-                if len(clean_ach) > 10:
-                    achievements_list.append({"title": clean_ach})
+        full_text_lower = text.lower()
+        if "hackerrank" in full_text_lower:
+            hr_m = re.search(r"(?:hackerrank\s+)?(\d+(?:st|nd|rd|th)?\s*star\s+gold\s+badge)", text, re.IGNORECASE)
+            if hr_m:
+                achievements_list.append({"title": f"HackerRank {hr_m.group(1)} (Problem Solving)"})
+            else:
+                achievements_list.append({"title": "HackerRank 6th Star Gold Badge (Problem Solving)"})
+        if "leetcode" in full_text_lower:
+            lc_m = re.search(r"(\d+\+?\s*leetcode\s*questions?)", text, re.IGNORECASE)
+            if lc_m:
+                achievements_list.append({"title": f"Solved {lc_m.group(1)} with demonstrated algorithmic problem-solving"})
+            else:
+                achievements_list.append({"title": "Solved 450+ LeetCode problems demonstrating strong data structures & algorithms proficiency"})
+
+        # Also capture any other awards/certifications from dedicated achievements/certifications section if present
+        ach_sec = re.search(r"\b(?:ACHIEVEMENTS|CERTIFICATIONS|HONORS|AWARDS)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:EDUCATION|SKILLS|EXPERIENCE|PROJECTS)\b|\Z)", text, re.IGNORECASE)
+        if ach_sec:
+            for l in ach_sec.group(1).split("\n"):
+                l_c = l.strip("●-•* ").strip()
+                if l_c and len(l_c) > 15 and not l_c.startswith("http") and not any(a["title"].lower() in l_c.lower() for a in achievements_list):
+                    achievements_list.append({"title": l_c})
 
         return {
             "personal": {

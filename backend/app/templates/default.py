@@ -33,6 +33,16 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             alignment=1,  # Center
         )
 
+        headline_style = ParagraphStyle(
+            "ResumeHeadline",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=9.5,
+            leading=13,
+            textColor=colors.HexColor("#3730a3"),
+            alignment=1,  # Center
+        )
+
         contact_style = ParagraphStyle(
             "ResumeContact",
             parent=styles["Normal"],
@@ -89,7 +99,12 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
         personal = content.get("personal", {})
         name = personal.get("fullName") or personal.get("full_name") or "Candidate"
         story.append(Paragraph(name, title_style))
-        story.append(Spacer(1, 4))
+        story.append(Spacer(1, 2))
+
+        headline = content.get("target_headline") or personal.get("target_headline") or ""
+        if headline:
+            story.append(Paragraph(headline, headline_style))
+            story.append(Spacer(1, 3))
 
         contact_parts = []
         for key in ["email", "phone"]:

@@ -306,6 +306,9 @@ def format_profile_for_rendering(profile: dict) -> dict:
     return {
         "personal": {
             "fullName": name,
+            "full_name": name,
+            "target_headline": headline,
+            "headline": headline,
             "email": email,
             "phone": phone,
             "location_str": loc_str,

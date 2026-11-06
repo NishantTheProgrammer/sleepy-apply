@@ -393,3 +393,60 @@ Return strict JSON only in this schema:
                 "answered_at": None,
             },
         ]
+
+    def generate_gap_verification_questions(
+        self,
+        profile: dict,
+        missing_skills: list[str],
+    ) -> list[dict[str, Any]]:
+        """
+        Generates non-redundant, targeted questions when important JD requirements lack sufficient candidate evidence.
+        Never asks questions whose answers already exist in profile, qa_history, or candidate_verifications.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat()
+        existing_q_texts = set()
+
+        for q in profile.get("screening_questions", []):
+            if isinstance(q, dict) and q.get("question"):
+                existing_q_texts.add(q["question"].lower())
+            if isinstance(q, dict) and q.get("field"):
+                existing_q_texts.add(str(q["field"]).lower())
+
+        for q in profile.get("qa_history", []):
+            if isinstance(q, dict) and q.get("question"):
+                existing_q_texts.add(q["question"].lower())
+
+        verifications = profile.get("candidate_verifications", {})
+
+        questions = []
+        for sk in missing_skills:
+            clean_sk = sk.strip()
+            if not clean_sk or len(clean_sk) < 2:
+                continue
+            if clean_sk.lower() in verifications:
+                continue
+            if any(clean_sk.lower() in eq for eq in existing_q_texts):
+                continue
+
+            q_id = f"gap_{re.sub(r'[^a-zA-Z0-9_]', '_', clean_sk.lower())}"
+            questions.append({
+                "id": q_id,
+                "category": "technical_verification",
+                "field": clean_sk,
+                "type": "single_select",
+                "question": f"Do you have hands-on experience working with {clean_sk}?",
+                "context_hint": f"Clarifying experience for requirement: {clean_sk}",
+                "suggested_options": [
+                    f"No experience with {clean_sk}",
+                    f"Academic / Personal exploration only",
+                    f"1-2 years hands-on experience",
+                    f"3+ years production experience",
+                ],
+                "asked_at": now_iso,
+                "answer": None,
+                "answered_at": None,
+            })
+            if len(questions) >= 3:
+                break
+
+        return questions

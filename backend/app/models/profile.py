@@ -98,6 +98,29 @@ class ProfileQuestion(MongoBaseModel):
     answer: str | None = None
 
 
+class TailoredResumeSchema(MongoBaseModel):
+    model_config = ConfigDict(extra="allow")
+    job_id: str
+    job_title: str
+    company: str
+    target_headline: str = ""
+    summary: str = ""
+    tailored_summary: str = ""
+    matching_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    skills_breakdown: dict[str, Any] = Field(default_factory=dict)
+    evidence_mappings: list[dict[str, Any]] = Field(default_factory=list)
+    personal: dict[str, Any] = Field(default_factory=dict)
+    skills: dict[str, list[str]] | list[str] = Field(default_factory=dict)
+    experience: list[dict[str, Any]] = Field(default_factory=list)
+    education: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+    achievements: list[dict[str, Any]] = Field(default_factory=list)
+    template: str = "default"
+    generated_at: str = ""
+    validation_report: dict[str, Any] = Field(default_factory=dict)
+
+
 class Profile(MongoBaseModel):
     model_config = ConfigDict(extra="allow")
     id: PyObjectId | None = Field(default=None, alias="_id")

@@ -1377,6 +1377,11 @@ function JobsPageContent() {
                                   <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
                                     {candidateName}
                                   </h1>
+                                  {previewItem.tailored_resume?.target_headline && (
+                                    <p className="text-xs font-semibold text-indigo-700 tracking-wide mt-0.5">
+                                      {previewItem.tailored_resume.target_headline}
+                                    </p>
+                                  )}
                                   {locationStr && (
                                     <p className="text-xs text-slate-600 mt-1 font-medium">{locationStr}</p>
                                   )}
@@ -1433,6 +1438,11 @@ function JobsPageContent() {
                               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-black font-serif">
                                 {candidateName}
                               </h1>
+                              {previewItem.tailored_resume?.target_headline && (
+                                <p className="text-xs font-serif italic text-slate-800 mt-1">
+                                  {previewItem.tailored_resume.target_headline}
+                                </p>
+                              )}
                               <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-xs text-black mt-2 font-medium font-serif">
                                 {contactParts.map((c, i) => (
                                   <span key={i} className="flex items-center">

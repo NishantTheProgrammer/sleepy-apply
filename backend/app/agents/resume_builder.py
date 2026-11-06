@@ -11,8 +11,8 @@ from app.models.settings import UserSettings
 
 logger = structlog.get_logger()
 
-RESUME_TAILOR_PROMPT = """You are an elite ATS resume strategist and executive technical recruiter.
-Your mission is to tailor the candidate's resume for the target job with MAXIMUM ACCURACY, RELEVANCE, and ATS IMPACT.
+RESUME_TAILOR_PROMPT = """You are a seasoned technical hiring manager and staff engineer tailoring a candidate's resume for a specific software engineering role.
+Your mission is to maximize ATS keyword alignment and technical credibility while keeping the tone 100% authentic, grounded, and human-written.
 
 TARGET JOB DETAILS:
 - Target Role: {job_title}
@@ -30,32 +30,49 @@ CANDIDATE'S AUTHENTIC BACKGROUND:
 - Real Personal / Independent Projects:
 {projects_summary}
 
-STRICT ACCURACY & RELEVANCE RULES:
-1. ZERO HALLUCINATION (100% GROUNDED): You must ONLY use the candidate's real work history, roles, companies, verified skills, and authentic projects. Never invent employers, fake degrees, fabricated metrics, or claim unverified technologies.
-2. MAKE RELEVANT THINGS BOLD: Wrap all matching skills, key frameworks, relevant architectures, and measurable metrics in markdown bold: **keyword** (e.g. **NodeJS**, **MongoDB**, **REST APIs**, **Microservices**, **40%**).
-3. PROFESSIONAL SUMMARY:
-   - 2-3 concise, high-impact sentences.
-   - Explicitly position the candidate for **{job_title}** at **{company}**.
-   - Bold the target title and key matching tech stack that directly answers the job's main technical requirements.
-4. TAILORED EXPERIENCE HIGHLIGHTS:
-   - For each role listed in the history, provide 2-3 tailored bullet points highlighting accomplishments relevant to {job_title}.
-   - Lead each bullet with a strong action verb (Engineered, Architected, Optimized, Delivered, Streamlined).
-   - Bold relevant technical tools, technologies, and metrics inside each bullet point.
-5. SELECT & TAILOR RELEVANT PROJECTS (CRITICAL):
-   - Evaluate the candidate's authentic projects against {job_title} and {required_skills}.
-   - SELECT ONLY 2 TO 3 PROJECTS that directly demonstrate relevant skills for the target role.
-   - COMPLETELY OMIT / DISCARD irrelevant, outdated, or basic academic/college projects (e.g., if applying for a senior/backend role, discard basic school assignments, unrelated mobile apps, or non-matching stacks).
-   - Under NO circumstances create fake projects. Only choose from the candidate's authentic projects listed above.
-   - For each selected project, refine the description (1-2 sentences) to emphasize accomplishments using target technologies, bolding matching keywords: **keyword**.
+CRITICAL RULES FOR AUTHENTICITY, ACCURACY & ATS SUCCESS:
+1. ZERO HALLUCINATION (100% FACTUAL GROUNDING):
+   - You must strictly use ONLY the candidate's real work history, authentic companies, real roles, and verified skills.
+   - Never invent employers, fake degrees, unverified technologies, or fabricated accomplishments.
+
+2. AVOID ALL AI "TELL-TALES" (SOUND LIKE A REAL ENGINEER, NOT AN LLM):
+   - BANNED BUZZWORDS: Do NOT use pretentious or overused AI words such as "spearheaded", "synergized", "leveraged", "delve", "pivotal", "transformative", "game-changing", "visionary", "testament to", "holistic", "cutting-edge", or "revolutionized".
+   - PREFERRED CONCRETE ACTION VERBS: Built, Designed, Implemented, Refactored, Maintained, Optimized, Automated, Integrated, Migrated, Deployed, Resolved, Scaled.
+   - Write clear, concise, pragmatic engineering sentences. Avoid bloated corporate filler.
+
+3. REALISTIC IMPACT & GOOGLE X-Y-Z FORMULA (NO FAKE METRICS):
+   - Format bullets following: Accomplished [X], as measured by [Y], by doing [Z].
+   - If candidate's background notes include metrics (e.g. latency, scale, team size), use them.
+   - If no specific metric is in candidate notes, describe tangible engineering outcomes (e.g. "reducing query execution times with index optimization", "preventing duplicate transactions using Redis distributed locks", "achieving 90%+ test coverage", "automating manual staging deployments").
+   - NEVER invent implausible corporate finance claims (e.g. "$40M revenue increase", "99.999% efficiency leap").
+
+4. SUBTLE & CLEAN BOLDING:
+   - Bold ONLY 1 to 2 key matching technologies or metrics per bullet (e.g. **PostgreSQL**, **FastAPI**, **p99 latency**).
+   - Do NOT over-saturate sentences with bolding; keep it readable, tasteful, and professional.
+
+5. TARGET PROFESSIONAL HEADLINE:
+   - Provide a clean 1-line professional headline matching the target job and candidate's core stack (e.g. "Senior Backend Engineer | Go, PostgreSQL & Distributed Systems").
+
+6. PROFESSIONAL SUMMARY:
+   - 2-3 direct, impactful sentences.
+   - Explicitly position the candidate for **{job_title}** at **{company}** highlighting matching strengths.
+
+7. TAILORED EXPERIENCE HIGHLIGHTS:
+   - For each company in the candidate's history, provide 2-3 realistic, punchy bullet points emphasizing relevant technical accomplishments.
+
+8. SELECT & REFINE RELEVANT PROJECTS:
+   - Select 2 to 3 authentic projects from the candidate's list that best prove competency for {job_title}. Discard irrelevant/unrelated projects.
+   - Refine each project description (1-2 sentences) highlighting matching technologies and realistic outcomes.
 
 Return ONLY a valid JSON object matching this exact schema:
 {{
-  "tailored_summary": "2-3 sentence impactful summary with **bold** keywords",
+  "target_headline": "Professional Role Headline | Primary Tech Stacks",
+  "tailored_summary": "2-3 sentence impactful summary with selective **bold** keywords",
   "tailored_experience": [
     {{
       "company": "Exact Company Name",
       "highlights": [
-        "Action verb + achievement + **relevant technology** in bold"
+        "Action verb + technical accomplishment + realistic outcome with selective **bold** tech"
       ]
     }}
   ],
@@ -63,7 +80,7 @@ Return ONLY a valid JSON object matching this exact schema:
     {{
       "name": "Exact Name of matching project from candidate's background",
       "technologies": ["matching", "technologies"],
-      "description": "Refined 1-2 sentence description with **bold** matching technologies and impact"
+      "description": "Realistic 1-2 sentence description with selective **bold** technologies and outcome"
     }}
   ]
 }}
@@ -288,6 +305,7 @@ class ResumeBuilderAgent:
                 except Exception:
                     pass
 
+        target_headline = ""
         tailored_summary = profile.get("summary", "")
         tailored_experience = None
         tailored_projects = None
@@ -352,6 +370,8 @@ class ResumeBuilderAgent:
                 json_match = re.search(r"\{[\s\S]*\}", resp)
                 if json_match:
                     parsed = json.loads(json_match.group(0))
+                    if parsed.get("target_headline"):
+                        target_headline = parsed["target_headline"].strip()
                     if parsed.get("tailored_summary"):
                         tailored_summary = parsed["tailored_summary"].strip()
                         ai_tailored = True
@@ -364,6 +384,11 @@ class ResumeBuilderAgent:
                     ai_tailored = True
             except Exception as e:
                 logger.warning("AI resume tailoring failed, using rule-based synthesis with bolding", error=str(e))
+
+        if not target_headline:
+            top_tech = matching_skills[:3] if matching_skills else candidate_skills_list[:3]
+            top_tech_str = ", ".join(top_tech) if top_tech else "Software Architecture"
+            target_headline = f"{job_title} | {top_tech_str}"
 
         if not ai_tailored:
             bold_matching = [f"**{s}**" for s in matching_skills[:5]]
@@ -439,6 +464,7 @@ class ResumeBuilderAgent:
             "job_id": str(job_id),
             "job_title": job_title,
             "company": company,
+            "target_headline": target_headline,
             "tailored_summary": tailored_summary,
             "matching_skills": matching_skills,
             "required_skills": required_skills,
@@ -473,6 +499,7 @@ class ResumeBuilderAgent:
             from app.templates.manager import render_docx_for_profile
             tailored_profile_context = {
                 **profile,
+                "target_headline": target_headline,
                 "summary": tailored_summary,
                 "skills": tailored_skills if tailored_skills else raw_skills,
                 "experience": final_experience,

@@ -89,6 +89,15 @@ def create_classic_ats_template(output_path: Path):
     r_name.font.bold = True
     r_name.font.color.rgb = RGBColor(0, 0, 0)
 
+    p_head = doc.add_paragraph()
+    p_head.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_head.paragraph_format.space_after = Pt(2)
+    r_head = p_head.add_run("{{ personal.target_headline }}")
+    r_head.font.name = "Times New Roman"
+    r_head.font.size = Pt(10)
+    r_head.font.bold = True
+    r_head.font.color.rgb = RGBColor(40, 40, 40)
+
     p_contact = doc.add_paragraph()
     p_contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_contact.paragraph_format.space_after = Pt(8)
@@ -172,7 +181,9 @@ def format_skills_rich(items: list[str], matching_skills: list[str]) -> RichText
 
 def format_profile_for_rendering(profile: dict) -> dict:
     """Transform candidate profile dictionary into standard template rendering context."""
-    personal = profile.get("personal", {})
+    personal = dict(profile.get("personal", {}))
+    headline = profile.get("target_headline") or profile.get("headline") or personal.get("headline") or ""
+    personal["target_headline"] = headline
     name = personal.get("fullName") or personal.get("full_name") or "Candidate Name"
     email = personal.get("email", "")
     phone = personal.get("phone", "")

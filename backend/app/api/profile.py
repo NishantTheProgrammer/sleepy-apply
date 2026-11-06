@@ -248,12 +248,12 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
                     break
         if not pers.get("github"):
             for l in extracted_links:
-                if "github.com/" in l.lower() and not any(r in l.lower() for r in ["/cbms", "/repo"]):
+                if "github.com/" in l.lower() and not re.search(r"github\.com/[^/]+/[^/]+", l.lower()):
                     pers["github"] = l
                     break
         if not pers.get("portfolio"):
             for l in extracted_links:
-                if "nishanttheprogrammer" in l.lower() or re.search(r"\bhttps?://[a-zA-Z0-9-]+\.(?:dev|me|site|io|app|com)\b", l.lower()):
+                if re.search(r"\bhttps?://[a-zA-Z0-9-]+\.(?:dev|me|site|io|app|com|in|tech|online)\b", l.lower()):
                     if not any(k in l.lower() for k in ["linkedin", "github", "google", "leetcode", "hackerrank"]):
                         pers["portfolio"] = l
                         break

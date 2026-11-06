@@ -325,26 +325,32 @@ def preserve_and_prioritize_experience_bullets(
     final_raw_bullets: list[str] = []
     if valid_ai_bullets:
         combined_ai_text = " ".join(valid_ai_bullets).lower()
-
+        # Restore full original bullet if AI truncated or dropped technical accomplishments
         for b in valid_ai_bullets:
-            bullet_fixed = b
-            # If bullet mentions query optimization but dropped materialized views, restore it
-            if "query optimization" in bullet_fixed.lower() and "materialized view" not in bullet_fixed.lower():
-                bullet_fixed = re.sub(
-                    r"query optimization(?:\s+and\s+|\s*,\s*)",
-                    "query optimization, materialized views, and ",
-                    bullet_fixed,
-                    flags=re.IGNORECASE,
-                )
-            final_raw_bullets.append(bullet_fixed)
+            b_words = set(re.findall(r"\b[a-z]{3,}\b", b.lower()))
+            best_ob = None
+            best_overlap = 0.0
+            for ob in clean_orig_bullets:
+                ob_words = set(re.findall(r"\b[a-z]{3,}\b", ob.lower()))
+                if ob_words and b_words:
+                    overlap = len(ob_words & b_words) / len(b_words)
+                    if overlap > best_overlap:
+                        best_overlap = overlap
+                        best_ob = ob
+            if best_ob and best_overlap >= 0.60 and len(best_ob) > len(b):
+                final_raw_bullets.append(best_ob)
+            else:
+                final_raw_bullets.append(b)
 
         # Check every authentic original bullet of THIS company:
         # Restore critical metrics, integrations, leadership, and JD requirements missing from AI output
         for ob in clean_orig_bullets:
             ob_lower = ob.lower()
-            has_metric = bool(re.search(r"\b\d+(?:,\d{3})*\+?\s*(?:urban local bodies|ULBs|requests|users|queries|rps|ms)\b", ob, re.IGNORECASE))
-            integrations = ["form.io", "amplitude", "sendgrid", "twilio", "stripe", "woocommerce", "materialized view"]
-            matched_integs = [integ for integ in integrations if integ in ob_lower]
+            has_metric = bool(re.search(r"\b(?:\d+(?:,\d{3})*(?:\.\d+)?(?:\+|%)?(?:\s*[a-zA-Z\-/]{2,}(?:\s+[a-zA-Z\-/]{2,}){0,2})?|[\$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?|\b\d+(?:st|nd|rd|th)\b|\b\d+(?:\.\d+)?x\b)\b", ob_lower))
+            matched_integs = [
+                t for t in EvidenceMapper.TECH_CANONICAL_MAP.keys()
+                if len(t) >= 4 and t in ob_lower and t not in combined_ai_text
+            ]
             has_mentoring = bool(re.search(r"\b(?:mentor\w*|interviews?)\b", ob_lower))
             bullet_matching = [ms for ms in matching_skills if len(ms) > 2 and ms.lower() in ob_lower]
 
@@ -355,21 +361,19 @@ def preserve_and_prioritize_experience_bullets(
                 if ob not in final_raw_bullets:
                     final_raw_bullets.append(ob)
             elif matched_integs:
+                sentences = re.split(r"(?<=[.!?])\s+", ob)
                 for integ in matched_integs:
                     if integ not in combined_ai_text:
-                        if integ == "form.io":
-                            formio_clause = "Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation."
-                            ipn_idx = next((i for i, fb in enumerate(final_raw_bullets) if "indian partner network" in fb.lower() or "ngo management" in fb.lower()), None)
-                            if ipn_idx is not None:
-                                if formio_clause.lower() not in final_raw_bullets[ipn_idx].lower():
-                                    final_raw_bullets[ipn_idx] = final_raw_bullets[ipn_idx].rstrip(" .") + ". " + formio_clause
-                            elif ob not in final_raw_bullets:
-                                final_raw_bullets.append(ob)
-                        elif integ == "amplitude":
-                            amp_sentence = "Built real-time analytics with Amplitude tracking across web applications and WordPress directories."
-                            if not any("amplitude" in fb.lower() for fb in final_raw_bullets):
-                                final_raw_bullets.append(amp_sentence)
-                        elif ob not in final_raw_bullets:
+                        matching_sent = next((s.strip() for s in sentences if integ in s.lower()), None)
+                        if matching_sent:
+                            p_prefix_m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", ob.strip())
+                            if p_prefix_m:
+                                prefix_term = p_prefix_m.group(1).lower()
+                                target_idx = next((i for i, fb in enumerate(final_raw_bullets) if fb.lower().startswith(prefix_term)), None)
+                                if target_idx is not None and matching_sent.lower() not in final_raw_bullets[target_idx].lower():
+                                    final_raw_bullets[target_idx] = final_raw_bullets[target_idx].rstrip(" .") + ". " + matching_sent
+                                    continue
+                        if ob not in final_raw_bullets:
                             final_raw_bullets.append(ob)
             elif bullet_matching and not any(bm.lower() in combined_ai_text for bm in bullet_matching):
                 if ob not in final_raw_bullets:

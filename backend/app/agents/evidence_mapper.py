@@ -584,8 +584,9 @@ class EvidenceMapper:
             # Check experience or projects
             found_evidence = []
             for role in index.professional_roles:
-                if "ecommerce" in role["raw_text"].lower() or "e-commerce" in role["raw_text"].lower() or "stripe" in role["raw_text"].lower():
-                    found_evidence.append((role["company"], "Contributed to e-commerce applications with WooCommerce REST API and Stripe split payments"))
+                if any(w in role["raw_text"].lower() for w in ["ecommerce", "e-commerce", "stripe", "woocommerce", "checkout", "payment"]):
+                    match_b = next((b for b in role.get("responsibilities", []) if any(w in b.lower() for w in ["ecommerce", "e-commerce", "stripe", "woocommerce", "payment"])), role["raw_text"])
+                    found_evidence.append((role["company"], match_b))
             for proj in index.projects:
                 if "ecommerce" in proj["raw_text"].lower() or "e-commerce" in proj["raw_text"].lower():
                     found_evidence.append((proj["name"], proj["description"]))
@@ -600,7 +601,7 @@ class EvidenceMapper:
                     evidence_text=txt,
                     source_entity=ent,
                     confidence=0.9,
-                    notes="Verified e-commerce and payment integration experience.",
+                    notes=f"Verified e-commerce experience from {ent}.",
                 )
             return EvidenceItem(requirement=name, status="MISSING", importance=importance)
 
@@ -731,9 +732,9 @@ class EvidenceMapper:
                             db_bullets.append(r_clean)
                         source_co = role["company"]
 
-            db_skills = [t for t in index.all_known_technologies if t in ["PostgreSQL", "MySQL", "SQL"]]
-            db_skills_str = ", ".join(sorted(list(set(db_skills)))) if db_skills else "PostgreSQL, MySQL"
-            bullet_text = "; ".join(db_bullets) if db_bullets else "Enhanced platform performance through query optimization, materialized views, and session synchronization"
+            all_known_dbs = [t for t in index.all_known_technologies if t.upper() in ["SQL", "POSTGRESQL", "MYSQL", "ORACLE", "SQLITE", "MARIADB", "SNOWFLAKE", "BIGQUERY"]]
+            db_skills_str = ", ".join(sorted(list(set(all_known_dbs)))) if all_known_dbs else "SQL"
+            bullet_text = "; ".join(db_bullets) if db_bullets else "Production relational database design, query tuning, and schema optimization"
             return EvidenceItem(
                 requirement="SQL",
                 status="MATCHED",
@@ -742,7 +743,7 @@ class EvidenceMapper:
                 evidence_text=f"Production database engineering ({db_skills_str}): {bullet_text}",
                 source_entity=source_co,
                 confidence=0.95,
-                notes="SQL requirement directly MATCHED via production PostgreSQL/MySQL, query optimization, and materialized views.",
+                notes=f"SQL requirement directly MATCHED via production {db_skills_str} and database engineering.",
             )
 
         # A) Check in professional experience

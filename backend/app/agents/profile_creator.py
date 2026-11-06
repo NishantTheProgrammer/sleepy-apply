@@ -486,7 +486,8 @@ class ProfileCreatorAgent:
                     total_yrs = 0.0
 
         if total_yrs <= 0.0:
-            total_yrs = 5.0  # sensible default if unstated
+            exps = data.get("experience", [])
+            total_yrs = float(len(exps) * 2.0) if exps else 0.0
 
         data["candidate"] = {
             "id": user_id_str,
@@ -682,21 +683,15 @@ class ProfileCreatorAgent:
         github_match = re.search(r"(?:https?://)?(?:www\.)?github\.com/([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
         github_url = f"https://{github_match.group(0).replace('https://', '').replace('http://', '')}" if github_match else None
 
-        # Handle label references in header (e.g. "GitHub | nishanttheprogrammer.com" or "LinkedIn®")
+        # Handle label references in header (e.g. "GitHub: username" or "LinkedIn: username")
         if not github_url:
-            for l in header_lines:
-                if "github" in l.lower():
-                    handle = portfolio_str.replace("https://", "").replace("http://", "").split(".")[0] if portfolio_str else (email_str.split("@")[0].lstrip("k") if email_str else "")
-                    if handle:
-                        github_url = f"https://github.com/{handle}"
-                        break
+            gh_handle_m = re.search(r"github(?:\.com)?\s*[:|/–-]?\s*@?([a-zA-Z0-9_-]+)", header_block, re.IGNORECASE)
+            if gh_handle_m and gh_handle_m.group(1).lower() not in ["com", "http", "https", "profile", "links"]:
+                github_url = f"https://github.com/{gh_handle_m.group(1)}"
         if not linkedin_url:
-            for l in header_lines:
-                if "linkedin" in l.lower():
-                    handle = portfolio_str.replace("https://", "").replace("http://", "").split(".")[0] if portfolio_str else (email_str.split("@")[0].lstrip("k") if email_str else "")
-                    if handle:
-                        linkedin_url = f"https://linkedin.com/in/{handle}"
-                        break
+            li_handle_m = re.search(r"linkedin(?:\.com/in)?\s*[:|/–-]?\s*@?([a-zA-Z0-9_-]+)", header_block, re.IGNORECASE)
+            if li_handle_m and li_handle_m.group(1).lower() not in ["com", "in", "http", "https", "profile", "links"]:
+                linkedin_url = f"https://linkedin.com/in/{li_handle_m.group(1)}"
 
         # 6. Professional Summary: extract full text without premature truncation
         summary_text = ""
@@ -860,14 +855,14 @@ class ProfileCreatorAgent:
                 if re.search(r"https?://|www\.|links?\b|github\.com|linkedin\.com|\.(?:com|org|io|in|dev|net)", line, re.IGNORECASE):
                     continue
                 # Reject lines that do not have education keywords
-                if not any(dk in line.lower() for dk in ["mca", "bca", "bachelor", "master", "b.tech", "m.tech", "degree", "diploma", "ignou", "university", "college", "school"]):
+                if not any(dk in line.lower() for dk in ["mca", "bca", "bachelor", "master", "b.tech", "m.tech", "degree", "diploma", "university", "college", "school"]):
                     continue
                 yr_m = re.search(r"\(?(\b(?:19|20)\d{2}\b)\)?", line)
                 yr = yr_m.group(1) if yr_m else ""
                 clean_l = re.sub(r"\(?(?:19|20)\d{2}\)?", "", line).strip(" -.,()")
                 parts = clean_l.split(".")
                 deg = parts[0].strip()
-                inst = parts[1].strip() if len(parts) > 1 else ("IGNOU" if "ignou" in clean_l.lower() else "University")
+                inst = parts[1].strip() if len(parts) > 1 else "University"
                 education_list.append({
                     "degree": deg,
                     "institution": inst,

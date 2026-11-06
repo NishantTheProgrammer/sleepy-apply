@@ -43,10 +43,6 @@ class HallucinationGuard:
         "revolutionized", "skyrocketed", "unparalleled", "groundbreaking",
     }
 
-    KNOWN_CANONICAL_METRICS = {
-        "5", "10+", "450+", "4000+", "6th", "2020", "2021", "2022", "2023", "2024", "2025", "2026",
-    }
-
     def _run_checks(
         self,
         tailored_resume: dict[str, Any],
@@ -60,6 +56,7 @@ class HallucinationGuard:
         cand_index = evidence_result.candidate_index
         missing_skills_set = {s.lower() for s in evidence_result.skills_classification.missing_skills}
         all_known_tech_lower = {t.lower() for t in cand_index.all_known_technologies}
+        profile_full_text = json.dumps(original_profile, default=str)
 
         # -------------------------------------------------------------
         # 1. Target Headline Checks
@@ -107,19 +104,25 @@ class HallucinationGuard:
             for m in tech_exp_matches:
                 claim_years = float(m.group(1))
                 claim_tech = m.group(2).strip()
-                # If claim_tech is Java or Spring Boot, candidate only has project-level experience, NOT multi-year employment!
-                if any(t in claim_tech.lower() for t in ["java", "spring"]):
-                    proj_tech_lower = [pt.lower() for pt in cand_index.project_technologies]
-                    if any(t in proj_tech_lower for t in ["java", "spring", "spring boot"]):
-                        if claim_years >= 3.0:
-                            violations.append(ValidationViolation(
-                                category="experience_inflation",
-                                severity="CRITICAL",
-                                field="summary",
-                                message=f"Misrepresented project-level technology {claim_tech} as {claim_years:g} years of experience.",
-                                detected_value=m.group(0),
-                                allowed_boundary="Spring Boot/Java is project experience in StaffSync, not multi-year professional employment.",
-                            ))
+                # If claim_tech is a project-only technology (not verified in professional employment), claiming multi-year experience is inflation
+                is_proj_tech = any(claim_tech.lower() in pt.lower() or pt.lower() in claim_tech.lower() for pt in cand_index.project_technologies)
+                is_prof_tech = any(claim_tech.lower() in pr.lower() or pr.lower() in claim_tech.lower() for pr in cand_index.professional_technologies)
+                if is_proj_tech and not is_prof_tech and claim_years >= 2.0:
+                    matching_proj_obj = next((p for p in cand_index.projects if any(claim_tech.lower() in t.lower() for t in (p.get("technologies") or []))), None)
+                    matching_p = matching_proj_obj.get("name") if matching_proj_obj else "independent projects"
+                    raw_p_techs = matching_proj_obj.get("technologies", []) if matching_proj_obj else []
+                    # De-duplicate substrings (e.g. keep "Spring Boot", drop standalone "Spring")
+                    filtered_p_techs = [t for t in raw_p_techs if not any(t.lower() != o.lower() and t.lower() in o.lower() for o in raw_p_techs)]
+                    sorted_p_techs = sorted(filtered_p_techs, key=lambda x: (len(x.split()), x), reverse=True)
+                    p_tech_str = "/".join(sorted_p_techs) if sorted_p_techs else claim_tech
+                    violations.append(ValidationViolation(
+                        category="experience_inflation",
+                        severity="CRITICAL",
+                        field="summary",
+                        message=f"Misrepresented project-level technology {claim_tech} as {claim_years:g} years of experience.",
+                        detected_value=m.group(0),
+                        allowed_boundary=f"{p_tech_str} is project experience in {matching_p}, not multi-year professional employment.",
+                    ))
 
             # C) Check for claiming professional specialization or proven expertise in project-only technologies
             spec_matches = re.finditer(
@@ -131,13 +134,14 @@ class HallucinationGuard:
                 claimed_spec = sm.group(1).lower()
                 for pt in cand_index.project_technologies:
                     if pt.lower() in claimed_spec and pt.lower() not in [pr.lower() for pr in cand_index.professional_technologies]:
+                        matching_p = next((p.get("name") for p in cand_index.projects if any(pt.lower() in t.lower() for t in (p.get("technologies") or []))), "independent projects")
                         violations.append(ValidationViolation(
                             category="unsupported_specialization",
                             severity="CRITICAL",
                             field="summary",
                             message=f"Summary falsely claims proven expertise/specialization in project-only technology '{pt}'.",
                             detected_value=sm.group(0).strip(),
-                            allowed_boundary=f"'{pt}' is an independent project technology (StaffSync), not professional expertise. Distinguish project exposure from professional experience.",
+                            allowed_boundary=f"'{pt}' is an independent project technology ({matching_p}), not professional expertise. Distinguish project exposure from professional experience.",
                         ))
 
             # D) Check for missing skills in summary
@@ -252,28 +256,32 @@ class HallucinationGuard:
                 # Check for fabricated team counts (e.g. "mentored team of 4-6 junior engineers")
                 team_count_m = re.search(r"(?:mentored|mentoring)\s+(?:a\s+)?(?:team\s+of\s+)?(\d+[-–]\d+|\d+)\s*(?:junior|engineers|developers)", b_str, re.IGNORECASE)
                 if team_count_m:
-                    violations.append(ValidationViolation(
-                        category="invented_metric",
-                        severity="CRITICAL",
-                        field="experience.responsibilities",
-                        message=f"Invented specific team count '{team_count_m.group(0)}' (source only states 'mentored junior developers').",
-                        detected_value=team_count_m.group(0),
-                        allowed_boundary="Preserve authentic phrasing: 'mentored junior developers' without fabricated headcounts.",
-                    ))
+                    count_val = team_count_m.group(1)
+                    if count_val not in profile_full_text:
+                        violations.append(ValidationViolation(
+                            category="invented_metric",
+                            severity="CRITICAL",
+                            field="experience.responsibilities",
+                            message=f"Invented specific team count '{team_count_m.group(0)}' (source does not state headcount of {count_val}).",
+                            detected_value=team_count_m.group(0),
+                            allowed_boundary="Preserve authentic phrasing from source without fabricated headcounts.",
+                        ))
 
                 # Check for invented financial claims
-                fin_m = re.search(r"\$\s*\d+[\d,\.]*\s*(?:million|m|k|billion|b)?", b_str, re.IGNORECASE)
+                fin_m = re.search(r"[\$€£₹]\s*\d+[\d,\.]*\s*(?:million|m|k|billion|b)?", b_str, re.IGNORECASE)
                 if fin_m:
-                    violations.append(ValidationViolation(
-                        category="invented_metric",
-                        severity="CRITICAL",
-                        field="experience.responsibilities",
-                        message=f"Invented corporate financial claim: '{fin_m.group(0)}'.",
-                        detected_value=fin_m.group(0),
-                        allowed_boundary="Financial claims not present in source profile are strictly forbidden.",
-                    ))
+                    fin_val = fin_m.group(0)
+                    if fin_val.lower() not in profile_full_text.lower():
+                        violations.append(ValidationViolation(
+                            category="invented_metric",
+                            severity="CRITICAL",
+                            field="experience.responsibilities",
+                            message=f"Invented corporate financial claim: '{fin_val}'.",
+                            detected_value=fin_val,
+                            allowed_boundary="Financial claims not present in source profile are strictly forbidden.",
+                        ))
 
-            # Check cross-employer responsibility attribution
+            # Check cross-employer responsibility attribution generically
             orig_emp = next((e for e in orig_exps if e.get("company", "").strip().lower() == co.lower()), None)
             if orig_emp:
                 orig_text = f"{orig_emp.get('jobTitle', '')} {orig_emp.get('description', '')} " + " ".join(orig_emp.get('responsibilities', []))
@@ -282,8 +290,34 @@ class HallucinationGuard:
                 for other in other_emps:
                     other_co = other.get("company", "")
                     other_text = f"{other.get('jobTitle', '')} {other.get('description', '')} " + " ".join(other.get('responsibilities', []))
-                    other_terms = ["getlivecoach", "mesa-qr", "kichi-mall", "in1mall", "woocommerce", "ionic", "twilio", "stripe split", "urban local bodies", "city finance", "sendgrid", "form.io", "amplitude", "materialized views", "dhwani"]
-                    distinctive_other = [t for t in other_terms if t in other_text.lower() and t not in orig_text_lower]
+
+                    distinctive_other = set()
+                    if other_co and len(other_co) > 3:
+                        distinctive_other.add(other_co.lower())
+                    for r_o in other.get("responsibilities", []):
+                        m_p = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", str(r_o).strip())
+                        if m_p:
+                            p_term = m_p.group(1).strip().lower()
+                            if p_term not in orig_text_lower:
+                                distinctive_other.add(p_term)
+                    for dom in re.findall(r"\b[a-zA-Z0-9\.\-]+\.(?:com|org|in|io|net)\b", other_text.lower()):
+                        if dom not in orig_text_lower:
+                            distinctive_other.add(dom)
+                    # Dynamically collect metrics from other employer's text
+                    other_metrics = re.findall(
+                        r"\b(?:\d+(?:,\d{3})*(?:\.\d+)?(?:\+|%)?(?:\s*[a-zA-Z\-/]{2,}(?:\s+[a-zA-Z\-/]{2,}){0,2})?|[\$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:k|m|b|million|billion|thousand|crore|lakh))?|\b\d+(?:st|nd|rd|th)\b|\b\d+(?:\.\d+)?x\b)\b",
+                        other_text.lower(),
+                    )
+                    for metric_match in other_metrics:
+                        m_str = metric_match.strip()
+                        if m_str and not (m_str.isdigit() and len(m_str) == 4 and (m_str.startswith("19") or m_str.startswith("20"))):
+                            if len(m_str) >= 2 and m_str not in orig_text_lower:
+                                distinctive_other.add(m_str)
+                    for m_obj in original_profile.get("metrics", []):
+                        if m_obj.get("company_id") == other.get("company_id"):
+                            m_val = str(m_obj.get("value", "")).lower()
+                            if m_val and m_val not in orig_text_lower:
+                                distinctive_other.add(m_val)
 
                     for b in bullets:
                         b_lower = str(b).lower()
@@ -297,20 +331,6 @@ class HallucinationGuard:
                                     detected_value=str(b),
                                     allowed_boundary=f"Responsibilities must not transfer across employers. '{term}' belongs strictly to '{other_co}'.",
                                 ))
-
-            # Explicit check for City Finance / 4000+ ULBs misattribution
-            if "max vision" in co.lower():
-                for b in bullets:
-                    b_str = str(b)
-                    if any(k in b_str.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies", "form.io", "sendgrid", "indian partner network"]):
-                        violations.append(ValidationViolation(
-                            category="cross_employer_bleed",
-                            severity="CRITICAL",
-                            field="experience.responsibilities",
-                            message=f"City Finance / 4000+ urban local bodies belongs strictly to Dhwani Rural Information Systems, but was attributed to '{co}'.",
-                            detected_value=b_str,
-                            allowed_boundary="City Finance must be attributed to Dhwani Rural Information Systems only.",
-                        ))
 
             # Check for unsupported generic outcome claims
             profile_full_text = json.dumps(original_profile, default=str)
@@ -512,26 +532,34 @@ class HallucinationGuard:
             if len(missing_tech) > 2:
                 clean_sum = re.sub(rf"\b{re.escape(missing_tech)}\b", "", clean_sum, flags=re.IGNORECASE)
         clean_sum = re.sub(r"\b(?:\d+)\+?\s*years?\b", f"{cand_index.overall_years:g} years", clean_sum, count=1, flags=re.IGNORECASE)
-        if ("java" in clean_sum.lower() or "spring" in clean_sum.lower()) and cand_index.overall_years >= 5:
-            clean_sum = re.sub(
-                r"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?Java(?:\s*,\s*(?:and\s*)?|\s+and\s+)?Spring Boot",
-                "with hands-on project experience in Spring Boot and Java through StaffSync",
-                clean_sum,
-                flags=re.IGNORECASE,
-            )
-            clean_sum = re.sub(
-                r"Proven expertise in Java, Spring Boot, and backend systems",
-                "Proven professional expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in Spring Boot and Java through StaffSync",
-                clean_sum,
-                flags=re.IGNORECASE,
-            )
-        if "specializing in java" in clean_sum.lower() or "specializing in spring" in clean_sum.lower():
-            clean_sum = re.sub(
-                r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
-                "with hands-on project experience in Spring Boot and Java (StaffSync).",
-                clean_sum,
-                flags=re.IGNORECASE,
-            )
+        # Generic project-level technology remediation in summary:
+        # Prevent project-level technologies from being inflated into professional expertise
+        for proj in cand_index.projects:
+            p_name = proj.get("name") or proj.get("title") or "independent project"
+            p_techs = proj.get("technologies") or proj.get("tech_stack") or []
+            p_tech_only = [t for t in p_techs if t.lower() not in [pr.lower() for pr in cand_index.professional_technologies]]
+            if p_tech_only and any(t.lower() in clean_sum.lower() for t in p_tech_only):
+                sorted_techs = sorted(p_tech_only, key=lambda x: (len(x.split()), len(x)), reverse=True)
+                techs_joined = " and ".join(sorted_techs[:2])
+                tech_or_pattern = "|".join(re.escape(t) for t in sorted_techs)
+                clean_sum = re.sub(
+                    rf"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?(?:{tech_or_pattern})(?:\s*(?:,|and)\s*(?:{tech_or_pattern}))*",
+                    f"with hands-on project experience in {techs_joined} through {p_name}",
+                    clean_sum,
+                    flags=re.IGNORECASE,
+                )
+                clean_sum = re.sub(
+                    rf"Proven expertise in (?:{tech_or_pattern})(?:\s*(?:,|and)\s*(?:{tech_or_pattern}))*,\s*and backend systems",
+                    f"Proven professional expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in {techs_joined} through {p_name}",
+                    clean_sum,
+                    flags=re.IGNORECASE,
+                )
+                clean_sum = re.sub(
+                    r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
+                    f"with hands-on project experience in {techs_joined} ({p_name}).",
+                    clean_sum,
+                    flags=re.IGNORECASE,
+                )
         clean_sum = re.sub(
             r"\b(?:\d+)\+?\s*years(?:\s+of)?(?:\s+overall)?\s+(?:software\s+engineering|software\s+development|development|full\s+stack)?\s*experience\b",
             f"{cand_index.overall_years:g} years of overall software development experience",
@@ -563,60 +591,13 @@ class HallucinationGuard:
             ]
 
         # 4. Reconstruct complete achievements
-        clean_achs = []
-        hr_url = ""
-        lc_url = ""
-        for a in tailored_resume.get("achievements") or []:
-            t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-            u = a.get("url") if isinstance(a, dict) else ""
-            if u:
-                if "hackerrank.com" in u.lower():
-                    hr_url = u
-                elif "leetcode.com" in u.lower():
-                    lc_url = u
-            if "hackerrank.com" in t.lower():
-                m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
-                if m:
-                    hr_url = m.group(0).strip(".,")
-                elif t.startswith("http"):
-                    hr_url = t
-            if "leetcode.com" in t.lower():
-                m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
-                if m:
-                    lc_url = m.group(0).strip(".,")
-                elif t.startswith("http"):
-                    lc_url = t
-
-        if not hr_url:
-            hr_url = original_profile.get("personal", {}).get("hackerrank") or original_profile.get("hackerrank") or ""
-            if not hr_url:
-                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "hackerrank.com" in u.lower():
-                        hr_url = u
-                        break
-        if not lc_url:
-            lc_url = original_profile.get("personal", {}).get("leetcode") or original_profile.get("leetcode") or ""
-            if not lc_url:
-                for l in (original_profile.get("links") or []) + (original_profile.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "leetcode.com" in u.lower():
-                        lc_url = u
-                        break
-
-        full_cand_text = f"{json.dumps(original_profile, default=str)} {summary}"
-        if "hackerrank" in full_cand_text.lower():
-            clean_achs.append({
-                "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
-                "url": hr_url or None,
-            })
-        if "leetcode" in full_cand_text.lower():
-            clean_achs.append({
-                "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
-                "url": lc_url or None,
-            })
-
-        sanitized_copy["achievements"] = clean_achs
+        # 4. Structured Achievement Reconstruction & URL Preservation
+        from app.agents.resume_builder import reconstruct_achievements
+        sanitized_copy["achievements"] = reconstruct_achievements(
+            tailored_resume.get("achievements") or [],
+            original_profile,
+            summary,
+        )
 
         # 5. Sanitize experience bullets
         profile_full_text = json.dumps(original_profile, default=str)
@@ -638,9 +619,16 @@ class HallucinationGuard:
                 for missing_tech in missing_skills_set:
                     if len(missing_tech) > 2:
                         r_clean = re.sub(rf"\b{re.escape(missing_tech)}\b", "", r_clean, flags=re.IGNORECASE)
+                def _sanitize_team_count(m: re.Match) -> str:
+                    count_str = m.group(1)
+                    if count_str and count_str in profile_full_text:
+                        return m.group(0)
+                    role_word = m.group(2)
+                    return f"mentored {role_word}"
+
                 r_clean = re.sub(
-                    r"(?:mentored|mentoring)\s+(?:a\s+)?(?:team\s+of\s+)?(?:\d+[-–]\d+|\d+)\s*(junior|engineers|developers)",
-                    r"mentored \1",
+                    r"(?:mentored|mentoring)\s+(?:a\s+)?(?:team\s+of\s+)?(\d+[-–]\d+|\d+)\s*(junior|engineers|developers)",
+                    _sanitize_team_count,
                     r_clean,
                     flags=re.IGNORECASE,
                 )
@@ -654,19 +642,68 @@ class HallucinationGuard:
             exp_c["highlights"] = clean_resps
             sanitized_exps.append(exp_c)
 
-        # Ensure City Finance is attributed to Dhwani, never to Max Vision
-        dhwani_san = next((e for e in sanitized_exps if "dhwani" in e.get("company", "").lower()), None)
+        # Ensure cross-company experience attribution integrity generically
+        orig_exps = original_profile.get("experience") or []
+        bullet_to_source_co: dict[str, str] = {}
+        distinctive_term_to_co: dict[str, str] = {}
+        for orig_e in orig_exps:
+            o_co = orig_e.get("company", "").strip()
+            for r in orig_e.get("responsibilities", []):
+                r_str = str(r).strip()
+                bullet_to_source_co[r_str.lower().strip(" ,.-")] = o_co
+                p_m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", r_str)
+                if p_m:
+                    distinctive_term_to_co[p_m.group(1).strip().lower()] = o_co
+                for dom in re.findall(r"\b[a-zA-Z0-9\.\-]+\.(?:com|org|in|io|net)\b", r_str.lower()):
+                    distinctive_term_to_co[dom] = o_co
+                # Dynamically index metrics to their source company
+                for m_term in re.findall(
+                    r"\b(?:\d+(?:,\d{3})*(?:\.\d+)?(?:\+|%)?(?:\s*[a-zA-Z\-/]{2,}(?:\s+[a-zA-Z\-/]{2,}){0,2})?|[\$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:k|m|b|million|billion|thousand|crore|lakh))?|\b\d+(?:st|nd|rd|th)\b|\b\d+(?:\.\d+)?x\b)\b",
+                    r_str.lower(),
+                ):
+                    m_clean = m_term.strip()
+                    if m_clean and len(m_clean) >= 3 and not (m_clean.isdigit() and len(m_clean) == 4 and (m_clean.startswith("19") or m_clean.startswith("20"))):
+                        distinctive_term_to_co[m_clean] = o_co
+
+        for m_obj in original_profile.get("metrics", []):
+            cid = m_obj.get("company_id")
+            if cid:
+                c_name = next((e.get("company") for e in orig_exps if e.get("company_id") == cid), None)
+                if c_name:
+                    m_val = str(m_obj.get("value", "")).lower()
+                    if len(m_val) >= 3:
+                        distinctive_term_to_co[m_val] = c_name
+
+        all_reassigned_resps: dict[str, list[str]] = {e.get("company", "").strip().lower(): [] for e in sanitized_exps}
         for exp_c in sanitized_exps:
-            if "max vision" in exp_c.get("company", "").lower():
-                mv_resps = []
-                for r in exp_c.get("responsibilities", []):
-                    if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
-                        if dhwani_san and r not in dhwani_san["responsibilities"]:
-                            dhwani_san["responsibilities"].append(r)
-                    else:
-                        mv_resps.append(r)
-                exp_c["responsibilities"] = mv_resps
-                exp_c["highlights"] = mv_resps
+            this_co = exp_c.get("company", "").strip().lower()
+            kept_resps = []
+            for r in exp_c.get("responsibilities", []):
+                r_lower = r.strip().lower().strip(" ,.-")
+                target_co = bullet_to_source_co.get(r_lower)
+                if not target_co:
+                    p_m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", r.strip())
+                    if p_m and p_m.group(1).strip().lower() in distinctive_term_to_co:
+                        target_co = distinctive_term_to_co[p_m.group(1).strip().lower()]
+                    if not target_co:
+                        for dom, d_co in distinctive_term_to_co.items():
+                            if dom in r_lower:
+                                target_co = d_co
+                                break
+
+                if target_co and target_co.lower() != this_co and target_co.lower() in all_reassigned_resps:
+                    all_reassigned_resps[target_co.lower()].append(r)
+                else:
+                    kept_resps.append(r)
+            exp_c["responsibilities"] = kept_resps
+            exp_c["highlights"] = kept_resps
+
+        for exp_c in sanitized_exps:
+            c_key = exp_c.get("company", "").strip().lower()
+            for r_add in all_reassigned_resps.get(c_key, []):
+                if r_add not in exp_c["responsibilities"]:
+                    exp_c["responsibilities"].append(r_add)
+                    exp_c["highlights"].append(r_add)
 
         sanitized_copy["experience"] = sanitized_exps
 

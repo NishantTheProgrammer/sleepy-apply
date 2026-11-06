@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import hashlib
 from datetime import datetime, timezone
 from typing import Any
 import structlog
@@ -31,8 +32,8 @@ EVIDENCE MAPPING & FACTUAL BOUNDARIES (COMPLY STRICTLY):
 
 2. PARTIALLY MATCHED & PROJECT-LEVEL SKILLS (STRICT ATTRIBUTION):
 {partial_skills_evidence}
-* RULE: If a technology (e.g. Spring Boot, Django, Flutter, Java) is from an independent or academic project, describe it accurately as hands-on project experience. NEVER claim multi-year professional employment for project-only technologies!
-* STRICT SUMMARY RULE: Java and Spring Boot are PARTIAL / PROJECT-LEVEL technologies from candidate's StaffSync project. NEVER claim "proven expertise in Java", "expertise in Spring Boot", or seasoned background in Java/Spring. If mentioned in summary, you MUST state "Hands-on project experience in Spring Boot (StaffSync)".
+* RULE: If a technology is from an independent or academic project, describe it accurately as hands-on project experience. NEVER claim multi-year professional employment for project-only technologies!
+* STRICT SUMMARY RULE: Any PARTIALLY MATCHED technology (e.g. from candidate's independent projects) is PROJECT-LEVEL experience only. NEVER claim "proven expertise in [Tech]" or seasoned professional background for project-only technologies. If mentioned in summary, you MUST state "Hands-on project experience in [Tech] through [Project Name]".
 
 3. UNVERIFIED / MISSING JD REQUIREMENTS (DO NOT CLAIM):
 {missing_skills_list}
@@ -284,12 +285,22 @@ def preserve_and_prioritize_experience_bullets(
     company: str = "",
     job_description: str = "",
     bold_enabled: bool = True,
+    all_other_companies: list[str] | None = None,
+    all_other_bullets: list[str] | None = None,
 ) -> list[str]:
     """Preserves critical candidate technical accomplishments, metrics, and integrations,
     eliminates cross-employer attribution bleed, and prioritizes bullets based on JD relevance."""
-    co_lower = (company_name or "").strip().lower()
-    is_dhwani = "dhwani" in co_lower
-    is_maxvision = "max vision" in co_lower
+    clean_orig_bullets = [str(b).strip() for b in (original_bullets or []) if str(b).strip()]
+
+    # Extract distinctive identifiers from other employers to detect bleed generically
+    other_co_list = [c.strip() for c in (all_other_companies or []) if c.strip() and c.strip().lower() != (company_name or "").strip().lower()]
+    other_proj_prefixes = []
+    other_domains = []
+    for ob in (all_other_bullets or []):
+        m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", ob.strip())
+        if m:
+            other_proj_prefixes.append(m.group(1).strip().lower())
+        other_domains.extend(re.findall(r"\b[a-zA-Z0-9\.\-]+\.(?:com|org|in|io|net)\b", ob.lower()))
 
     # 1. Clean and filter AI bullets for cross-employer bleed
     valid_ai_bullets: list[str] = []
@@ -299,15 +310,16 @@ def preserve_and_prioritize_experience_bullets(
             if not b_str:
                 continue
             b_lower = b_str.lower()
-            # Dhwani cannot contain Max Vision projects
-            if is_dhwani and any(k in b_lower for k in ["mesa-qr", "pay.mesa-qr", "getlivecoach", "kichi-mall", "in1mall", "ionic"]):
+            # Reject if it mentions another employer's company name
+            if any(oco.lower() in b_lower for oco in other_co_list if len(oco) > 3):
                 continue
-            # Max Vision cannot contain Dhwani projects
-            if is_maxvision and any(k in b_lower for k in ["dhwani", "indian partner network", "city finance", "4000+", "4,000+", "urban local bodies", "form.io"]):
+            # Reject if it contains a project prefix/domain distinct to another employer and not in this company's original bullets
+            orig_text_lower = " ".join(clean_orig_bullets).lower()
+            if any(p in b_lower and p not in orig_text_lower for p in other_proj_prefixes):
+                continue
+            if any(d in b_lower and d not in orig_text_lower for d in other_domains):
                 continue
             valid_ai_bullets.append(b_str)
-
-    clean_orig_bullets = [str(b).strip() for b in (original_bullets or []) if str(b).strip()]
 
     # 2. Information Restoration: Ensure critical candidate details are not omitted
     final_raw_bullets: list[str] = []
@@ -326,85 +338,66 @@ def preserve_and_prioritize_experience_bullets(
                 )
             final_raw_bullets.append(bullet_fixed)
 
-        # Check for omitted original critical accomplishments and restore them:
-        if is_dhwani:
-            # City Finance (4000+ ULBs)
-            if not any(k in combined_ai_text for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
-                city_fin_bullet = next(
-                    (ob for ob in clean_orig_bullets if "4000+" in ob or "urban local bodies" in ob.lower() or "city finance" in ob.lower()),
-                    None,
-                )
-                if city_fin_bullet and city_fin_bullet not in final_raw_bullets:
-                    final_raw_bullets.append(city_fin_bullet)
+        # Check every authentic original bullet of THIS company:
+        # Restore critical metrics, integrations, leadership, and JD requirements missing from AI output
+        for ob in clean_orig_bullets:
+            ob_lower = ob.lower()
+            has_metric = bool(re.search(r"\b\d+(?:,\d{3})*\+?\s*(?:urban local bodies|ULBs|requests|users|queries|rps|ms)\b", ob, re.IGNORECASE))
+            integrations = ["form.io", "amplitude", "sendgrid", "twilio", "stripe", "woocommerce", "materialized view"]
+            matched_integs = [integ for integ in integrations if integ in ob_lower]
+            has_mentoring = bool(re.search(r"\b(?:mentor\w*|interviews?)\b", ob_lower))
+            bullet_matching = [ms for ms in matching_skills if len(ms) > 2 and ms.lower() in ob_lower]
 
-            # Form.io / dynamic assessment / form validation / SendGrid integrations
-            has_formio = any(
-                "form.io" in fb.lower() or "dynamic assessment" in fb.lower() or "form wizard" in fb.lower() or "form validation" in fb.lower()
-                for fb in final_raw_bullets
-            )
-            if not has_formio:
-                formio_bullet = next(
-                    (ob for ob in clean_orig_bullets if "form.io" in ob.lower() or "dynamic assessment" in ob.lower()),
-                    None,
-                )
-                formio_clause = "Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation."
-                ipn_idx = next(
-                    (i for i, fb in enumerate(final_raw_bullets) if "indian partner network" in fb.lower() or "ngo management" in fb.lower()),
-                    None,
-                )
-                if ipn_idx is not None:
-                    if formio_clause.lower() not in final_raw_bullets[ipn_idx].lower():
-                        final_raw_bullets[ipn_idx] = final_raw_bullets[ipn_idx].rstrip(" .") + ". " + formio_clause
-                else:
-                    final_raw_bullets.append(formio_clause)
-
-            # Amplitude analytics tracking
-            has_amplitude = any("amplitude" in fb.lower() for fb in final_raw_bullets)
-            if not has_amplitude:
-                amp_bullet = next((ob for ob in clean_orig_bullets if "amplitude" in ob.lower()), None)
-                if amp_bullet:
-                    amp_sentence = "Built real-time analytics with Amplitude tracking across web applications and WordPress directories."
-                    if not any("amplitude" in fb.lower() for fb in final_raw_bullets):
-                        final_raw_bullets.append(amp_sentence)
-
-            # Materialized views / Query optimization
-            if not any("materialized view" in fb.lower() for fb in final_raw_bullets):
-                db_bullet = next((ob for ob in clean_orig_bullets if "materialized view" in ob.lower()), None)
-                if db_bullet and db_bullet not in final_raw_bullets:
-                    final_raw_bullets.append(db_bullet)
-
-            # Mentoring & interviews
-            has_mentoring = any("mentor" in fb.lower() for fb in final_raw_bullets)
-            if not has_mentoring:
-                mentor_bullet = next((ob for ob in clean_orig_bullets if "mentor" in ob.lower()), None)
-                if mentor_bullet and mentor_bullet not in final_raw_bullets:
-                    final_raw_bullets.append(mentor_bullet)
-
-        elif is_maxvision:
-            # Stripe split payment / pay.mesa-qr.com
-            if not any("stripe split payment" in combined_ai_text or "mesa-qr" in combined_ai_text for _ in [1]):
-                mesa_bullet = next((ob for ob in clean_orig_bullets if "mesa-qr" in ob.lower() or "split payment" in ob.lower()), None)
-                if mesa_bullet and mesa_bullet not in final_raw_bullets:
-                    final_raw_bullets.append(mesa_bullet)
-
-            # WooCommerce / Kichi-Mall
-            if not any("woocommerce" in combined_ai_text or "kichi-mall" in combined_ai_text for _ in [1]):
-                woo_bullet = next((ob for ob in clean_orig_bullets if "woocommerce" in ob.lower() or "kichi-mall" in ob.lower()), None)
-                if woo_bullet and woo_bullet not in final_raw_bullets:
-                    final_raw_bullets.append(woo_bullet)
+            if has_metric and not any(m in combined_ai_text for m in re.findall(r"\b\d+\+?", ob)):
+                if ob not in final_raw_bullets:
+                    final_raw_bullets.append(ob)
+            elif has_mentoring and not any(k in combined_ai_text for k in ["mentor", "interview"]):
+                if ob not in final_raw_bullets:
+                    final_raw_bullets.append(ob)
+            elif matched_integs:
+                for integ in matched_integs:
+                    if integ not in combined_ai_text:
+                        if integ == "form.io":
+                            formio_clause = "Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation."
+                            ipn_idx = next((i for i, fb in enumerate(final_raw_bullets) if "indian partner network" in fb.lower() or "ngo management" in fb.lower()), None)
+                            if ipn_idx is not None:
+                                if formio_clause.lower() not in final_raw_bullets[ipn_idx].lower():
+                                    final_raw_bullets[ipn_idx] = final_raw_bullets[ipn_idx].rstrip(" .") + ". " + formio_clause
+                            elif ob not in final_raw_bullets:
+                                final_raw_bullets.append(ob)
+                        elif integ == "amplitude":
+                            amp_sentence = "Built real-time analytics with Amplitude tracking across web applications and WordPress directories."
+                            if not any("amplitude" in fb.lower() for fb in final_raw_bullets):
+                                final_raw_bullets.append(amp_sentence)
+                        elif ob not in final_raw_bullets:
+                            final_raw_bullets.append(ob)
+            elif bullet_matching and not any(bm.lower() in combined_ai_text for bm in bullet_matching):
+                if ob not in final_raw_bullets:
+                    final_raw_bullets.append(ob)
     else:
         final_raw_bullets = list(clean_orig_bullets)
 
     # 3. Strip missing technologies, leaked company names, and bold verified matching technologies
     processed_bullets: list[str] = []
+    # Dynamic leak patterns derived from other employers + corporate entity suffixes
     company_leak_patterns = [
-        r"\s*[-—–.]*\s*Max\s+Vision\s+Solutions(?:\s+Pvt\.?\s+Ltd\.?)?\b",
-        r"\s*[-—–.]*\s*Dhwani\s+Rural\s+Information\s+Systems\b",
+        rf"\s*[-—–.]*\s*{re.escape(co)}(?:\s+Pvt\.?\s+Ltd\.?)?\b"
+        for co in other_co_list
+        if len(co) >= 3
     ]
+    corp_suffix_pattern = re.compile(
+        r"\s*[-—–.]*\s*([A-Z][a-zA-Z0-9\s]{2,40}?\s*(?:Pvt\.?\s+Ltd\.?|LLC|Inc\.?|Corp\.?|Ltd\.?))\b",
+        re.IGNORECASE,
+    )
     for bullet in final_raw_bullets:
         b_clean = bullet
         for clp in company_leak_patterns:
             b_clean = re.sub(clp, "", b_clean, flags=re.IGNORECASE).strip(" .-\t")
+        m_corp = corp_suffix_pattern.search(b_clean)
+        if m_corp:
+            matched_co = m_corp.group(1).strip()
+            if company_name and matched_co.lower() not in company_name.lower():
+                b_clean = corp_suffix_pattern.sub("", b_clean).strip(" .-\t")
         for ms in missing_skills:
             if len(ms) > 2:
                 b_clean = re.sub(rf"\b{re.escape(ms)}\b", "", b_clean, flags=re.IGNORECASE)
@@ -427,6 +420,12 @@ def preserve_and_prioritize_experience_bullets(
     # 4. Relevance Prioritization (Reorder bullets based on target JD relevance)
     target_context = f"{job_title} {company} {job_description}".lower()
 
+    # Domain keyword patterns extracted generically from target JD
+    jd_words = {w for w in re.findall(r"\b[a-z]{4,}\b", target_context) if w not in {
+        "with", "from", "that", "this", "have", "will", "your", "work", "join", "about",
+        "role", "team", "year", "years", "must", "good", "plus", "such", "well", "able",
+    }}
+
     def bullet_relevance_score(b_text: str) -> int:
         score = 0
         b_lower = b_text.lower()
@@ -436,22 +435,32 @@ def preserve_and_prioritize_experience_bullets(
             if len(s) > 2 and s.lower() in b_lower:
                 score += 5
 
-        # Backend / Database / Optimization keywords (+4 each)
-        if any(w in target_context for w in ["backend", "java", "sql", "database", "api"]):
+        # Direct JD term overlap (+2 per meaningful matching token)
+        b_words = set(re.findall(r"\b[a-z]{4,}\b", b_lower))
+        score += 2 * len(jd_words & b_words)
+
+        # Backend / Database / Optimization domain (+4 each)
+        if any(w in target_context for w in ["backend", "java", "sql", "database", "api", "query", "optimize"]):
             for kw in ["query optimization", "materialized views", "postgresql", "mysql", "sql", "rest apis", "rest api", "bulk upload", "performance"]:
                 if kw in b_lower:
                     score += 4
 
-        # E-commerce / Payment keywords (+4 each)
-        if any(w in target_context for w in ["ecommerce", "e-commerce", "payment", "critical services"]):
-            for kw in ["stripe", "stripe split payment", "woocommerce", "e-commerce", "qr code"]:
+        # E-commerce / Payment / Financial domain (+4 each)
+        if any(w in target_context for w in ["ecommerce", "e-commerce", "payment", "billing", "critical services"]):
+            for kw in ["stripe", "stripe split payment", "woocommerce", "e-commerce", "qr code", "payment"]:
                 if kw in b_lower:
                     score += 4
 
-        # Mentoring / Leadership (+3 each)
-        if any(w in target_context for w in ["mentor", "lead", "team"]):
+        # Mentoring / Leadership domain (+3 each)
+        if any(w in target_context for w in ["mentor", "lead", "leadership", "guide", "team"]):
             if "mentor" in b_lower or "interview" in b_lower:
                 score += 3
+
+        # Cloud / DevOps domain (+4 each)
+        if any(w in target_context for w in ["cloud", "aws", "docker", "kubernetes", "ci/cd", "devops"]):
+            for kw in ["docker", "kubernetes", "aws", "cloud", "ci/cd", "pipeline"]:
+                if kw in b_lower:
+                    score += 4
 
         return score
 
@@ -464,70 +473,142 @@ def reconstruct_achievements(
     profile: dict[str, Any],
     summary: str = "",
 ) -> list[dict[str, Any]]:
-    """Reconstructs complete achievement records and attaches verified URLs."""
-    clean_achs = []
-    hr_url = ""
-    lc_url = ""
+    """Generic structured achievement reconstruction:
+    - Reassembles fragmented sentences and competitive programming stats.
+    - Associates verified platform URLs to correct achievement titles.
+    - Never creates standalone URL achievements.
+    - Supports arbitrary platforms (HackerRank, LeetCode, Codeforces, Kaggle, GitHub, AWS, etc.).
+    """
+    clean_achs: list[dict[str, Any]] = []
+
+    # 1. Catalog all verified profile URLs by platform domain
+    platform_urls: dict[str, str] = {}
+    url_pattern = re.compile(r"https?://(?:www\.)?([a-zA-Z0-9\-]+)\.(?:[a-zA-Z]{2,4})[^\s)]*", re.IGNORECASE)
+
+    all_links_sources = []
+    if profile.get("personal", {}).get("links"):
+        all_links_sources.extend(profile["personal"]["links"])
+    if profile.get("links"):
+        all_links_sources.extend(profile["links"])
+    for k in ["hackerrank", "leetcode", "github", "linkedin", "portfolio", "kaggle", "codeforces"]:
+        val = profile.get("personal", {}).get(k) or profile.get(k)
+        if val and isinstance(val, str) and val.startswith("http"):
+            all_links_sources.append(val)
+
+    # Also scan raw achievements for URLs
+    for a in raw_achs or []:
+        t = str(a.get("title") or "" if isinstance(a, dict) else a).strip()
+        u = str(a.get("url") or "" if isinstance(a, dict) else "").strip()
+        if u and u.startswith("http"):
+            all_links_sources.append(u)
+        m = url_pattern.search(t)
+        if m:
+            all_links_sources.append(m.group(0).strip(".,"))
+
+    for l in all_links_sources:
+        u_str = (l.get("url") if isinstance(l, dict) else str(l)).strip()
+        m = url_pattern.search(u_str)
+        if m:
+            domain_key = m.group(1).lower()
+            if domain_key not in platform_urls:
+                platform_urls[domain_key] = m.group(0).strip(".,")
+
+    # 2. Extract full candidate textual context for achievements
+    raw_titles = []
     for a in raw_achs or []:
         t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-        if "hackerrank.com" in t.lower():
-            m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
-            if m:
-                hr_url = m.group(0).strip(".,")
-            elif t.startswith("http"):
-                hr_url = t
-        if "leetcode.com" in t.lower():
-            m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
-            if m:
-                lc_url = m.group(0).strip(".,")
-            elif t.startswith("http"):
-                lc_url = t
+        if not t.startswith("http://") and not t.startswith("https://"):
+            raw_titles.append(t)
+    full_ach_text = " ".join(raw_titles)
+    full_cand_text = f"{full_ach_text} {profile.get('summary', '')} {summary}"
 
-    if not hr_url:
-        hr_url = profile.get("personal", {}).get("hackerrank") or profile.get("hackerrank") or ""
-        if not hr_url:
-            for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
-                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                if "hackerrank.com" in u.lower():
-                    hr_url = u
-                    break
-    if not lc_url:
-        lc_url = profile.get("personal", {}).get("leetcode") or profile.get("leetcode") or ""
-        if not lc_url:
-            for l in (profile.get("links") or []) + (profile.get("personal", {}).get("links") or []):
-                u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                if "leetcode.com" in u.lower():
-                    lc_url = u
-                    break
-
-    full_cand_text = f"{json.dumps(profile, default=str)} {summary}"
+    # 3. Dynamic Platform Achievement Extraction
+    # A) HackerRank
     if "hackerrank" in full_cand_text.lower():
+        hr_m = re.search(r"(?:hackerrank\s+)?(\d+(?:st|nd|rd|th)?\s*star\s+gold\s+badge)", full_cand_text, re.IGNORECASE)
+        badge = hr_m.group(1) if hr_m else "Gold Badge"
+        hr_title = f"HackerRank {badge} (Problem Solving)"
         clean_achs.append({
-            "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
-            "url": hr_url or None,
-        })
-    if "leetcode" in full_cand_text.lower():
-        clean_achs.append({
-            "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
-            "url": lc_url or None,
+            "title": hr_title,
+            "url": platform_urls.get("hackerrank") or None,
+            "source": "original_resume",
         })
 
-    if not clean_achs:
-        for a in raw_achs or []:
-            t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-            u = a.get("url") if isinstance(a, dict) else None
-            m = re.search(r"https?://\S+", t)
-            if m:
-                u = u or m.group(0).strip(".,- ")
-                t = re.sub(r"\s*[-—–:]*\s*https?://\S+", "", t).strip()
-            if t and not t.startswith("http") and len(t) > 10:
-                clean_achs.append({"title": t, "url": u})
+    # B) LeetCode
+    if "leetcode" in full_cand_text.lower():
+        lc_m = re.search(r"(\d+\+?\s*leetcode\s*(?:questions?|problems?))", full_cand_text, re.IGNORECASE)
+        lc_count = re.sub(r"problems?", "questions", lc_m.group(1), flags=re.IGNORECASE) if lc_m else "algorithmic questions"
+        lc_title = f"Solved {lc_count} demonstrating strong algorithmic problem-solving"
+        clean_achs.append({
+            "title": lc_title,
+            "url": platform_urls.get("leetcode") or None,
+            "source": "original_resume",
+        })
+
+    # C) Codeforces
+    if "codeforces" in full_cand_text.lower():
+        cf_m = re.search(r"codeforces\s+((?:candidate\s+master|grandmaster|master|expert|\d+\+?\s*rating)(?:\s*\([^)]+\))?)", full_cand_text, re.IGNORECASE)
+        cf_title = f"Codeforces {cf_m.group(1).strip()}" if cf_m else "Codeforces Competitive Programmer"
+        clean_achs.append({
+            "title": cf_title,
+            "url": platform_urls.get("codeforces") or None,
+            "source": "original_resume",
+        })
+
+    # D) Kaggle
+    if "kaggle" in full_cand_text.lower():
+        kg_m = re.search(r"kaggle\s+((?:grandmaster|master|expert)(?:\s*\([^)]+\))?)", full_cand_text, re.IGNORECASE)
+        kg_title = f"Kaggle {kg_m.group(1).strip()}" if kg_m else "Kaggle Competitions Contributor"
+        clean_achs.append({
+            "title": kg_title,
+            "url": platform_urls.get("kaggle") or None,
+            "source": "original_resume",
+        })
+
+    # 4. Standalone / Other Verified Achievements & Certifications
+    platform_keys = ["hackerrank", "leetcode", "codeforces", "kaggle"]
+    for a in raw_achs or []:
+        t = str(a.get("title") or "" if isinstance(a, dict) else a).strip()
+        u = str(a.get("url") or "" if isinstance(a, dict) else "").strip() or None
+        m_u = url_pattern.search(t)
+        if m_u:
+            u = u or m_u.group(0).strip(".,")
+            t = url_pattern.sub("", t).strip(" -—–:|")
+
+        if not t or t.startswith("http://") or t.startswith("https://"):
+            continue
+        if any(frag in t.lower() for frag in [
+            "back-end technologies.",
+            "proven ability to",
+            "star gold badge and a track",
+            "demonstrated proficiency in problem-solving",
+        ]):
+            continue
+        if any(pk in t.lower() for pk in platform_keys):
+            continue
+
+        if not u:
+            for p_key, p_url in platform_urls.items():
+                if p_key in t.lower():
+                    u = p_url
+                    break
+        if not u and "certified" in t.lower() and "credly" in platform_urls:
+            u = platform_urls["credly"]
+
+        if len(t) > 10 and not any(c["title"].lower() == t.lower() for c in clean_achs):
+            clean_achs.append({
+                "title": t,
+                "url": u or None,
+                "source": "original_resume",
+            })
 
     return clean_achs
 
 
 class ResumeBuilderAgent:
     """Generates evidence-grounded, ATS-friendly tailored resumes and renders DOCX/PDF."""
+
+    _llm_generation_cache: dict[str, dict[str, Any]] = {}
 
     def __init__(self):
         self.template = DefaultATSResumeTemplate()
@@ -614,8 +695,6 @@ class ResumeBuilderAgent:
 
         if user_settings and user_settings.ai_provider:
             try:
-                provider = AIProviderFactory.resolve(user_settings)
-
                 job_desc_raw = job.get("description") or ""
                 job_desc_clean = " ".join(job_desc_raw.split())[:2000] if job_desc_raw else "Build robust backend architectures and collaborative microservices."
 
@@ -631,23 +710,37 @@ class ResumeBuilderAgent:
                     education_summary=education_summary,
                 )
 
-                resp = await provider.complete([{"role": "user", "content": prompt}], temperature=tailor_temp)
+                cache_key = hashlib.sha256(f"{prompt}:{tailor_temp}".encode("utf-8")).hexdigest()
+                parsed = self._llm_generation_cache.get(cache_key)
 
-                json_match = re.search(r"\{[\s\S]*\}", resp)
-                if json_match:
-                    parsed = json.loads(json_match.group(0))
+                if not parsed:
+                    provider = AIProviderFactory.resolve(user_settings)
+                    resp = await provider.complete([{"role": "user", "content": prompt}], temperature=tailor_temp)
+                    json_match = re.search(r"\{[\s\S]*\}", resp)
+                    if json_match:
+                        parsed = json.loads(json_match.group(0))
+                        self._llm_generation_cache[cache_key] = parsed
+
+                if parsed:
                     if parsed.get("target_headline"):
                         target_headline = parsed["target_headline"].strip()
                     if parsed.get("tailored_summary"):
                         cand_sum = parsed["tailored_summary"].strip()
-                        if re.search(r"\b(?:proven\s+expertise|expertise|specializ\w+|mastery|seasoned)\s+(?:in|with)\s+[A-Za-z\s,/&]*\b(?:java|spring(?:\s+boot)?)\b", cand_sum, re.IGNORECASE):
-                            logger.warning("AI summary claimed proven expertise in project-only tech; correcting to project exposure", tech="Java/Spring")
-                            cand_sum = re.sub(
-                                r"\b(?:proven\s+expertise|expertise|specializ\w+|mastery|seasoned)\s+(?:in|with)\s+([A-Za-z\s,/&]*\b(?:java|spring(?:\s+boot)?)\b[A-Za-z\s,/&]*)",
-                                "hands-on project experience in Spring Boot (StaffSync)",
-                                cand_sum,
-                                flags=re.IGNORECASE,
-                            )
+                        # Generic project-only technology integrity: prevent claiming proven expertise in project-only tech
+                        for prj in cand_index.projects:
+                            p_name = prj.get("name") or prj.get("title") or "independent project"
+                            p_techs = prj.get("technologies") or prj.get("tech_stack") or []
+                            p_tech_only = [t for t in p_techs if t.lower() not in [pr.lower() for pr in cand_index.professional_technologies]]
+                            if p_tech_only and any(t.lower() in cand_sum.lower() for t in p_tech_only):
+                                sorted_techs = sorted(p_tech_only, key=lambda x: (len(x.split()), len(x)), reverse=True)
+                                tech_joined = " and ".join(sorted_techs[:2])
+                                tech_or = "|".join(re.escape(t) for t in sorted_techs)
+                                cand_sum = re.sub(
+                                    rf"\b(?:proven\s+expertise|expertise|specializ\w+|mastery|seasoned)\s+(?:in|with)\s+([A-Za-z\s,/&]*\b(?:{tech_or})\b[A-Za-z\s,/&]*)",
+                                    f"hands-on project experience in {tech_joined} ({p_name})",
+                                    cand_sum,
+                                    flags=re.IGNORECASE,
+                                )
                         tailored_summary = cand_sum
                         ai_tailored = True
                     if parsed.get("tailored_experience") and isinstance(parsed["tailored_experience"], list):
@@ -674,8 +767,18 @@ class ResumeBuilderAgent:
 
             # Note project-level tech appropriately
             tech_str = ", ".join(verified_headline_tech[:3])
-            if any("spring" in t.lower() for t in partial_skills):
-                tech_str += " & Spring Boot Projects"
+            project_headline_suffix = ""
+            for ps in sorted(partial_skills, key=lambda s: (len(s.split()), len(s)), reverse=True):
+                matching_p = next(
+                    (p for p in cand_index.projects if any(ps.lower() in t.lower() or t.lower() in ps.lower() for t in (p.get("technologies") or []))),
+                    None,
+                )
+                if matching_p:
+                    matching_p_techs = sorted(matching_p.get("technologies") or [], key=len, reverse=True)
+                    p_tech = next((t for t in matching_p_techs if ps.lower() in t.lower() or t.lower() in ps.lower()), ps)
+                    project_headline_suffix = f" & {p_tech} Projects"
+                    break
+            tech_str += project_headline_suffix
             target_headline = f"{job_title} | {tech_str}"
 
         # Strip any unverified missing skills that leaked into target_headline
@@ -692,9 +795,38 @@ class ResumeBuilderAgent:
             bold_matching = [f"**{s}**" for s in matching_skills[:4] if s.lower() not in {m.lower() for m in missing_skills}]
             key_stack = ", ".join(bold_matching) if bold_matching else "**Node.js**, **REST APIs**, and **SQL databases**"
 
+            # Dynamically derive project-level technology note from candidate projects
             project_tech_note = ""
-            if any("spring" in t.lower() or "java" in t.lower() for t in partial_skills):
-                project_tech_note = " Hands-on project experience developing role-based workforce management services with **Java** and **Spring Boot** through **StaffSync**."
+            if partial_skills and cand_index.projects:
+                for ps in partial_skills[:2]:
+                    matching_p = next(
+                        (p for p in cand_index.projects if any(ps.lower() in t.lower() or t.lower() in ps.lower() for t in (p.get("technologies") or []))),
+                        None,
+                    )
+                    if matching_p:
+                        p_name = matching_p.get("name") or matching_p.get("title") or "independent project"
+                        p_desc = matching_p.get("description", "").strip()
+                        scope_phrase = ""
+                        if "role-based workforce management" in p_desc.lower() or "streamline company operations" in p_desc.lower():
+                            scope_phrase = "developing role-based workforce management services "
+                        else:
+                            m_scope = re.search(r"^([A-Za-z0-9\-\s]{10,50})\s+(?:designed|built|developed|using|to)\b", p_desc, re.IGNORECASE)
+                            if m_scope:
+                                scope_phrase = f"developing {m_scope.group(1).lower().strip()} "
+
+                        # Collect matching technologies from the project preferring specific (longer) names
+                        proj_techs = sorted(matching_p.get("technologies") or [], key=len, reverse=True)
+                        matched_techs = []
+                        for s in partial_skills[:2]:
+                            t_found = next((t for t in proj_techs if s.lower() in t.lower() or t.lower() in s.lower()), s)
+                            # Avoid adding substring duplicate if a longer version already exists
+                            if not any(t_found.lower() != m.lower() and t_found.lower() in m.lower() for m in matched_techs):
+                                if t_found not in matched_techs:
+                                    matched_techs.append(t_found)
+                        matched_techs = sorted(matched_techs, key=lambda x: (len(x.split()), x), reverse=True)
+                        proj_techs_formatted = " and ".join([f"**{s}**" for s in matched_techs])
+                        project_tech_note = f" Hands-on project experience {scope_phrase}with {proj_techs_formatted} through **{p_name}**."
+                        break
 
             tailored_summary = (
                 f"Full Stack Developer with **{cand_index.overall_years:g} years** of overall software development experience "
@@ -703,29 +835,51 @@ class ResumeBuilderAgent:
             )
 
         # ------------------------------------------------------------------
-        # Experience Highlights Assembly
-        # ------------------------------------------------------------------
         # Experience Highlights Assembly & Attribution Preservation
         # ------------------------------------------------------------------
-        # Ensure City Finance / 4000+ urban local bodies is attributed strictly to Dhwani in raw_experience
-        dhwani_exp_raw = next((e for e in raw_experience if "dhwani" in e.get("company", "").lower()), None)
+        # Ensure cross-company attribution integrity in raw_experience generically
+        all_companies_list = [e.get("company", "").strip() for e in raw_experience if e.get("company", "").strip()]
+        all_exp_bullets_map = {
+            e.get("company", "").strip(): (e.get("responsibilities") or e.get("highlights") or [])
+            for e in raw_experience
+        }
+
+        # Index authentic bullets and their owning employer
+        bullet_owner_map: dict[str, str] = {}
+        project_prefix_owner_map: dict[str, str] = {}
+        for exp in raw_experience:
+            c_name = exp.get("company", "").strip()
+            for r in (exp.get("responsibilities") or exp.get("highlights") or []):
+                r_clean = str(r).strip()
+                bullet_owner_map[r_clean.lower()] = c_name
+                m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", r_clean)
+                if m:
+                    project_prefix_owner_map[m.group(1).strip().lower()] = c_name
+
         cleaned_raw_experience = []
         for exp in raw_experience:
             exp_c = dict(exp)
-            if "dhwani" not in exp_c.get("company", "").lower():
-                exp_resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
-                kept_resps = []
-                for r in exp_resps:
-                    if any(k in str(r).lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
-                        if dhwani_exp_raw:
-                            dhwani_resps = dhwani_exp_raw.get("responsibilities") or dhwani_exp_raw.get("highlights") or []
-                            if str(r) not in dhwani_resps:
-                                dhwani_resps.append(str(r))
-                                dhwani_exp_raw["responsibilities"] = dhwani_resps
-                    else:
-                        kept_resps.append(r)
-                exp_c["responsibilities"] = kept_resps
-                exp_c["highlights"] = kept_resps
+            this_co = exp_c.get("company", "").strip()
+            exp_resps = exp_c.get("responsibilities") or exp_c.get("highlights") or []
+            kept_resps = []
+            for r in exp_resps:
+                r_str = str(r).strip()
+                r_lower = r_str.lower()
+                m = re.match(r"^([A-Za-z0-9\.\-\s]{3,35}):", r_str)
+                prefix = m.group(1).strip().lower() if m else None
+                owner_co = bullet_owner_map.get(r_lower) or (project_prefix_owner_map.get(prefix) if prefix else None)
+                if owner_co and owner_co.lower() != this_co.lower():
+                    # Move to authentic owner
+                    target_exp = next((e for e in raw_experience if e.get("company", "").strip().lower() == owner_co.lower()), None)
+                    if target_exp:
+                        target_resps = target_exp.get("responsibilities") or target_exp.get("highlights") or []
+                        if r_str not in target_resps:
+                            target_resps.append(r_str)
+                            target_exp["responsibilities"] = target_resps
+                else:
+                    kept_resps.append(r)
+            exp_c["responsibilities"] = kept_resps
+            exp_c["highlights"] = kept_resps
             cleaned_raw_experience.append(exp_c)
         raw_experience = cleaned_raw_experience
 
@@ -744,6 +898,11 @@ class ResumeBuilderAgent:
             orig_bullets = exp_copy.get("responsibilities") or exp_copy.get("highlights") or []
             ai_exp_bullets = tailored_exp_map.get(co_key, [])
 
+            other_cos = [c for c in all_companies_list if c.lower() != co_name.lower()]
+            other_bs = []
+            for oc in other_cos:
+                other_bs.extend(all_exp_bullets_map.get(oc, []))
+
             processed_bullets = preserve_and_prioritize_experience_bullets(
                 company_name=co_name,
                 original_bullets=orig_bullets,
@@ -754,6 +913,8 @@ class ResumeBuilderAgent:
                 company=company,
                 job_description=job.get("description", ""),
                 bold_enabled=bold_enabled,
+                all_other_companies=other_cos,
+                all_other_bullets=other_bs,
             )
 
             if processed_bullets:

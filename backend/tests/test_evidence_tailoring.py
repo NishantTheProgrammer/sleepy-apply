@@ -1040,5 +1040,395 @@ async def test_summary_accuracy_and_evidence_alignment(candidate_profile, pocket
         assert ach.get("url") is not None
 
 
+def test_generic_multi_company_isolation():
+    """Verify generic entity isolation across arbitrary employers without hardcoded names."""
+    from app.agents.hallucination_guard import HallucinationGuard
+    from app.agents.evidence_mapper import EvidenceMapper
+    from app.agents.resume_builder import preserve_and_prioritize_experience_bullets
+
+    candidate = {
+        "personal": {"fullName": "Dr. Alex Taylor"},
+        "summary": "Software Architect with 6 years experience.",
+        "skills": {"backend": ["Go", "Python", "C++"], "databases": ["PostgreSQL"]},
+        "experience": [
+            {
+                "company": "FinTech Labs Inc.",
+                "jobTitle": "Lead Systems Engineer",
+                "responsibilities": [
+                    "Engineered High-Frequency Trading engine processing 50,000 orders/sec.",
+                ],
+            },
+            {
+                "company": "BioHealth Corp.",
+                "jobTitle": "Data Infrastructure Engineer",
+                "responsibilities": [
+                    "Genomics Pipeline: processed 10,000 DNA sequences per day with distributed workers.",
+                ],
+            },
+        ],
+    }
+
+    mock_jd = {
+        "title": "Systems Architect",
+        "company": "NextGen Quant",
+        "description": "Seeking Systems Architect with Go and low-latency experience.",
+    }
+
+    # 1. Test bullet leak stripping for arbitrary companies
+    leaked = ["Engineered High-Frequency Trading engine. BioHealth Corp."]
+    cleaned = preserve_and_prioritize_experience_bullets(
+        company_name="FinTech Labs Inc.",
+        original_bullets=leaked,
+        ai_bullets=None,
+        matching_skills=["Go"],
+        missing_skills=[],
+        all_other_companies=["BioHealth Corp."],
+    )
+    assert "BioHealth Corp" not in cleaned[0]
+
+    # 2. Test cross-employer bleed detection
+    mapper = EvidenceMapper()
+    ev_res = mapper.map_evidence(candidate, mock_jd)
+    guard = HallucinationGuard()
+
+    inverted_resume = {
+        "target_headline": "Systems Architect | Go",
+        "tailored_summary": "Architect with 6 years experience.",
+        "experience": [
+            {
+                "company": "FinTech Labs Inc.",
+                "responsibilities": [
+                    "Genomics Pipeline: processed 10,000 DNA sequences per day with distributed workers.",
+                ],
+            },
+            {
+                "company": "BioHealth Corp.",
+                "responsibilities": [
+                    "Engineered High-Frequency Trading engine processing 50,000 orders/sec.",
+                ],
+            },
+        ],
+    }
+
+    val_raw = guard.validate(inverted_resume, candidate, ev_res)
+    assert not val_raw.is_valid
+    categories = [v.category for v in val_raw.critical_violations]
+    assert "cross_employer_bleed" in categories
+
+    # 3. Test sanitization re-routes bullets to authentic employer
+    val_res = guard.validate_and_sanitize(inverted_resume, candidate, ev_res)
+    fintech_resps = next(e["responsibilities"] for e in val_res.sanitized_content["experience"] if e["company"] == "FinTech Labs Inc.")
+    bio_resps = next(e["responsibilities"] for e in val_res.sanitized_content["experience"] if e["company"] == "BioHealth Corp.")
+
+    # Genomics Pipeline must NOT be in FinTech Labs
+    assert not any("genomics pipeline" in r.lower() for r in fintech_resps)
+    # Trading engine must NOT be in BioHealth Corp
+    assert not any("trading engine" in r.lower() for r in bio_resps)
+    # Authentic bullets must be restored to their true employers
+    assert any("genomics pipeline" in r.lower() for r in bio_resps)
+    assert any("trading engine" in r.lower() for r in fintech_resps)
+
+
+def test_dynamic_project_to_technology_mapping():
+    """Verify arbitrary project-to-technology mapping without StaffSync hardcoding."""
+    from app.agents.evidence_mapper import EvidenceMapper
+    from app.agents.hallucination_guard import HallucinationGuard
+
+    cand = {
+        "personal": {"fullName": "Taylor Swift"},
+        "summary": "Systems Developer with 4 years experience.",
+        "skills": {"backend": ["Python", "C++"]},
+        "experience": [
+            {
+                "company": "Network Systems",
+                "jobTitle": "Systems Developer",
+                "responsibilities": ["Maintained TCP/IP daemon."],
+            }
+        ],
+        "projects": [
+            {
+                "name": "RustTelemetry",
+                "description": "High performance metric collector designed for distributed nodes.",
+                "technologies": ["Rust", "Actix"],
+            }
+        ],
+    }
+
+    jd = {
+        "title": "Rust Developer",
+        "company": "FastEdge",
+        "required_skills": ["Rust"],
+        "description": "Seeking Rust engineer for high performance edge compute.",
+    }
+
+    mapper = EvidenceMapper()
+    ev_res = mapper.map_evidence(cand, jd)
+
+    # 1. Evidence mapper must classify Rust as PARTIAL project-level match
+    rust_ev = next((m for m in ev_res.mappings if m.requirement.lower() == "rust"), None)
+    assert rust_ev is not None
+    assert rust_ev.status == "PARTIAL"
+    assert rust_ev.evidence_source == "project"
+    assert rust_ev.source_entity == "RustTelemetry"
+    assert "RustTelemetry" in rust_ev.notes
+
+    # 2. Claiming 4 years professional Rust must fail validation
+    guard = HallucinationGuard()
+    inflated_resume = {
+        "target_headline": "Rust Developer | Rust",
+        "tailored_summary": "Systems Developer with 4+ years of Rust experience.",
+        "experience": cand["experience"],
+    }
+    val = guard.validate(inflated_resume, cand, ev_res)
+    assert not val.is_valid
+    inflation_violation = next((v for v in val.critical_violations if v.category == "experience_inflation"), None)
+    assert inflation_violation is not None
+    assert "RustTelemetry" in inflation_violation.allowed_boundary
+
+
+def test_arbitrary_platforms_achievement_reconstruction():
+    """Verify generic achievement reconstruction across Kaggle, Codeforces, AWS certifications, and broken OCR fragments."""
+    from app.agents.resume_builder import reconstruct_achievements
+
+    cand = {
+        "personal": {"fullName": "Dana Scully"},
+        "summary": "Data Scientist with Kaggle Grandmaster status and Codeforces Candidate Master rating.",
+        "links": [
+            {"name": "Kaggle", "url": "https://www.kaggle.com/danascully"},
+            {"name": "Codeforces", "url": "https://codeforces.com/profile/danascully"},
+        ],
+    }
+
+    raw_fragmented = [
+        {"title": "data pipelines across clouds. Kaggle Grandmaster (Competitions)"},
+        {"title": "https://www.kaggle.com/danascully"},
+        {"title": "Codeforces Candidate Master (Max rating 1980)"},
+        {"title": "https://codeforces.com/profile/danascully"},
+        {"title": "AWS Certified Solutions Architect Professional"},
+        {"title": "https://www.credly.com/badges/abc-123"},
+        {"title": "proven ability to deliver"},
+    ]
+
+    achs = reconstruct_achievements(raw_fragmented, cand)
+
+    # 1. Standalone URLs must NOT be titles
+    for a in achs:
+        assert not a["title"].startswith("http")
+
+    # 2. Fragmented sentence shards must be filtered out
+    assert not any("proven ability to" in a["title"].lower() for a in achs)
+
+    # 3. Kaggle achievement extracted and mapped to Kaggle URL
+    kg = next((a for a in achs if "kaggle" in a["title"].lower()), None)
+    assert kg is not None
+    assert "kaggle grandmaster" in kg["title"].lower()
+    assert kg["url"] == "https://www.kaggle.com/danascully"
+
+    # 4. Codeforces achievement extracted and mapped to Codeforces URL
+    cf = next((a for a in achs if "codeforces" in a["title"].lower()), None)
+    assert cf is not None
+    assert "candidate master" in cf["title"].lower()
+    assert cf["url"] == "https://codeforces.com/profile/danascully"
+
+    # 5. AWS certification mapped to Credly URL
+    aws = next((a for a in achs if "aws certified" in a["title"].lower()), None)
+    assert aws is not None
+    assert aws["url"] == "https://www.credly.com/badges/abc-123"
+
+
+def test_dynamic_metrics_extraction_and_cross_company_isolation():
+    """Phase 5: Test dynamic metrics extraction with provenance and cross-employer metric isolation."""
+    from app.agents.profile_creator import ProfileCreatorAgent
+    from app.agents.evidence_mapper import EvidenceMapper
+    from app.agents.hallucination_guard import HallucinationGuard
+
+    raw_profile = {
+        "personal": {"fullName": "Taylor Swift", "email": "taylor@swift.io"},
+        "experience": [
+            {
+                "company": "Alpha HighScale Inc",
+                "role": "Staff Systems Engineer",
+                "responsibilities": [
+                    "Architected event streaming pipelines processing 50,000 req/s with 99.99% uptime.",
+                    "Optimized distributed cache reducing latency by 45% and saving $1.2M annually.",
+                ],
+            },
+            {
+                "company": "Beta Retail Ltd",
+                "role": "Backend Developer",
+                "responsibilities": [
+                    "Scaled online ordering service to handle 200,000 active shoppers during flash sales.",
+                ],
+            },
+        ],
+        "projects": [
+            {
+                "name": "RustKV",
+                "description": "Embedded key-value engine benchmarked at 1.5M QPS on NVMe storage.",
+            }
+        ],
+        "achievements": [
+            {"title": "1st place in Global Distributed Systems Hackathon 2024"},
+        ],
+    }
+
+    creator = ProfileCreatorAgent()
+    norm = creator._normalize_extracted_data(raw_profile)
+
+    # 1. Verify dynamic metrics extraction across experience, projects, and achievements
+    metrics = norm.get("metrics", [])
+    assert len(metrics) >= 4
+
+    alpha_cid = norm["experience"][0]["company_id"]
+    beta_cid = norm["experience"][1]["company_id"]
+    alpha_metrics = [m for m in metrics if m.get("company_id") == alpha_cid]
+    beta_metrics = [m for m in metrics if m.get("company_id") == beta_cid]
+    proj_metrics = [m for m in metrics if m.get("source_type") == "personal_project"]
+
+    assert any("50,000" in m["value"] or "99.99%" in m["value"] for m in alpha_metrics)
+    assert any("200,000" in m["value"] for m in beta_metrics)
+    assert any("1.5M" in m["value"] for m in proj_metrics)
+
+    # 2. Test cross-employer metric bleed detection in HallucinationGuard
+    jd = {
+        "title": "Principal Systems Engineer",
+        "company": "Stripe",
+        "required_skills": ["Rust", "Distributed Systems"],
+        "responsibilities": ["Lead high-throughput event processing."],
+    }
+
+    mapper = EvidenceMapper()
+    ev_res = mapper.map_evidence(norm, jd)
+    guard = HallucinationGuard()
+
+    # Leaked metric: Beta Retail Ltd claims 50,000 req/s from Alpha HighScale
+    leaked_resume = {
+        "target_headline": "Principal Systems Engineer | Rust & Distributed Systems",
+        "tailored_summary": "Experienced systems engineer with deep distributed systems background.",
+        "experience": [
+            {
+                "company": "Alpha HighScale Inc",
+                "responsibilities": [
+                    "Architected event streaming pipelines processing 50,000 req/s with 99.99% uptime.",
+                ],
+            },
+            {
+                "company": "Beta Retail Ltd",
+                "responsibilities": [
+                    "Scaled online ordering service to handle 50,000 req/s with 99.99% uptime.",
+                ],
+            },
+        ],
+    }
+
+    val_res = guard.validate(leaked_resume, norm, ev_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+    assert "cross_employer_bleed" in categories
+
+    # 3. Test fabricated financial metric detection ($10M ARR never appeared in profile)
+    invented_metric_resume = {
+        "target_headline": "Principal Systems Engineer | Rust & Distributed Systems",
+        "tailored_summary": "Experienced systems engineer.",
+        "experience": [
+            {
+                "company": "Beta Retail Ltd",
+                "responsibilities": [
+                    "Generated $10M ARR through optimized flash sale infrastructure.",
+                ],
+            },
+        ],
+    }
+
+    val_res_inv = guard.validate(invented_metric_resume, norm, ev_res)
+    assert not val_res_inv.is_valid
+    assert any(v.category == "invented_metric" for v in val_res_inv.critical_violations)
+
+
+def test_dynamic_jd_analysis_arbitrary_domains():
+    """Phase 6: Test dynamic JD requirement extraction, section importance, and degree matching on arbitrary roles."""
+    from app.agents.evidence_mapper import EvidenceMapper
+
+    mapper = EvidenceMapper()
+
+    jd = {
+        "title": "Cloud Platform Engineer",
+        "company": "DataCorp",
+        "required_skills": ["Python", "Docker"],
+        "description": """
+        About the role:
+        We are seeking a Cloud Platform Engineer to manage scalable distributed systems.
+        
+        Requirements:
+        - 3 to 5 years experience in building backend cloud services
+        - Master's degree in Computer Science or related technical discipline
+        - Strong background in Python and FastAPI
+        
+        Nice to have:
+        - Experience with Docker containerization and Redis
+        - Knowledge of Microservices architecture
+        """,
+    }
+
+    reqs = mapper.extract_jd_requirements(jd["title"], jd["required_skills"], jd["description"])
+    req_names = {r["name"] for r in reqs}
+
+    # Verify dynamic technology extraction
+    assert "Python" in req_names
+    assert "Docker" in req_names
+    assert "FastAPI" in req_names
+    assert "Redis" in req_names
+    assert "Microservices" in req_names
+
+    # Verify importance detection: Python & FastAPI are mandatory, Redis is desirable
+    py_req = next(r for r in reqs if r["name"] == "Python")
+    assert py_req["importance"] == "mandatory"
+
+    redis_req = next(r for r in reqs if r["name"] == "Redis")
+    assert redis_req["importance"] == "desirable"
+
+    # Candidate with Master's degree
+    candidate = {
+        "personal": {"fullName": "Dana Scully", "email": "dana@fbi.gov"},
+        "summary": "Cloud engineer with 4 years building APIs in Python and FastAPI.",
+        "skills": {
+            "backend": ["Python", "FastAPI"],
+            "databases": ["Redis"],
+            "tools": ["Docker"],
+        },
+        "experience": [
+            {
+                "company": "FBI Tech Division",
+                "role": "Cloud Platform Engineer",
+                "current": True,
+                "responsibilities": [
+                    "Engineered cloud infrastructure using Python and FastAPI.",
+                    "Configured Redis caches and Docker containers.",
+                ],
+            }
+        ],
+        "education": [
+            {"degree": "Master of Science in Computer Science", "institution": "Stanford University", "year": "2020"},
+        ],
+    }
+
+    res = mapper.map_evidence(candidate, jd)
+
+    # Master's degree should be MATCHED directly
+    edu_m = next((m for m in res.mappings if m.evidence_source == "education" or "master" in m.requirement.lower()), None)
+    assert edu_m is not None
+    assert edu_m.status == "MATCHED"
+
+    # Matched skills
+    assert "Python" in res.skills_classification.matched_skills
+    assert "Docker" in res.skills_classification.matched_skills
+    assert "FastAPI" in res.skills_classification.matched_skills
+
+
+
+
+
+
+
 
 

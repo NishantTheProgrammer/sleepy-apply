@@ -8,6 +8,8 @@ or self-reported skill).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from typing import Any
 from pydantic import BaseModel, Field
@@ -122,11 +124,15 @@ class EvidenceMapper:
         "maven": "Maven",
         "tdd": "TDD",
         "test driven development": "TDD",
-        "b.tech": "B.Tech",
-        "b.e": "BE",
-        "mca": "MCA",
-        "bca": "BCA",
     }
+
+    _profile_index_cache: dict[str, CandidateEvidenceIndex] = {}
+    _jd_reqs_cache: dict[str, list[dict[str, Any]]] = {}
+
+    @classmethod
+    def _compute_hash(cls, data: Any) -> str:
+        canonical_str = json.dumps(data, sort_keys=True, default=str)
+        return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
 
     @classmethod
     def canonical_tech(cls, tech: str) -> str:
@@ -135,6 +141,10 @@ class EvidenceMapper:
 
     def build_candidate_index(self, profile: dict[str, Any]) -> CandidateEvidenceIndex:
         """Indexes candidate profile into clean, distinct evidence layers."""
+        prof_hash = self._compute_hash(profile)
+        if prof_hash in self._profile_index_cache:
+            return self._profile_index_cache[prof_hash].model_copy(deep=True)
+
         personal = profile.get("personal", {})
         name = personal.get("fullName") or personal.get("full_name") or "Candidate"
 
@@ -158,9 +168,9 @@ class EvidenceMapper:
         ]
         for exp in raw_exp:
             company = exp.get("company", "").strip()
-            title = exp.get("jobTitle") or exp.get("title", "").strip()
-            start = exp.get("startDate") or exp.get("start_date", "").strip()
-            end = "Present" if (exp.get("current") or exp.get("is_current")) else (exp.get("endDate") or exp.get("end_date", "")).strip()
+            title = str(exp.get("jobTitle") or exp.get("title") or "").strip()
+            start = str(exp.get("startDate") or exp.get("start_date") or "").strip()
+            end = "Present" if (exp.get("current") or exp.get("is_current")) else str(exp.get("endDate") or exp.get("end_date") or "").strip()
             resps = exp.get("responsibilities") or exp.get("highlights") or []
             desc = exp.get("description", "")
 
@@ -228,6 +238,10 @@ class EvidenceMapper:
             p_name = p.get("name") or p.get("title", "").strip()
             p_desc = p.get("description", "").strip()
             p_techs = [self.canonical_tech(t) for t in (p.get("technologies") or p.get("tech_stack") or [])]
+            for t in p_techs:
+                if t:
+                    proj_known.add(t)
+                    all_known.add(t)
             full_text = f"{p_name} {p_desc} " + " ".join(p_techs)
 
             for raw_k, canon in self.TECH_CANONICAL_MAP.items():
@@ -297,7 +311,7 @@ class EvidenceMapper:
             if isinstance(q, dict) and q.get("answer"):
                 qa_facts[q.get("question", "")] = q["answer"]
 
-        return CandidateEvidenceIndex(
+        idx_result = CandidateEvidenceIndex(
             full_name=name,
             overall_years=overall_years,
             professional_roles=prof_roles,
@@ -310,11 +324,17 @@ class EvidenceMapper:
             self_reported_technologies=self_known,
             verified_qa_facts=qa_facts,
         )
+        self._profile_index_cache[prof_hash] = idx_result
+        return idx_result
 
     def extract_jd_requirements(
         self, job_title: str, required_skills: list[str], job_description: str
     ) -> list[dict[str, Any]]:
         """Extracts structured requirements from JD with importance classifications."""
+        jd_hash = self._compute_hash({"title": job_title, "skills": sorted(required_skills), "desc": job_description})
+        if jd_hash in self._jd_reqs_cache:
+            return [dict(r) for r in self._jd_reqs_cache[jd_hash]]
+
         reqs = []
         seen = set()
 
@@ -382,17 +402,35 @@ class EvidenceMapper:
             ("Docker", ["docker"], "Docker containerization", "desirable"),
         ]
 
+        # Structured importance detector based on preceding JD section header
+        jd_section_headers = []
+        for m in re.finditer(r"\b(?:requirements?|must have|what you(?:'ll| will) need|qualifications|core qualifications|minimum qualifications)\b", desc_lower):
+            jd_section_headers.append((m.start(), "mandatory"))
+        for m in re.finditer(r"\b(?:nice to have|preferred|desirables?|good to have|plus|bonus|what we'd like to see)\b", desc_lower):
+            jd_section_headers.append((m.start(), "desirable"))
+        jd_section_headers.sort(key=lambda x: x[0])
+
+        def get_importance(term: str, default: str = "desirable") -> str:
+            matches = [m.start() for m in re.finditer(r"\b" + re.escape(term) + r"\b", desc_lower)]
+            if not matches:
+                return default
+            prec = [h for h in jd_section_headers if h[0] < matches[0]]
+            if prec:
+                return prec[-1][1]
+            return default
+
         for canon, variants, label, default_imp in tech_patterns:
-            if any(re.search(r"\b" + re.escape(v) + r"\b", desc_lower) for v in variants):
-                imp = default_imp
-                for v in variants:
-                    if re.search(rf"\b(?:must have|required|requirements)\b[\s\S]*?\b{re.escape(v)}\b", desc_lower):
-                        imp = "mandatory"
-                        break
-                    elif re.search(rf"\b(?:desirables?|nice to have|preferred|plus)\b[\s\S]*?\b{re.escape(v)}\b", desc_lower):
-                        imp = "desirable"
-                        break
+            matched_var = next((v for v in variants if re.search(r"\b" + re.escape(v) + r"\b", desc_lower)), None)
+            if matched_var:
+                imp = get_importance(matched_var, default_imp)
                 add_req(canon, "technology", imp, label)
+
+        # Dynamically scan any other technology from TECH_CANONICAL_MAP in description
+        for raw_k, canon in self.TECH_CANONICAL_MAP.items():
+            if canon.lower() not in seen and len(raw_k) >= 3:
+                if re.search(r"\b" + re.escape(raw_k) + r"\b", desc_lower):
+                    imp = get_importance(raw_k, "desirable")
+                    add_req(canon, "technology", imp, canon)
 
         # Domain experience (e.g. eCommerce)
         if "ecommerce" in desc_lower or "e-commerce" in desc_lower:
@@ -408,10 +446,22 @@ class EvidenceMapper:
             add_req("Mentoring", "leadership", "desirable", "Mentoring junior developers / engineers")
 
         # Education requirements
-        edu_m = re.search(r"\b(B\.?Tech|B\.?E|MCA|BCA|Master|Bachelor|Computer Science)\b", job_description, re.IGNORECASE)
+        edu_m = re.search(r"\b(B\.?Tech|B\.?E|MCA|BCA|Master(?:'s)?|Bachelor(?:'s)?|Computer Science)\b", job_description, re.IGNORECASE)
         if edu_m:
-            add_req("B.Tech/BE or related", "education", "desirable", "B.Tech/BE Computer Science, Engineering, or related field")
+            matched_deg = edu_m.group(1).lower()
+            if "b.tech" in matched_deg or "b.e" in matched_deg:
+                req_deg_name = "B.Tech/BE or related"
+                req_deg_label = "B.Tech/BE Computer Science, Engineering, or related field"
+            elif "master" in matched_deg or "mca" in matched_deg:
+                req_deg_name = "Master's or related"
+                req_deg_label = "Master's degree in Computer Science or related field"
+            else:
+                req_deg_name = "Bachelor's or related"
+                req_deg_label = "Bachelor's degree in Computer Science or related field"
+            imp = get_importance(edu_m.group(0), "desirable")
+            add_req(req_deg_name, "education", imp, req_deg_label)
 
+        self._jd_reqs_cache[jd_hash] = reqs
         return reqs
 
     def map_evidence(
@@ -596,7 +646,7 @@ class EvidenceMapper:
                             importance=importance,
                             evidence_source="professional_experience",
                             evidence_text=et_str,
-                            source_entity=rexp.get("company", "Dhwani Rural Information Systems"),
+                            source_entity=rexp.get("company", "Professional Experience"),
                             confidence=1.0,
                             notes=f"Mentoring explicitly MATCHED from {rexp.get('company')} experience.",
                         )
@@ -604,43 +654,61 @@ class EvidenceMapper:
             # 3. Search candidate summary
             summary_text = f"{index.overall_summary} {index.raw_profile.get('summary', '')}"
             if re.search(r"\b(?:mentor\w*|interviews?|coaching)\b", summary_text, re.IGNORECASE):
+                primary_co = index.experiences[0].get("company", "Professional Experience") if index.experiences else "Professional Experience"
                 return EvidenceItem(
                     requirement=name,
                     status="MATCHED",
                     importance=importance,
                     evidence_source="professional_experience",
                     evidence_text="Mentored junior developers and conducted interviews.",
-                    source_entity="Dhwani Rural Information Systems",
+                    source_entity=primary_co,
                     confidence=1.0,
-                    notes="Mentoring explicitly MATCHED from candidate profile summary.",
+                    notes=f"Mentoring explicitly MATCHED from candidate profile summary ({primary_co}).",
                 )
 
         # 4. Education check
         if category == "education":
             degrees = [e["degree"] for e in index.education]
             deg_str = ", ".join(degrees)
-            has_btech = any("b.tech" in d.lower() or "b.e" in d.lower() for d in degrees)
-            has_cs = any("mca" in d.lower() or "bca" in d.lower() or "computer" in d.lower() for d in degrees)
-            if has_btech:
+            primary_inst = index.education[0].get("institution", "University") if index.education else "University"
+            deg_lower = deg_str.lower()
+            name_lower = name.lower()
+
+            # Exact or direct level match
+            is_direct_match = (
+                ("b.tech" in name_lower and ("b.tech" in deg_lower or "b.e" in deg_lower))
+                or ("master" in name_lower and ("master" in deg_lower or "mca" in deg_lower or "m.tech" in deg_lower or "ms" in deg_lower))
+                or ("bachelor" in name_lower and ("bachelor" in deg_lower or "bca" in deg_lower or "b.tech" in deg_lower or "bs" in deg_lower))
+            )
+            if is_direct_match:
                 return EvidenceItem(
                     requirement=name,
                     status="MATCHED",
                     importance=importance,
                     evidence_source="education",
                     evidence_text=deg_str,
-                    source_entity="IGNOU",
+                    source_entity=primary_inst,
                     confidence=1.0,
+                    notes=f"Candidate holds verified degree: {deg_str}.",
                 )
-            elif has_cs:
+
+            # Related technical degree equivalent (e.g. MCA/BCA vs B.Tech/BE)
+            has_cs = any("mca" in d.lower() or "bca" in d.lower() or "computer" in d.lower() or "science" in d.lower() or "engineering" in d.lower() for d in degrees)
+            if has_cs:
+                notes_msg = (
+                    f"Candidate holds {deg_str} rather than B.Tech/BE. Highlight exact degrees authentically."
+                    if "b.tech" in name_lower or "b.e" in name_lower
+                    else f"Candidate holds {deg_str} (technical discipline equivalent). Highlight exact degrees authentically."
+                )
                 return EvidenceItem(
                     requirement=name,
                     status="PARTIAL",
                     importance=importance,
                     evidence_source="education",
                     evidence_text=f"Candidate holds {deg_str} (Computer Applications degree equivalent).",
-                    source_entity="IGNOU",
+                    source_entity=primary_inst,
                     confidence=0.85,
-                    notes="Candidate holds MCA (2023) and BCA (2020) rather than B.Tech/BE. Highlight exact degrees authentically.",
+                    notes=notes_msg,
                 )
             return EvidenceItem(requirement=name, status="MISSING", importance=importance)
 
@@ -648,7 +716,8 @@ class EvidenceMapper:
         # Special semantic mappings for SQL / Relational Databases (Checked BEFORE generic text fallback)
         if name.upper() == "SQL":
             db_bullets = []
-            source_co = "Dhwani Rural Information Systems"
+            db_exp = next((e for e in index.professional_roles if any(k in " ".join(e.get("responsibilities", [])).lower() for k in ["query optimization", "materialized views", "postgresql", "mysql", "database", "sql"])), None)
+            source_co = db_exp.get("company") if db_exp else (index.professional_roles[0].get("company") if index.professional_roles else "Professional Experience")
             for role in index.professional_roles:
                 for r in role.get("responsibilities", []):
                     if any(k in r.lower() for k in ["query optimization", "materialized views", "postgresql", "mysql", "database"]):
@@ -694,32 +763,28 @@ class EvidenceMapper:
 
         # B) Check in independent / academic projects
         for proj in index.projects:
-            if name.lower() in [t.lower() for t in proj["technologies"]] or re.search(r"\b" + re.escape(name) + r"\b", proj["raw_text"], re.IGNORECASE):
+            proj_techs = [t.lower() for t in (proj.get("technologies") or proj.get("tech_stack") or [])]
+            name_lower = name.lower()
+            matches_tech = (
+                name_lower in proj_techs
+                or any(name_lower in t or t in name_lower for t in proj_techs)
+                or re.search(r"\b" + re.escape(name) + r"\b", proj.get("raw_text", ""), re.IGNORECASE)
+                or (name_lower in ["spring", "spring framework"] and any("spring" in t for t in proj_techs))
+                or (any(j in name_lower for j in ["java", "core java"]) and any("java" in t for t in proj_techs))
+            )
+            if matches_tech:
                 source_type = "academic_project" if proj.get("is_academic") else "project"
+                p_name = proj.get("name") or proj.get("title") or "Project"
+                p_desc = proj.get("description", "").strip()
                 return EvidenceItem(
                     requirement=name,
                     status="PARTIAL",
                     importance=importance,
                     evidence_source=source_type,
-                    evidence_text=f"Built {proj['name']}: {proj['description']}",
-                    source_entity=proj["name"],
+                    evidence_text=f"{p_name}: {p_desc}" if p_desc else f"Built {p_name}: {proj.get('description', '')}",
+                    source_entity=p_name,
                     confidence=0.85,
-                    notes=f"Candidate has hands-on {name} experience in personal/independent project ({proj['name']}), NOT multi-year professional employment.",
-                )
-
-        # Check Spring Boot special case: if JD asks for Spring, Spring Boot is in StaffSync
-        if name in ["Spring", "Spring Boot", "Java", "Core Java"]:
-            staff_sync = next((p for p in index.projects if "staffsync" in p["name"].lower()), None)
-            if staff_sync and ("spring" in name.lower() or name in ["Java", "Core Java"]):
-                return EvidenceItem(
-                    requirement=name,
-                    status="PARTIAL",
-                    importance=importance,
-                    evidence_source="project",
-                    evidence_text=f"StaffSync: {staff_sync['description']}",
-                    source_entity="StaffSync",
-                    confidence=0.85,
-                    notes=f"Hands-on {name} implemented in StaffSync role-based workforce management system. Do NOT claim multi-year enterprise Java.",
+                    notes=f"Candidate has hands-on {name} experience in personal/independent project ({p_name}), NOT multi-year professional employment.",
                 )
 
         # C) Check self-reported skills

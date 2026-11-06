@@ -35,9 +35,12 @@ class SubProject(MongoBaseModel):
 
 class Experience(MongoBaseModel):
     model_config = ConfigDict(extra="allow")
+    id: str = ""
+    company_id: str = ""
     company: str = ""
     jobTitle: str = ""
     title: str = ""
+    role: str = ""
     startDate: str = ""
     start_date: str = ""
     endDate: str | None = None
@@ -46,31 +49,41 @@ class Experience(MongoBaseModel):
     is_current: bool = False
     description: str = ""
     responsibilities: list[str] = Field(default_factory=list)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
     projects: list[dict[str, Any]] = Field(default_factory=list)
     achievements: list[str] = Field(default_factory=list)
 
 
 class Education(MongoBaseModel):
     model_config = ConfigDict(extra="allow")
+    id: str = ""
     degree: str = ""
     institution: str = ""
     field: str = ""
     year: int | str = ""
     graduation_year: str = ""
     gpa: str | None = None
+    source_type: str = "education"
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class Project(MongoBaseModel):
     model_config = ConfigDict(extra="allow")
+    id: str = ""
     name: str = ""
     description: str = ""
     technologies: list[str] = Field(default_factory=list)
     url: str | None = None
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class Achievement(MongoBaseModel):
     model_config = ConfigDict(extra="allow")
+    id: str = ""
     title: str = ""
+    url: str | None = None
+    source: str = "original_resume"
+    source_type: str = "achievement"
 
 
 class JobPreferences(MongoBaseModel):
@@ -127,6 +140,7 @@ class Profile(MongoBaseModel):
     user_id: PyObjectId
     resume_filename: str | None = None
     resume_raw_text: str | None = None
+    candidate: dict[str, Any] = Field(default_factory=dict)
     personal: dict[str, Any] = Field(default_factory=dict)
     summary: str = ""
     skills: dict[str, list[str]] | list[str] = Field(default_factory=dict)
@@ -134,6 +148,8 @@ class Profile(MongoBaseModel):
     projects: list[dict[str, Any]] = Field(default_factory=list)
     education: list[dict[str, Any]] = Field(default_factory=list)
     achievements: list[dict[str, Any]] = Field(default_factory=list)
+    certifications: list[dict[str, Any]] = Field(default_factory=list)
+    metrics: list[dict[str, Any]] = Field(default_factory=list)
     jobPreferences: dict[str, Any] = Field(default_factory=dict)
     job_preferences: dict[str, Any] = Field(default_factory=dict)
     additionalInformation: dict[str, Any] = Field(default_factory=dict)

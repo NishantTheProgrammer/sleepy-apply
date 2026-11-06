@@ -370,43 +370,27 @@ class ProfileCreatorAgent:
                 "projects": clean_sub,
             })
 
-        # Strict Source-Company Attribution Correction:
-        # City Finance and 4000+ urban local bodies belong exclusively to Dhwani Rural Information Systems
-        dhwani_exp = next((e for e in cleaned_exp_list if "dhwani" in e.get("company", "").lower()), None)
+        # Generic Employer Isolation:
+        # Scrub foreign company names that leaked into bullets or job titles
         for exp in cleaned_exp_list:
-            co_name = exp.get("company", "").lower()
-            if "dhwani" not in co_name:
-                misplaced_resps = []
-                remaining_resps = []
-                for r in exp.get("responsibilities", []):
-                    if any(k in r.lower() for k in ["city finance", "4000+", "4,000+", "urban local bodies", "indian partner network"]):
-                        misplaced_resps.append(r)
-                    else:
-                        remaining_resps.append(r)
-                exp["responsibilities"] = remaining_resps
+            co_name = exp.get("company", "").strip()
+            other_cos = [o.get("company", "").strip() for o in cleaned_exp_list if o.get("company", "").strip().lower() != co_name.lower()]
+            clean_resps = []
+            for r in exp.get("responsibilities", []):
+                r_clean = r
+                for o_co in other_cos:
+                    if o_co and len(o_co) > 3:
+                        r_clean = re.sub(rf"\s*[-—–.]*\s*{re.escape(o_co)}(?:\s+Pvt\.?\s+Ltd\.?)?\b", "", r_clean, flags=re.IGNORECASE).strip(" .-\t")
+                if r_clean:
+                    clean_resps.append(r_clean)
+            exp["responsibilities"] = clean_resps
 
-                # If jobTitle accidentally absorbed City Finance / urban local bodies, restore accurate title
-                jt = exp.get("jobTitle", "")
-                if any(k in jt.lower() for k in ["urban local bodies", "city finance"]):
-                    exp["jobTitle"] = "Mobile Application Developer"
-                    exp["title"] = "Mobile Application Developer"
-
-                if misplaced_resps and dhwani_exp:
-                    for mr in misplaced_resps:
-                        if mr not in dhwani_exp["responsibilities"]:
-                            dhwani_exp["responsibilities"].append(mr)
-
-        # Conversely, Max Vision projects (pay.mesa-qr.com, getlivecoach, kichi-mall, in1mall) must not be under Dhwani
-        if dhwani_exp:
-            maxvision_exp = next((e for e in cleaned_exp_list if "max vision" in e.get("company", "").lower()), None)
-            dhwani_clean_resps = []
-            for r in dhwani_exp.get("responsibilities", []):
-                if any(k in r.lower() for k in ["pay.mesa-qr.com", "mesa-qr", "getlivecoach", "kichi-mall", "in1mall"]):
-                    if maxvision_exp and r not in maxvision_exp["responsibilities"]:
-                        maxvision_exp["responsibilities"].append(r)
-                else:
-                    dhwani_clean_resps.append(r)
-            dhwani_exp["responsibilities"] = dhwani_clean_resps
+            # If jobTitle accidentally absorbed a foreign company name or bullet text, restore it
+            jt = exp.get("jobTitle", "")
+            for o_co in other_cos:
+                if o_co and o_co.lower() in jt.lower():
+                    exp["jobTitle"] = "Software Engineer"
+                    exp["title"] = "Software Engineer"
 
         data["experience"] = cleaned_exp_list
 
@@ -421,6 +405,7 @@ class ProfileCreatorAgent:
                     if not p_name:
                         continue
                     p_desc = _clean_str(prj.get("description")) or ""
+                    raw_tech = prj.get("technologies") or prj.get("tech_stack") or []
                     clean_tech = []
                     seen_t = set()
                     for t in (raw_tech if isinstance(raw_tech, list) else [raw_tech]):
@@ -466,70 +451,169 @@ class ProfileCreatorAgent:
         data["education"] = clean_edu
 
         # Normalize achievements
+        from app.agents.resume_builder import reconstruct_achievements
         ach_list = data.get("achievements", [])
-        clean_ach = []
-        if isinstance(ach_list, list):
-            hr_url = ""
-            lc_url = ""
-            for a in ach_list:
-                t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
-                if "hackerrank.com" in t.lower():
-                    m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
-                    if m:
-                        hr_url = m.group(0).strip(".,")
-                    elif t.startswith("http"):
-                        hr_url = t
-                if "leetcode.com" in t.lower():
-                    m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
-                    if m:
-                        lc_url = m.group(0).strip(".,")
-                    elif t.startswith("http"):
-                        lc_url = t
-
-            # Also check links in personal or top-level links if not found in achievements
-            if not hr_url:
-                for l in (data.get("links") or []) + (data.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "hackerrank.com" in u.lower():
-                        hr_url = u
-                        break
-            if not lc_url:
-                for l in (data.get("links") or []) + (data.get("personal", {}).get("links") or []):
-                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
-                    if "leetcode.com" in u.lower():
-                        lc_url = u
-                        break
-            merged_text = " ".join([
-                (a.get("title") if isinstance(a, dict) else str(a)).strip()
-                for a in ach_list
-            ])
-            sum_text = data.get("summary", "")
-            if "hackerrank" in merged_text.lower() or "hackerrank" in sum_text.lower():
-                clean_ach.append({
-                    "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
-                    "url": hr_url or None,
-                })
-            if "leetcode" in merged_text.lower() or "leetcode" in sum_text.lower():
-                clean_ach.append({
-                    "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
-                    "url": lc_url or None,
-                })
-
-            for ach in ach_list:
-                t = (ach.get("title") if isinstance(ach, dict) else str(ach)).strip()
-                if not t or t.startswith("http://") or t.startswith("https://"):
-                    continue
-                if any(k in t.lower() for k in ["back-end technologies.", "proven ability to", "star gold badge and a track", "hackerrank", "leetcode"]):
-                    continue
-                if not any(c["title"].lower() == t.lower() for c in clean_ach) and len(t) > 10:
-                    clean_ach.append({"title": t})
-        data["achievements"] = clean_ach
+        data["achievements"] = reconstruct_achievements(
+            ach_list if isinstance(ach_list, list) else [],
+            data,
+            data.get("summary", ""),
+        )
 
         # Sync jobPreferences
         if "jobPreferences" in data and not data.get("job_preferences"):
             data["job_preferences"] = data["jobPreferences"]
         elif "job_preferences" in data and not data.get("jobPreferences"):
             data["jobPreferences"] = data["job_preferences"]
+
+        # -------------------------------------------------------------
+        # Phase 1: Structured Provenance & Entity ID Assignment
+        # -------------------------------------------------------------
+        # Candidate block with overall years of experience
+        user_id_str = str(data.get("id") or data.get("_id") or data.get("user_id") or "candidate_001")
+        total_yrs = 0.0
+        if "additionalInformation" in data and isinstance(data["additionalInformation"], dict):
+            try:
+                total_yrs = float(data["additionalInformation"].get("yearsOfExperience", 0.0))
+            except (ValueError, TypeError):
+                total_yrs = 0.0
+
+        if total_yrs <= 0.0 and data.get("summary"):
+            m = re.search(r"(\d+(?:\.\d+)?)\+?\s*years(?:\s+of)?\s+experience", data["summary"], re.IGNORECASE)
+            if m:
+                try:
+                    total_yrs = float(m.group(1))
+                except (ValueError, TypeError):
+                    total_yrs = 0.0
+
+        if total_yrs <= 0.0:
+            total_yrs = 5.0  # sensible default if unstated
+
+        data["candidate"] = {
+            "id": user_id_str,
+            "overall_experience_years": total_yrs,
+        }
+
+        # Experience entities and evidence
+        for exp_idx, exp in enumerate(data.get("experience", [])):
+            exp_id = f"experience_{exp_idx+1:03d}"
+            exp["id"] = exp_id
+            co_slug = re.sub(r"[^a-zA-Z0-9]+", "_", exp.get("company", "").lower()).strip("_")
+            co_id = f"company_{co_slug}" if co_slug else f"company_{exp_idx+1:03d}"
+            exp["company_id"] = co_id
+            exp["role"] = exp.get("jobTitle") or exp.get("title") or "Software Engineer"
+            ev_list = []
+            for b_idx, bullet in enumerate(exp.get("responsibilities", [])):
+                ev_list.append({
+                    "id": f"{exp_id}_ev_{b_idx+1:03d}",
+                    "text": bullet,
+                    "source_type": "professional_experience",
+                    "company_id": co_id,
+                    "company": exp.get("company", ""),
+                })
+            exp["evidence"] = ev_list
+
+        # Standalone projects and evidence
+        for p_idx, prj in enumerate(data.get("projects", [])):
+            p_id = f"project_{p_idx+1:03d}"
+            prj["id"] = p_id
+            p_techs = prj.get("technologies") or prj.get("tech_stack") or []
+            prj["technologies"] = p_techs
+            prj["tech_stack"] = p_techs
+            prj["title"] = prj.get("name") or prj.get("title") or f"Project {p_idx+1}"
+            prj["evidence"] = [
+                {
+                    "id": f"{p_id}_ev_001",
+                    "text": prj.get("description", ""),
+                    "source_type": "project",
+                    "project_name": prj.get("name", ""),
+                    "technologies": p_techs,
+                }
+            ]
+
+        # Education and evidence
+        for ed_idx, ed in enumerate(data.get("education", [])):
+            ed_id = f"education_{ed_idx+1:03d}"
+            ed["id"] = ed_id
+            ed["source_type"] = "education"
+            deg = ed.get("degree", "")
+            inst = ed.get("institution", "")
+            yr = str(ed.get("year", ""))
+            ed["evidence"] = [
+                {
+                    "id": f"{ed_id}_ev_001",
+                    "text": f"{deg} from {inst} ({yr})".strip(),
+                    "source_type": "education",
+                    "degree": deg,
+                    "institution": inst,
+                    "year": yr,
+                }
+            ]
+
+        # Achievements with IDs and provenance
+        for a_idx, ach in enumerate(data.get("achievements", [])):
+            ach["id"] = f"achievement_{a_idx+1:03d}"
+            ach["source"] = "original_resume"
+            ach["source_type"] = "achievement"
+
+        if "certifications" not in data or not isinstance(data["certifications"], list):
+            data["certifications"] = []
+
+        # Quantitative metrics extraction with entity provenance
+        extracted_metrics = []
+        metric_seen = set()
+        metric_pattern = re.compile(
+            r"(?:"
+            r"[\$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:k|m|b|million|billion|thousand|crore|lakh))?\b"
+            r"|\b\d+(?:,\d{3})*(?:\.\d+)?%"
+            r"|\b\d+(?:,\d{3})*(?:\.\d+)?(?:\+)?(?:\s*(?:urban local bodies|ulbs|questions|applications|years|star gold badge|stars|badges|engineers|developers|users|clients|shoppers|active shoppers|transactions|customers|records|queries|requests|rps|qps|tps|req/s|ms|s|sec|seconds|nodes|pods|services))\b"
+            r"|\b\d+(?:,\d{3})*\+\b"
+            r"|\b\d+(?:st|nd|rd|th)\b"
+            r"|\b\d+(?:\.\d+)?x\b"
+            r"|\b\d+(?:\.\d+)?\s*[kmb]\b"
+            r")",
+            re.IGNORECASE,
+        )
+
+        def _collect_metrics(text: str, src_type: str, src_id: str, company_id: str | None = None):
+            for match in metric_pattern.finditer(text):
+                val = match.group(0).strip()
+                # Skip standalone 4-digit years like 2020, 2024
+                if val.isdigit() and len(val) == 4 and (val.startswith("19") or val.startswith("20")):
+                    continue
+                # Skip tiny single digits without suffix or context
+                if val.isdigit() and len(val) == 1 and not (val == "5" and "year" in text.lower()):
+                    continue
+                key = (val.lower(), company_id or src_id)
+                if key not in metric_seen:
+                    metric_seen.add(key)
+                    extracted_metrics.append({
+                        "id": f"metric_{len(extracted_metrics)+1:03d}",
+                        "value": val,
+                        "source_type": src_type,
+                        "source_id": src_id,
+                        "company_id": company_id,
+                    })
+
+        for exp in data.get("experience", []):
+            cid = exp.get("company_id")
+            for ev in exp.get("evidence", []):
+                _collect_metrics(ev["text"], "professional_experience", ev["id"], cid)
+            for p in exp.get("projects", []):
+                p_text = f"{p.get('name', '')} {p.get('description', '')} " + " ".join(p.get("achievements", []))
+                _collect_metrics(p_text, "employment_project", p.get("id", ""), cid)
+
+        for prj in data.get("projects", []):
+            prj_text = f"{prj.get('name', '')} {prj.get('description', '')} " + " ".join(prj.get("highlights", []))
+            _collect_metrics(prj_text, "personal_project", prj.get("id", ""))
+
+        for ach in data.get("achievements", []):
+            ach_text = str(ach.get("title", ""))
+            _collect_metrics(ach_text, "achievement", ach.get("id", ""))
+
+        if data.get("summary"):
+            _collect_metrics(str(data["summary"]), "summary", "profile_summary")
+
+        data["metrics"] = extracted_metrics
 
         return data
 
@@ -801,13 +885,13 @@ class ProfileCreatorAgent:
 
         if "hackerrank" in full_text_lower:
             hr_m = re.search(r"(?:hackerrank\s+)?(\d+(?:st|nd|rd|th)?\s*star\s+gold\s+badge)", text, re.IGNORECASE)
-            badge = hr_m.group(1) if hr_m else "6th Star Gold Badge"
+            badge = hr_m.group(1) if hr_m else "Gold Badge"
             hr_title = f"HackerRank {badge} (Problem Solving)"
             achievements_list.append({"title": hr_title, "url": hr_url or None})
 
         if "leetcode" in full_text_lower:
-            lc_m = re.search(r"(\d+\+?\s*leetcode\s*questions?)", text, re.IGNORECASE)
-            lc_count = lc_m.group(1) if lc_m else "450+ LeetCode questions"
+            lc_m = re.search(r"(\d+\+?\s*leetcode\s*(?:questions?|problems?))", text, re.IGNORECASE)
+            lc_count = re.sub(r"problems?", "questions", lc_m.group(1), flags=re.IGNORECASE) if lc_m else "algorithmic questions"
             lc_title = f"Solved {lc_count} demonstrating strong algorithmic problem-solving"
             achievements_list.append({"title": lc_title, "url": lc_url or None})
 

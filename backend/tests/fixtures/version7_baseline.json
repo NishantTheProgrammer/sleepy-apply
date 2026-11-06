@@ -1,0 +1,366 @@
+{
+  "user_id": "67167725dc397cff17e92823",
+  "job_id": "6ae471313c8722ed067d8d99",
+  "template": "default",
+  "content": {
+    "job_id": "6ae471313c8722ed067d8d99",
+    "job_title": "Senior Backend Engineer",
+    "company": "Pocketpills",
+    "target_headline": "Senior Backend Engineer | SQL, Node.js, PostgreSQL & Spring Boot Projects",
+    "summary": "Full Stack Developer with **5 years** of overall software development experience delivering scalable backend systems, high-performance APIs, and database optimizations. Proven professional track record in **SQL**, query tuning, and microservices architecture. Hands-on project experience developing role-based workforce management services with **Java** and **Spring Boot** through **StaffSync**.",
+    "tailored_summary": "Full Stack Developer with **5 years** of overall software development experience delivering scalable backend systems, high-performance APIs, and database optimizations. Proven professional track record in **SQL**, query tuning, and microservices architecture. Hands-on project experience developing role-based workforce management services with **Java** and **Spring Boot** through **StaffSync**.",
+    "matching_skills": [
+      "SQL"
+    ],
+    "missing_skills": [
+      "CI/CD",
+      "Jenkins",
+      "Maven",
+      "TDD"
+    ],
+    "skills_breakdown": {
+      "matched_skills": [
+        "SQL"
+      ],
+      "partially_matched_skills": [
+        "Java",
+        "Spring"
+      ],
+      "missing_skills": [
+        "CI/CD",
+        "Jenkins",
+        "Maven",
+        "TDD"
+      ],
+      "unverified_skills": [
+        "Hibernate",
+        "System Design"
+      ],
+      "additional_relevant_skills": [
+        "Amplitude",
+        "Angular",
+        "Express",
+        "Form.io",
+        "Ionic",
+        "MySQL",
+        "Node.js",
+        "PostgreSQL",
+        "REST APIs",
+        "SendGrid"
+      ]
+    },
+    "evidence_mappings": [
+      {
+        "requirement": "Java",
+        "status": "PARTIAL",
+        "importance": "mandatory",
+        "evidence_source": "project",
+        "evidence_text": "Built StaffSync: Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "source_entity": "StaffSync",
+        "confidence": 0.85,
+        "notes": "Candidate has hands-on Java experience in personal/independent project (StaffSync), NOT multi-year professional employment."
+      },
+      {
+        "requirement": "CI/CD",
+        "status": "MISSING",
+        "importance": "mandatory",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for CI/CD found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "requirement": "06 to 08 years Core Java and with the spring framework",
+        "status": "PARTIAL",
+        "importance": "mandatory",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Candidate has 5 years overall experience (target was 06 to 08 years Core Java and with the spring framework)",
+        "source_entity": "Candidate Profile",
+        "confidence": 0.8,
+        "notes": "Candidate has 5 years overall full-stack experience vs 06 to 08 years Core Java and with the spring framework demanded. Do not fabricate extra years."
+      },
+      {
+        "requirement": "Spring",
+        "status": "PARTIAL",
+        "importance": "desirable",
+        "evidence_source": "project",
+        "evidence_text": "Built StaffSync: Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "source_entity": "StaffSync",
+        "confidence": 0.85,
+        "notes": "Candidate has hands-on Spring experience in personal/independent project (StaffSync), NOT multi-year professional employment."
+      },
+      {
+        "requirement": "SQL",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Production database engineering (MySQL, PostgreSQL, SQL): Indian Partner Network: Designed and developed a comprehensive full-stack NGO management platform, building robust backend systems with Node.js/Express and modern Angular frontend. Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation. Implemented personalized email automation using SendGrid with calendar integration, notification triggers, and reminder systems. Built real-time analytics with Amplitude tracking across web applications and WordPress directories. Created a dynamic CMS and interactive dashboard system with engagement metrics, team management capabilities, and profile compliance tracking. Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs",
+        "source_entity": "Dhwani Rural Information Systems",
+        "confidence": 0.95,
+        "notes": "SQL requirement directly MATCHED via production PostgreSQL/MySQL, query optimization, and materialized views."
+      },
+      {
+        "requirement": "Hibernate",
+        "status": "UNVERIFIED",
+        "importance": "desirable",
+        "evidence_source": "self_reported",
+        "evidence_text": "Hibernate is listed under candidate's skills list without detailed employment bullets.",
+        "source_entity": "Skills List",
+        "confidence": 0.5,
+        "notes": "Self-reported keyword. No supporting employment or project metrics."
+      },
+      {
+        "requirement": "Jenkins",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for Jenkins found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "requirement": "Maven",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for Maven found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "requirement": "TDD",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for TDD found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "requirement": "System Design",
+        "status": "UNVERIFIED",
+        "importance": "desirable",
+        "evidence_source": "self_reported",
+        "evidence_text": "System Design is listed under candidate's skills list without detailed employment bullets.",
+        "source_entity": "Skills List",
+        "confidence": 0.5,
+        "notes": "Self-reported keyword. No supporting employment or project metrics."
+      },
+      {
+        "requirement": "E-commerce",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Kichi-Mall, In1Mall: Contributed to e-commerce applications Kichi-Mall and In1Mall, utilizing WordPress, WooCommerce Rest API, Ionic, and Angular",
+        "source_entity": "Max Vision Solutions Pvt. Ltd.",
+        "confidence": 0.95,
+        "notes": "Verified professional employment experience with E-commerce."
+      },
+      {
+        "requirement": "Mentoring",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services",
+        "source_entity": "Dhwani Rural Information Systems",
+        "confidence": 1.0,
+        "notes": "Mentoring explicitly MATCHED from Dhwani Rural Information Systems experience (mentoring junior developers and conducting technical interviews)."
+      },
+      {
+        "requirement": "B.Tech/BE or related",
+        "status": "PARTIAL",
+        "importance": "desirable",
+        "evidence_source": "education",
+        "evidence_text": "Candidate holds Masters in computer applications (MCA), Bachelors in computer application (BCA) (Computer Applications degree equivalent).",
+        "source_entity": "IGNOU",
+        "confidence": 0.85,
+        "notes": "Candidate holds MCA (2023) and BCA (2020) rather than B.Tech/BE. Highlight exact degrees authentically."
+      }
+    ],
+    "required_skills": [
+      "Java",
+      "CI/CD"
+    ],
+    "personal": {
+      "fullName": "Nishant",
+      "full_name": "Nishant",
+      "email": "knishant113@gmail.com",
+      "phone": "+91 7838716089",
+      "location": {
+        "city": "Delhi",
+        "country": "India"
+      },
+      "linkedin": "https://www.linkedin.com/in/nishanttheprogrammer",
+      "github": "https://github.com/NishantTheProgrammer",
+      "portfolio": "https://nishanttheprogrammer.com"
+    },
+    "skills": {
+      "backend": [
+        "Node.js",
+        "Express",
+        "Spring Boot",
+        "Hibernate",
+        "Java",
+        "Django"
+      ],
+      "frontend": [
+        "React",
+        "Angular",
+        "Vue",
+        "Next.js",
+        "JavaScript",
+        "TypeScript"
+      ],
+      "databases": [
+        "SQL",
+        "MongoDB",
+        "PostgreSQL",
+        "MySQL",
+        "Redis"
+      ],
+      "tools": [
+        "Docker",
+        "Git",
+        "Linux",
+        "Jest"
+      ],
+      "architecture": [
+        "Microservices",
+        "System Design",
+        "REST APIs"
+      ]
+    },
+    "experience": [
+      {
+        "company": "Dhwani Rural Information Systems",
+        "jobTitle": "SDE-2 Full Stack",
+        "title": "SDE-2 Full Stack",
+        "startDate": "Jan 2023",
+        "endDate": "Present",
+        "current": true,
+        "description": "Technology-driven social impact venture that enables development sector organizations.",
+        "responsibilities": [
+          "Indian Partner Network: Designed and developed a comprehensive full-stack NGO management platform, building robust backend systems with Node.js/Express and modern Angular frontend. Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation. Implemented personalized email automation using SendGrid with calendar integration, notification triggers, and reminder systems. Built real-time analytics with Amplitude tracking across web applications and WordPress directories. Created a dynamic CMS and interactive dashboard system with engagement metrics, team management capabilities, and profile compliance tracking. Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs",
+          "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services",
+          "City Finance: Worked on complex reactive forms, integrated geographical maps, added Google Analytics, and implemented a bulk upload service. Which handles data for 4000+ urban local bodies and their finance"
+        ],
+        "highlights": [
+          "Indian Partner Network: Designed and developed a comprehensive full-stack NGO management platform, building robust backend systems with Node.js/Express and modern Angular frontend. Seamlessly integrated Form.io for dynamic assessments, form solutions, and form wizard workflows with advanced validation. Implemented personalized email automation using SendGrid with calendar integration, notification triggers, and reminder systems. Built real-time analytics with Amplitude tracking across web applications and WordPress directories. Created a dynamic CMS and interactive dashboard system with engagement metrics, team management capabilities, and profile compliance tracking. Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs",
+          "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services",
+          "City Finance: Worked on complex reactive forms, integrated geographical maps, added Google Analytics, and implemented a bulk upload service. Which handles data for 4000+ urban local bodies and their finance"
+        ],
+        "start_date": "Jan 2023",
+        "end_date": "Present",
+        "is_current": true
+      },
+      {
+        "company": "Max Vision Solutions Pvt. Ltd.",
+        "jobTitle": "Mobile Application Developer",
+        "title": "Mobile Application Developer",
+        "startDate": "Mar 2021",
+        "endDate": "Dec 2022",
+        "current": false,
+        "description": "Web Development company devoted to delivering services with the Global market.",
+        "responsibilities": [
+          "pay.mesa-qr.com: This is a multi vendor restaurant web application, incorporating Stripe split payment, QR code generation, and responsive web layout",
+          "Kichi-Mall, In1Mall: Contributed to e-commerce applications Kichi-Mall and In1Mall, utilizing WordPress, WooCommerce Rest API, Ionic, and Angular",
+          "getlivecoach.com, getlivecoach mobile app: A one to one video call coaching platform, integrated stripe payment gateway and twilio APIs for video, also worked on push notification and deep linking",
+          "Link Locality: It's a social networking platform built with Ionic worked on OTP verification, google and facebook login, geolocation and social sharing"
+        ],
+        "highlights": [
+          "pay.mesa-qr.com: This is a multi vendor restaurant web application, incorporating Stripe split payment, QR code generation, and responsive web layout",
+          "Kichi-Mall, In1Mall: Contributed to e-commerce applications Kichi-Mall and In1Mall, utilizing WordPress, WooCommerce Rest API, Ionic, and Angular",
+          "getlivecoach.com, getlivecoach mobile app: A one to one video call coaching platform, integrated stripe payment gateway and twilio APIs for video, also worked on push notification and deep linking",
+          "Link Locality: It's a social networking platform built with Ionic worked on OTP verification, google and facebook login, geolocation and social sharing"
+        ],
+        "start_date": "Mar 2021",
+        "end_date": "Dec 2022",
+        "is_current": false
+      }
+    ],
+    "education": [
+      {
+        "degree": "Masters in computer applications (MCA)",
+        "institution": "IGNOU",
+        "year": "2023"
+      },
+      {
+        "degree": "Bachelors in computer application (BCA)",
+        "institution": "IGNOU",
+        "year": "2020"
+      }
+    ],
+    "projects": [
+      {
+        "name": "StaffSync",
+        "title": "StaffSync",
+        "description": "Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "technologies": [
+          "Spring Boot",
+          "Java"
+        ],
+        "tech_stack": [
+          "Spring Boot",
+          "Java"
+        ]
+      },
+      {
+        "name": "DoneMySite",
+        "title": "DoneMySite",
+        "description": "Building a freelancing platform utilizing React JS and Django REST APIs, integrating Stripe.",
+        "technologies": [
+          "React",
+          "Django",
+          "Stripe"
+        ],
+        "tech_stack": [
+          "React",
+          "Django",
+          "Stripe"
+        ]
+      },
+      {
+        "name": "SkillsAkhada",
+        "title": "SkillsAkhada",
+        "description": "A gaming tournament platform using Flutter, React, and Node.js for APIs.",
+        "technologies": [
+          "Flutter",
+          "React",
+          "Node.js"
+        ],
+        "tech_stack": [
+          "Flutter",
+          "React",
+          "Node.js"
+        ]
+      }
+    ],
+    "achievements": [
+      {
+        "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
+        "url": "https://www.hackerrank.com/profile/NishantThePro"
+      },
+      {
+        "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
+        "url": "https://leetcode.com/NishantTheProgrammer"
+      }
+    ],
+    "template": "default",
+    "generated_at": "2026-11-06T09:33:06.934950+00:00",
+    "validation_report": {
+      "is_valid": true,
+      "sanitized": false,
+      "critical_violations": [],
+      "warnings": [],
+      "summary": "Validation passed with 0 critical violations. 0 warning(s)."
+    }
+  },
+  "pdf_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99.pdf",
+  "docx_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99_default.docx",
+  "generated_at": "2026-11-06T09:33:06.934950+00:00",
+  "_id": "6aed9ed27080d11b789281e8"
+}

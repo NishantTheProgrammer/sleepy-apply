@@ -461,3 +461,159 @@ def test_candidate_verification_questions(candidate_profile, pocketpills_jd):
     q_fields = [q["field"] for q in questions]
     assert any(f in ["CI/CD", "Jenkins", "Maven", "TDD"] for f in q_fields)
     assert all("question" in q and "suggested_options" in q for q in questions)
+
+
+# ==============================================================================
+# 11. Targeted Fixes Verification (Pocketpills Audit)
+# ==============================================================================
+
+def test_evidence_mapping_mentoring_and_sql_precision(candidate_profile, pocketpills_jd):
+    """Mentoring must be MATCHED from Dhwani; SQL evidence must use database facts not company mission."""
+    mapper = EvidenceMapper()
+    res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+
+    # 1. Mentoring requirement must be MATCHED
+    mentor_m = next((m for m in res.mappings if "mentor" in m.requirement.lower()), None)
+    assert mentor_m is not None
+    assert mentor_m.status == "MATCHED"
+    assert mentor_m.confidence == 1.0
+    assert "mentored junior developers" in mentor_m.evidence_text.lower()
+    assert "Dhwani" in mentor_m.source_entity
+
+    # 2. SQL requirement evidence must use real DB bullets, not company descriptions
+    sql_m = next((m for m in res.mappings if m.requirement == "SQL" or "sql" in m.requirement.lower()), None)
+    assert sql_m is not None
+    assert sql_m.status == "MATCHED"
+    assert "Technology-driven social impact venture" not in sql_m.evidence_text
+    assert any(db_kw in sql_m.evidence_text for db_kw in ["query optimization", "materialized views", "PostgreSQL", "MySQL", "SQL"])
+
+
+def test_hallucination_guard_semantic_and_bleed_checks(candidate_profile, pocketpills_jd):
+    """Validator catches contradictory mappings, cross-employer bleed, and unsupported specialization."""
+    mapper = EvidenceMapper()
+    evidence_res = mapper.map_evidence(candidate_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    # Contradictory mapping: CI/CD is MISSING but candidate claims it in matching_skills
+    # Cross-employer bleed: pay.mesa-qr.com placed under Dhwani
+    # Unsupported specialization: claiming "specializing in Java"
+    faulty_resume = {
+        "matching_skills": ["SQL", "CI/CD"],
+        "target_headline": "Senior Backend Engineer | Java & SQL",
+        "tailored_summary": "Seasoned Backend Engineer specializing in Java and Spring Boot architecture.",
+        "experience": [
+            {
+                "company": "Dhwani Rural Information Systems",
+                "responsibilities": [
+                    "Enhanced platform performance through query optimization.",
+                    "Built multi-vendor restaurant web application (pay.mesa-qr.com) with Stripe split payment.",
+                ],
+            },
+            {
+                "company": "Max Vision Solutions Pvt. Ltd.",
+                "responsibilities": [
+                    "Implemented bulk upload service handling data for 4000+ urban local bodies.",
+                ],
+            },
+        ],
+        "education": candidate_profile["education"],
+    }
+
+    val_res = guard.validate_and_sanitize(faulty_resume, candidate_profile, evidence_res)
+    assert not val_res.is_valid
+    categories = [v.category for v in val_res.critical_violations]
+
+    # Verify all semantic checks fired
+    assert "contradictory_evidence_mapping" in categories
+    assert "cross_employer_bleed" in categories
+    assert "unsupported_specialization" in categories
+
+    # Verify auto-sanitization cleaned the output
+    sanitized = val_res.sanitized_content
+    assert "CI/CD" not in sanitized["matching_skills"]
+    assert "specializing in Java" not in sanitized["summary"]
+
+
+def test_information_preservation_and_reordering(candidate_profile, pocketpills_jd):
+    """Restore critical original details (materialized views, 4000+ ULBs, Stripe split payment) and sort by relevance."""
+    from app.agents.resume_builder import preserve_and_prioritize_experience_bullets
+
+    # Dhwani test: AI generated 1 bullet dropping materialized views and City Finance
+    ai_dhwani_bullets = [
+        "Enhanced platform performance through query optimization and session synchronization across multiple tabs."
+    ]
+    dhwani_orig = candidate_profile["experience"][0]["responsibilities"]
+
+    preserved_dhwani = preserve_and_prioritize_experience_bullets(
+        company_name="Dhwani Rural Information Systems",
+        original_bullets=dhwani_orig,
+        ai_bullets=ai_dhwani_bullets,
+        matching_skills=["Node.js", "Express", "SQL", "REST APIs"],
+        missing_skills=["CI/CD", "Jenkins"],
+        job_title=pocketpills_jd["title"],
+        company=pocketpills_jd["company"],
+        job_description=pocketpills_jd["description"],
+    )
+
+    # Must have restored materialized views into query optimization bullet
+    assert any("materialized views" in b for b in preserved_dhwani)
+    # Must have restored City Finance with 4000+ urban local bodies
+    assert any("4000+ urban local bodies" in b for b in preserved_dhwani)
+
+    # Max Vision test: Pocketpills asks for eCommerce and critical services.
+    # pay.mesa-qr.com (Stripe split payment) and Kichi-Mall (WooCommerce Rest API) must rank high
+    max_vision_orig = candidate_profile["experience"][1]["responsibilities"]
+    preserved_max = preserve_and_prioritize_experience_bullets(
+        company_name="Max Vision Solutions Pvt. Ltd.",
+        original_bullets=max_vision_orig,
+        ai_bullets=None,
+        matching_skills=["Stripe", "REST APIs"],
+        missing_skills=["CI/CD"],
+        job_title=pocketpills_jd["title"],
+        company=pocketpills_jd["company"],
+        job_description=pocketpills_jd["description"],
+    )
+
+    # First bullet must be eCommerce / payment focused
+    assert "stripe" in preserved_max[0].lower() or "woocommerce" in preserved_max[0].lower()
+    assert any("pay.mesa-qr.com" in b and "split payment" in b.lower() and "stripe" in b.lower() for b in preserved_max)
+    assert any("woocommerce" in b.lower() for b in preserved_max)
+
+
+def test_achievements_normalization_and_url_preservation():
+    """Achievements retain full descriptions and verified URLs without fragmented text."""
+    from app.agents.profile_creator import ProfileCreatorAgent
+
+    agent = ProfileCreatorAgent()
+    fragmented_raw_profile = {
+        "personal": {
+            "fullName": "Nishant",
+            "links": [
+                {"name": "HackerRank", "url": "https://www.hackerrank.com/profile/NishantThePro"},
+                {"name": "LeetCode", "url": "https://leetcode.com/NishantTheProgrammer"},
+            ],
+        },
+        "achievements": [
+            {"title": "back-end technologies. Demonstrated proficiency in problem-solving with a HackerRank 6th"},
+            {"title": "Star Gold Badge and a track record of solving 450+ LeetCode questions. Proven ability to"},
+            {"title": "https://www.hackerrank.com/profile/NishantThePro"},
+            {"title": "https://leetcode.com/NishantTheProgrammer"},
+        ],
+    }
+
+    normalized = agent._normalize_extracted_data(fragmented_raw_profile)
+    achievements = normalized["achievements"]
+
+    assert len(achievements) == 2
+    # Check HackerRank entry
+    hr_entry = next((a for a in achievements if "hackerrank" in a["title"].lower()), None)
+    assert hr_entry is not None
+    assert "HackerRank 6th Star Gold Badge (Problem Solving)" in hr_entry["title"]
+    assert "https://www.hackerrank.com/profile/NishantThePro" in hr_entry["title"]
+
+    # Check LeetCode entry
+    lc_entry = next((a for a in achievements if "leetcode" in a["title"].lower()), None)
+    assert lc_entry is not None
+    assert "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving" in lc_entry["title"]
+    assert "https://leetcode.com/NishantTheProgrammer" in lc_entry["title"]
+

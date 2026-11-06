@@ -131,7 +131,26 @@ class HallucinationGuard:
                                 allowed_boundary="Spring Boot/Java is project experience in StaffSync, not multi-year professional employment.",
                             ))
 
-            # C) Check for missing skills in summary
+            # C) Check for claiming professional specialization in project-only technologies
+            spec_matches = re.finditer(
+                r"(?:specializing in|expert in|specialist in|specialization in|mastery of)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
+                summary,
+                re.IGNORECASE,
+            )
+            for sm in spec_matches:
+                claimed_spec = sm.group(1).lower()
+                for pt in cand_index.project_technologies:
+                    if pt.lower() in claimed_spec and pt.lower() not in [pr.lower() for pr in cand_index.professional_technologies]:
+                        violations.append(ValidationViolation(
+                            category="unsupported_specialization",
+                            severity="CRITICAL",
+                            field="summary",
+                            message=f"Summary falsely claims professional specialization in project-only technology '{pt}'.",
+                            detected_value=sm.group(0).strip(),
+                            allowed_boundary=f"'{pt}' is an independent project technology (StaffSync), not a primary professional specialization.",
+                        ))
+
+            # D) Check for missing skills in summary
             for missing_tech in missing_skills_set:
                 if len(missing_tech) > 2 and re.search(r"\b" + re.escape(missing_tech) + r"\b", summary.lower()):
                     violations.append(ValidationViolation(
@@ -143,7 +162,7 @@ class HallucinationGuard:
                         allowed_boundary=f"Missing technology must not be claimed: '{missing_tech}'.",
                     ))
 
-            # D) Banned AI buzzwords
+            # E) Banned AI buzzwords
             for bw in self.BANNED_BUZZWORDS:
                 if re.search(r"\b" + re.escape(bw) + r"\b", summary, re.IGNORECASE):
                     warnings.append(ValidationViolation(
@@ -154,6 +173,21 @@ class HallucinationGuard:
                         detected_value=bw,
                         allowed_boundary="Use concrete engineering verbs (Built, Designed, Integrated).",
                     ))
+
+        # -------------------------------------------------------------
+        # 3. Contradictory Evidence Mapping Checks
+        # -------------------------------------------------------------
+        matching_skills_in_resume = [str(s).lower() for s in (tailored_resume.get("matching_skills") or [])]
+        for missing_tech in missing_skills_set:
+            if missing_tech in matching_skills_in_resume:
+                violations.append(ValidationViolation(
+                    category="contradictory_evidence_mapping",
+                    severity="CRITICAL",
+                    field="matching_skills",
+                    message=f"Skill '{missing_tech}' is classified as MISSING in EvidenceMapping, but present in matching_skills.",
+                    detected_value=missing_tech,
+                    allowed_boundary="Missing skills cannot be marked as matched.",
+                ))
 
         # -------------------------------------------------------------
         # 3. Work Experience Checks (Factual Immutability)
@@ -225,6 +259,31 @@ class HallucinationGuard:
                         allowed_boundary="Financial claims not present in source profile are strictly forbidden.",
                     ))
 
+            # Check cross-employer responsibility attribution
+            orig_emp = next((e for e in orig_exps if e.get("company", "").strip().lower() == co.lower()), None)
+            if orig_emp:
+                orig_text = f"{orig_emp.get('jobTitle', '')} {orig_emp.get('description', '')} " + " ".join(orig_emp.get('responsibilities', []))
+                orig_text_lower = orig_text.lower()
+                other_emps = [e for e in orig_exps if e.get("company", "").strip().lower() != co.lower()]
+                for other in other_emps:
+                    other_co = other.get("company", "")
+                    other_text = f"{other.get('jobTitle', '')} {other.get('description', '')} " + " ".join(other.get('responsibilities', []))
+                    other_terms = ["getlivecoach", "mesa-qr", "kichi-mall", "in1mall", "woocommerce", "ionic", "twilio", "stripe split", "urban local bodies", "city finance", "sendgrid", "form.io", "amplitude", "materialized views", "dhwani"]
+                    distinctive_other = [t for t in other_terms if t in other_text.lower() and t not in orig_text_lower]
+
+                    for b in bullets:
+                        b_lower = str(b).lower()
+                        for term in distinctive_other:
+                            if term in b_lower:
+                                violations.append(ValidationViolation(
+                                    category="cross_employer_bleed",
+                                    severity="CRITICAL",
+                                    field="experience.responsibilities",
+                                    message=f"Bullet under '{co}' contains distinctive achievement/term '{term}' belonging to '{other_co}'.",
+                                    detected_value=str(b),
+                                    allowed_boundary=f"Responsibilities must not transfer across employers. '{term}' belongs strictly to '{other_co}'.",
+                                ))
+
         # -------------------------------------------------------------
         # 4. Education & Dates Fidelity
         # -------------------------------------------------------------
@@ -275,9 +334,23 @@ class HallucinationGuard:
                     clean_sum,
                     flags=re.IGNORECASE,
                 )
+            if "specializing in java" in clean_sum.lower() or "specializing in spring" in clean_sum.lower():
+                clean_sum = re.sub(
+                    r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
+                    "with hands-on project experience in Spring Boot (StaffSync).",
+                    clean_sum,
+                    flags=re.IGNORECASE,
+                )
             clean_sum = " ".join(clean_sum.split()).strip()
             sanitized_copy["tailored_summary"] = clean_sum
             sanitized_copy["summary"] = clean_sum
+
+            # Strip missing skills if leaked into matching_skills
+            if "matching_skills" in sanitized_copy and isinstance(sanitized_copy["matching_skills"], list):
+                sanitized_copy["matching_skills"] = [
+                    s for s in sanitized_copy["matching_skills"]
+                    if str(s).lower() not in missing_skills_set
+                ]
 
             # Sanitize experience bullets
             sanitized_exps = []

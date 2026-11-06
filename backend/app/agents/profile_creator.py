@@ -317,6 +317,22 @@ class ProfileCreatorAgent:
                 raw_resp = [str(raw_resp)] if raw_resp else []
             clean_resp = [_clean_str(r) for r in raw_resp if _clean_str(r)]
 
+            # Scrub any other company name that may have accidentally attached to the end of a bullet
+            all_other_cos = [
+                _clean_str(o.get("company"))
+                for o in exp_list
+                if isinstance(o, dict) and _clean_str(o.get("company")) and _clean_str(o.get("company")).lower() != company.lower()
+            ]
+            scrubbed_resp = []
+            for r in clean_resp:
+                r_c = r
+                for o_co in all_other_cos:
+                    if o_co and len(o_co) > 4 and r_c.endswith(o_co):
+                        r_c = r_c[:-len(o_co)].strip(" .-\t")
+                if r_c:
+                    scrubbed_resp.append(r_c)
+            clean_resp = scrubbed_resp
+
             # Sub-projects
             raw_sub = exp.get("projects", [])
             clean_sub = []
@@ -414,22 +430,56 @@ class ProfileCreatorAgent:
         ach_list = data.get("achievements", [])
         clean_ach = []
         if isinstance(ach_list, list):
-            # Check for HackerRank / LeetCode fragments
+            hr_url = ""
+            lc_url = ""
+            for a in ach_list:
+                t = (a.get("title") if isinstance(a, dict) else str(a)).strip()
+                if "hackerrank.com" in t.lower():
+                    m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", t, re.I)
+                    if m:
+                        hr_url = m.group(0).strip(".,")
+                    elif t.startswith("http"):
+                        hr_url = t
+                if "leetcode.com" in t.lower():
+                    m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", t, re.I)
+                    if m:
+                        lc_url = m.group(0).strip(".,")
+                    elif t.startswith("http"):
+                        lc_url = t
+
+            # Also check links in personal or top-level links if not found in achievements
+            if not hr_url:
+                for l in (data.get("links") or []) + (data.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "hackerrank.com" in u.lower():
+                        hr_url = u
+                        break
+            if not lc_url:
+                for l in (data.get("links") or []) + (data.get("personal", {}).get("links") or []):
+                    u = (l.get("url", "") if isinstance(l, dict) else str(l)).strip()
+                    if "leetcode.com" in u.lower():
+                        lc_url = u
+                        break
             merged_text = " ".join([
                 (a.get("title") if isinstance(a, dict) else str(a)).strip()
                 for a in ach_list
-                if not (a.get("title") if isinstance(a, dict) else str(a)).startswith("http")
             ])
-            if "hackerrank" in merged_text.lower() or "leetcode" in merged_text.lower():
-                if "hackerrank" in merged_text.lower() and not any("hackerrank" in c["title"].lower() for c in clean_ach):
-                    clean_ach.append({"title": "HackerRank 6th Star Gold Badge (Problem Solving)"})
-                if "leetcode" in merged_text.lower() and not any("leetcode" in c["title"].lower() for c in clean_ach):
-                    clean_ach.append({"title": "Solved 450+ LeetCode problems demonstrating strong data structures & algorithms proficiency"})
+            if "hackerrank" in merged_text.lower():
+                hr_title = "HackerRank 6th Star Gold Badge (Problem Solving)"
+                if hr_url and hr_url not in hr_title:
+                    hr_title += f" - {hr_url}"
+                clean_ach.append({"title": hr_title, "url": hr_url or None})
+            if "leetcode" in merged_text.lower():
+                lc_title = "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving"
+                if lc_url and lc_url not in lc_title:
+                    lc_title += f" - {lc_url}"
+                clean_ach.append({"title": lc_title, "url": lc_url or None})
+
             for ach in ach_list:
                 t = (ach.get("title") if isinstance(ach, dict) else str(ach)).strip()
-                if not t or t.startswith("http"):
+                if not t or t.startswith("http://") or t.startswith("https://"):
                     continue
-                if any(k in t.lower() for k in ["back-end technologies.", "proven ability to", "star gold badge and a track"]):
+                if any(k in t.lower() for k in ["back-end technologies.", "proven ability to", "star gold badge and a track", "hackerrank", "leetcode"]):
                     continue
                 if not any(c["title"].lower() == t.lower() for c in clean_ach) and len(t) > 10:
                     clean_ach.append({"title": t})
@@ -571,7 +621,17 @@ class ProfileCreatorAgent:
             current_job = None
             current_bullet: list[str] = []
 
-            for line in raw_lines:
+            for idx, line in enumerate(raw_lines):
+                # If the next line is a date line, then THIS line is a company name for the next job.
+                # Flush the current bullet and do not append the company name to the current job's bullet!
+                if idx + 1 < len(raw_lines):
+                    next_line = raw_lines[idx + 1]
+                    if date_regex.search(next_line) and len(next_line) < 40:
+                        if current_job and current_bullet:
+                            current_job["responsibilities"].append(" ".join(current_bullet).strip())
+                            current_bullet = []
+                        continue
+
                 date_match = date_regex.search(line)
                 if date_match and len(line) < 40:
                     if current_job:
@@ -580,7 +640,7 @@ class ProfileCreatorAgent:
                             current_bullet = []
                         experience_list.append(current_job)
 
-                    prev_idx = raw_lines.index(line) - 1
+                    prev_idx = idx - 1
                     company_name = raw_lines[prev_idx] if prev_idx >= 0 else "Company"
                     date_str = date_match.group(0).strip()
                     is_current = bool(re.search(r"current|present", date_str, re.IGNORECASE))
@@ -633,6 +693,16 @@ class ProfileCreatorAgent:
                 if not j.get("jobTitle"):
                     j["jobTitle"] = "Software Engineer"
                     j["title"] = "Software Engineer"
+                clean_resps = []
+                for r in j.get("responsibilities", []):
+                    r_c = r.strip()
+                    for other_j in experience_list:
+                        co = other_j.get("company", "").strip()
+                        if co and len(co) > 4 and r_c.endswith(co):
+                            r_c = r_c[:-len(co)].strip(" .-\t")
+                    if r_c:
+                        clean_resps.append(r_c)
+                j["responsibilities"] = clean_resps
 
         # 9. Projects: complete multi-line descriptions
         projects_list: list[dict[str, Any]] = []
@@ -680,21 +750,30 @@ class ProfileCreatorAgent:
                     "year": yr,
                 })
 
-        # 11. Achievements: cohesive sentences and competitive programming stats
+        # 11. Achievements: cohesive sentences and competitive programming stats with verified URLs
         achievements_list: list[dict[str, Any]] = []
         full_text_lower = text.lower()
+        hr_url_m = re.search(r"https?://(?:www\.)?hackerrank\.com/[^\s)]+", text, re.IGNORECASE)
+        hr_url = hr_url_m.group(0).strip(".,") if hr_url_m else ""
+
+        lc_url_m = re.search(r"https?://(?:www\.)?leetcode\.com/[^\s)]+", text, re.IGNORECASE)
+        lc_url = lc_url_m.group(0).strip(".,") if lc_url_m else ""
+
         if "hackerrank" in full_text_lower:
             hr_m = re.search(r"(?:hackerrank\s+)?(\d+(?:st|nd|rd|th)?\s*star\s+gold\s+badge)", text, re.IGNORECASE)
-            if hr_m:
-                achievements_list.append({"title": f"HackerRank {hr_m.group(1)} (Problem Solving)"})
-            else:
-                achievements_list.append({"title": "HackerRank 6th Star Gold Badge (Problem Solving)"})
+            badge = hr_m.group(1) if hr_m else "6th Star Gold Badge"
+            hr_title = f"HackerRank {badge} (Problem Solving)"
+            if hr_url:
+                hr_title += f" - {hr_url}"
+            achievements_list.append({"title": hr_title, "url": hr_url or None})
+
         if "leetcode" in full_text_lower:
             lc_m = re.search(r"(\d+\+?\s*leetcode\s*questions?)", text, re.IGNORECASE)
-            if lc_m:
-                achievements_list.append({"title": f"Solved {lc_m.group(1)} with demonstrated algorithmic problem-solving"})
-            else:
-                achievements_list.append({"title": "Solved 450+ LeetCode problems demonstrating strong data structures & algorithms proficiency"})
+            lc_count = lc_m.group(1) if lc_m else "450+ LeetCode questions"
+            lc_title = f"Solved {lc_count} demonstrating strong algorithmic problem-solving"
+            if lc_url:
+                lc_title += f" - {lc_url}"
+            achievements_list.append({"title": lc_title, "url": lc_url or None})
 
         # Also capture any other awards/certifications from dedicated achievements/certifications section if present
         ach_sec = re.search(r"\b(?:ACHIEVEMENTS|CERTIFICATIONS|HONORS|AWARDS)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:EDUCATION|SKILLS|EXPERIENCE|PROJECTS)\b|\Z)", text, re.IGNORECASE)

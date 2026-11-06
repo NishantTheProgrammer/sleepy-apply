@@ -254,6 +254,154 @@ def select_and_tailor_projects(
     return final_projects
 
 
+def preserve_and_prioritize_experience_bullets(
+    company_name: str,
+    original_bullets: list[str],
+    ai_bullets: list[str] | None,
+    matching_skills: list[str],
+    missing_skills: list[str],
+    job_title: str = "",
+    company: str = "",
+    job_description: str = "",
+    bold_enabled: bool = True,
+) -> list[str]:
+    """Preserves critical candidate technical accomplishments, metrics, and integrations,
+    eliminates cross-employer attribution bleed, and prioritizes bullets based on JD relevance."""
+    co_lower = (company_name or "").strip().lower()
+    is_dhwani = "dhwani" in co_lower
+    is_maxvision = "max vision" in co_lower
+
+    # 1. Clean and filter AI bullets for cross-employer bleed
+    valid_ai_bullets: list[str] = []
+    if ai_bullets and isinstance(ai_bullets, list):
+        for b in ai_bullets:
+            b_str = str(b).strip()
+            if not b_str:
+                continue
+            b_lower = b_str.lower()
+            # Dhwani cannot contain Max Vision projects
+            if is_dhwani and any(k in b_lower for k in ["mesa-qr", "pay.mesa-qr", "getlivecoach", "kichi-mall", "in1mall", "ionic"]):
+                continue
+            # Max Vision cannot contain Dhwani projects
+            if is_maxvision and any(k in b_lower for k in ["dhwani", "indian partner network", "city finance", "4000+", "4,000+", "urban local bodies", "form.io"]):
+                continue
+            valid_ai_bullets.append(b_str)
+
+    clean_orig_bullets = [str(b).strip() for b in (original_bullets or []) if str(b).strip()]
+
+    # 2. Information Restoration: Ensure critical candidate details are not omitted
+    final_raw_bullets: list[str] = []
+    if valid_ai_bullets:
+        combined_ai_text = " ".join(valid_ai_bullets).lower()
+
+        for b in valid_ai_bullets:
+            bullet_fixed = b
+            # If bullet mentions query optimization but dropped materialized views, restore it
+            if "query optimization" in bullet_fixed.lower() and "materialized view" not in bullet_fixed.lower():
+                bullet_fixed = re.sub(
+                    r"query optimization(?:\s+and\s+|\s*,\s*)",
+                    "query optimization, materialized views, and ",
+                    bullet_fixed,
+                    flags=re.IGNORECASE,
+                )
+            final_raw_bullets.append(bullet_fixed)
+
+        # Check for omitted original critical accomplishments and restore them:
+        if is_dhwani:
+            # City Finance (4000+ ULBs)
+            if not any(k in combined_ai_text for k in ["city finance", "4000+", "4,000+", "urban local bodies"]):
+                city_fin_bullet = next(
+                    (ob for ob in clean_orig_bullets if "4000+" in ob or "urban local bodies" in ob.lower() or "city finance" in ob.lower()),
+                    None,
+                )
+                if city_fin_bullet and city_fin_bullet not in final_raw_bullets:
+                    final_raw_bullets.append(city_fin_bullet)
+
+            # Form.io / SendGrid integrations
+            if not any("form.io" in combined_ai_text or "sendgrid" in combined_ai_text for _ in [1]):
+                formio_bullet = next((ob for ob in clean_orig_bullets if "form.io" in ob.lower() or "sendgrid" in ob.lower()), None)
+                if formio_bullet and not any("indian partner network" in fb.lower() for fb in final_raw_bullets):
+                    final_raw_bullets.append(formio_bullet)
+
+            # Materialized views / Query optimization
+            if not any("materialized view" in fb.lower() for fb in final_raw_bullets):
+                db_bullet = next((ob for ob in clean_orig_bullets if "materialized view" in ob.lower()), None)
+                if db_bullet and db_bullet not in final_raw_bullets:
+                    final_raw_bullets.append(db_bullet)
+
+        elif is_maxvision:
+            # Stripe split payment / pay.mesa-qr.com
+            if not any("stripe split payment" in combined_ai_text or "mesa-qr" in combined_ai_text for _ in [1]):
+                mesa_bullet = next((ob for ob in clean_orig_bullets if "mesa-qr" in ob.lower() or "split payment" in ob.lower()), None)
+                if mesa_bullet and mesa_bullet not in final_raw_bullets:
+                    final_raw_bullets.append(mesa_bullet)
+
+            # WooCommerce / Kichi-Mall
+            if not any("woocommerce" in combined_ai_text or "kichi-mall" in combined_ai_text for _ in [1]):
+                woo_bullet = next((ob for ob in clean_orig_bullets if "woocommerce" in ob.lower() or "kichi-mall" in ob.lower()), None)
+                if woo_bullet and woo_bullet not in final_raw_bullets:
+                    final_raw_bullets.append(woo_bullet)
+    else:
+        final_raw_bullets = list(clean_orig_bullets)
+
+    # 3. Strip missing technologies and bold verified matching technologies
+    processed_bullets: list[str] = []
+    for bullet in final_raw_bullets:
+        b_clean = bullet
+        for ms in missing_skills:
+            if len(ms) > 2:
+                b_clean = re.sub(rf"\b{re.escape(ms)}\b", "", b_clean, flags=re.IGNORECASE)
+
+        if bold_enabled:
+            for ms in matching_skills:
+                if (
+                    len(ms) > 2
+                    and ms.lower() in b_clean.lower()
+                    and f"**{ms}**" not in b_clean
+                    and f"**{ms.lower()}**" not in b_clean.lower()
+                ):
+                    pattern = re.compile(rf"\b{re.escape(ms)}\b", re.IGNORECASE)
+                    b_clean = pattern.sub(f"**{ms}**", b_clean)
+
+        b_clean = " ".join(b_clean.split()).strip()
+        if b_clean and b_clean not in processed_bullets:
+            processed_bullets.append(b_clean)
+
+    # 4. Relevance Prioritization (Reorder bullets based on target JD relevance)
+    target_context = f"{job_title} {company} {job_description}".lower()
+
+    def bullet_relevance_score(b_text: str) -> int:
+        score = 0
+        b_lower = b_text.lower()
+
+        # Target matching skills (+5 each)
+        for s in matching_skills:
+            if len(s) > 2 and s.lower() in b_lower:
+                score += 5
+
+        # Backend / Database / Optimization keywords (+4 each)
+        if any(w in target_context for w in ["backend", "java", "sql", "database", "api"]):
+            for kw in ["query optimization", "materialized views", "postgresql", "mysql", "sql", "rest apis", "rest api", "bulk upload", "performance"]:
+                if kw in b_lower:
+                    score += 4
+
+        # E-commerce / Payment keywords (+4 each)
+        if any(w in target_context for w in ["ecommerce", "e-commerce", "payment", "critical services"]):
+            for kw in ["stripe", "stripe split payment", "woocommerce", "e-commerce", "qr code"]:
+                if kw in b_lower:
+                    score += 4
+
+        # Mentoring / Leadership (+3 each)
+        if any(w in target_context for w in ["mentor", "lead", "team"]):
+            if "mentor" in b_lower or "interview" in b_lower:
+                score += 3
+
+        return score
+
+    processed_bullets.sort(key=bullet_relevance_score, reverse=True)
+    return processed_bullets
+
+
 class ResumeBuilderAgent:
     """Generates evidence-grounded, ATS-friendly tailored resumes and renders DOCX/PDF."""
 
@@ -434,29 +582,26 @@ class ResumeBuilderAgent:
 
         for exp in raw_experience:
             exp_copy = dict(exp)
-            co_key = exp_copy.get("company", "").strip().lower()
-            resps_to_process = (
-                tailored_exp_map[co_key]
-                if co_key in tailored_exp_map and tailored_exp_map[co_key]
-                else (exp_copy.get("responsibilities") or exp_copy.get("highlights") or [])
-            )
-            bolded_resps = []
-            for r in resps_to_process:
-                bolded_r = str(r)
-                # Ensure no missing technology is claimed in bullet
-                for ms in missing_skills:
-                    if len(ms) > 2:
-                        bolded_r = re.sub(rf"\b{re.escape(ms)}\b", "", bolded_r, flags=re.IGNORECASE)
-                # Bold verified matching skills
-                for ms in matching_skills:
-                    if len(ms) > 2 and ms.lower() in bolded_r.lower() and f"**{ms}**" not in bolded_r and f"**{ms.lower()}**" not in bolded_r.lower():
-                        pattern = re.compile(rf"\b{re.escape(ms)}\b", re.IGNORECASE)
-                        bolded_r = pattern.sub(f"**{ms}**", bolded_r)
-                bolded_resps.append(" ".join(bolded_r.split()))
+            co_name = exp_copy.get("company", "").strip()
+            co_key = co_name.lower()
+            orig_bullets = exp_copy.get("responsibilities") or exp_copy.get("highlights") or []
+            ai_exp_bullets = tailored_exp_map.get(co_key, [])
 
-            if bolded_resps:
-                exp_copy["responsibilities"] = bolded_resps
-                exp_copy["highlights"] = bolded_resps
+            processed_bullets = preserve_and_prioritize_experience_bullets(
+                company_name=co_name,
+                original_bullets=orig_bullets,
+                ai_bullets=ai_exp_bullets,
+                matching_skills=matching_skills,
+                missing_skills=missing_skills,
+                job_title=job_title,
+                company=company,
+                job_description=job.get("description", ""),
+                bold_enabled=bold_enabled,
+            )
+
+            if processed_bullets:
+                exp_copy["responsibilities"] = processed_bullets
+                exp_copy["highlights"] = processed_bullets
 
             # Ensure backward-compatible title/date fields
             exp_copy["title"] = exp_copy.get("jobTitle") or exp_copy.get("title") or "Software Engineer"

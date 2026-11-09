@@ -6,6 +6,7 @@ from .base import MongoBaseModel, PyObjectId, utcnow
 
 class NotificationPreferences(MongoBaseModel):
     discord_dm: bool = True
+    discord_webhook_url: str | None = None
     email: bool = False
     events: list[str] = Field(
         default_factory=lambda: [

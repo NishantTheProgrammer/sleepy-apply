@@ -32,7 +32,7 @@ This document details the current implementation status of all subsystems, ident
 | **Candidate & Admin Dashboards** | `✅ COMPLETED` | Full Next.js UI for profile, job discovery, application filtering, and admin company controls. ([`frontend/src/app/`](frontend/src/app/)) |
 | **Test Persona Switcher** | `✅ COMPLETED` | Modal switching between preloaded test candidates (Nishant, Suraj Singh, Abhishek Soni, Priya Sharma, etc.). ([`TestLoginModal.tsx`](frontend/src/components/TestLoginModal.tsx)) |
 | **Evidence-Grounded Resume Tailoring (v8.2)** | `✅ COMPLETED` | Generic, multi-employer resume tailoring pipeline with evidence isolation, strict tenure grounding, deterministic summary synthesis, and automated hallucination sanitization. ([`resume_builder.py`](backend/app/agents/resume_builder.py), [`evidence_mapper.py`](backend/app/agents/evidence_mapper.py), [`hallucination_guard.py`](backend/app/agents/hallucination_guard.py)) |
-| **Discord Notifications** | `🟡 PARTIALLY DONE` | Outbound Discord webhook notifications for new job matches and submitted applications; 2-way bot commands not yet built. ([`discord_bot.py`](backend/app/agents/discord_bot.py)) |
+| **Discord Bot & Notifications** | `✅ COMPLETED` | Outbound Webhooks, Bot DMs, and two-way interactive Discord bot (`!status`, `!jobs`, `!tailor`, `!apply`, `!profile`, `!help`) mapped to MongoDB candidate accounts. ([`discord_bot.py`](backend/app/agents/discord_bot.py), [`test_discord_bot.py`](backend/tests/test_discord_bot.py)) |
 | **Playwright SPA Scraper** | `🟡 PARTIALLY DONE` | Headless browser crawler written with route interception, but Playwright browser binaries are not installed in Docker container. ([`playwright_crawler.py`](backend/app/sources/playwright_crawler.py)) |
 | **Autonomous Browser Form Submission** | `❌ MISSING` | Currently simulated in `form_applier.py`. Real Playwright form-filling for Greenhouse, Lever, and Ashby is not yet implemented. ([`form_applier.py`](backend/app/appliers/form_applier.py)) |
 | **Background Recurring Scheduler (Cron)** | `❌ MISSING` | Currently triggers on-demand (upload, role change, fetch button). Standing automated cron (e.g. APScheduler / Celery Beat) is not yet active. |
@@ -107,6 +107,24 @@ This document details the current implementation status of all subsystems, ident
   - Deterministically synthesizes grammatically complete, concise summaries grounded purely in verified facts, avoiding broken conjunctions or ad-hoc regex string replacements.
   - 5-stage validation & sanitization lifecycle: Generate $\to$ Validate $\to$ Remediate $\to$ Re-serialize to JSON $\to$ Final Validate $\to$ Output `is_valid` state (`hallucination_guard.py`).
   - 49/49 regression unit and integration tests passing in ~1.0s.
+
+### 3.7 Discord Bot & Two-Way Notifications Subsystem (`✅ COMPLETED`)
+- **Outbound Multi-Channel Notifications**:
+  - Webhook broadcasting to private Discord text channels with rich embeds for job discoveries, application submissions, and action alerts.
+  - Direct Message (DM) notifications delivered directly to the candidate's Discord inbox via REST API v10 or Gateway bot.
+- **Two-Way Interactive Assistant (`discord.ext.commands.Bot`)**:
+  - Automatically identifies candidate in MongoDB (`db.users`) via `str(message.author.id)`.
+  - Commands supported:
+    - `!status`: Summarizes candidate profile completion, target role, total matched jobs, applications submitted, and pending action items.
+    - `!jobs`: Surfaces top 5 matched opportunities sorted by compatibility score with one-click command syntax.
+    - `!tailor <job_id>`: Triggers on-demand ATS resume tailoring, returns target headline, verified matching skills, and summary preview.
+    - `!apply <job_id>`: Executes application submission and returns confirmation or action required link.
+    - `!profile`: Displays verified skills, total years of experience, and target roles.
+    - `!help`: Detailed command guide.
+- **Resilient Lifecycle & User Control**:
+  - Server lifespan integration in FastAPI: skips Gateway listener gracefully if bot token is a development placeholder or unset; webhook and REST fallback remain active.
+  - Full test coverage across token validation, webhooks, REST DMs, bot commands, and API endpoints (16 dedicated tests, 65/65 suite passing).
+  - Web dashboard user settings for private webhook URLs, DM toggles, live connection badges, and one-click notification testing.
 
 ---
 

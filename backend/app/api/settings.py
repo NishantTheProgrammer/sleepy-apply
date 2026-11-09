@@ -5,6 +5,8 @@ from app.security.jwt import get_current_user_id
 from app.models.settings import UserSettings, UserSettingsPublic, AIProvider
 from app.security.vault import encrypt
 from app.providers.factory import AIProviderFactory, PROVIDER_MODEL_SUGGESTIONS
+from app.agents.discord_bot import DiscordAgent, is_valid_token, is_bot_running
+from app.core.config import get_settings
 from pydantic import BaseModel
 from datetime import datetime, timezone
 import structlog
@@ -139,3 +141,70 @@ async def test_ai_provider(request: Request):
 async def get_model_suggestions():
     """Return model suggestions for each AI provider."""
     return PROVIDER_MODEL_SUGGESTIONS
+
+
+class TestDiscordRequest(BaseModel):
+    webhook_url: str | None = None
+
+
+@router.post("/test-discord")
+async def test_discord(request: Request, body: TestDiscordRequest | None = None):
+    """Send a test notification to the user's Discord webhook or DM."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    settings_cfg = get_settings()
+
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+
+    notif_prefs = (doc or {}).get("notification_preferences", {})
+    body_url = body.webhook_url if body else None
+    target_webhook = body_url or notif_prefs.get("discord_webhook_url") or settings_cfg.discord_webhook_url
+
+    cand_discord_id = (user or {}).get("discord_id")
+    send_dm = notif_prefs.get("discord_dm", True)
+    target_discord_id = cand_discord_id if send_dm else None
+
+    if not target_webhook and not target_discord_id:
+        return {
+            "ok": False,
+            "error": "No Discord webhook URL or linked Discord account found to receive notifications.",
+        }
+
+    agent = DiscordAgent()
+    results = await agent.notify_test(discord_user_id=target_discord_id, webhook_url=target_webhook)
+
+    success = results.get("webhook", False) or results.get("dm", False)
+    return {
+        "ok": success,
+        "webhook_sent": results.get("webhook", False),
+        "dm_sent": results.get("dm", False),
+        "message": (
+            "Discord test notification sent successfully!"
+            if success
+            else "Failed to deliver test notification. Please verify your Webhook URL or Bot Token."
+        ),
+    }
+
+
+@router.get("/discord-status")
+async def get_discord_status(request: Request):
+    """Return current Discord bot & webhook integration status for user."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    settings_cfg = get_settings()
+
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    notif_prefs = (doc or {}).get("notification_preferences", {})
+
+    return {
+        "bot_configured": is_valid_token(settings_cfg.discord_bot_token),
+        "bot_connected": is_bot_running(),
+        "global_webhook_configured": bool(settings_cfg.discord_webhook_url),
+        "user_webhook_configured": bool(notif_prefs.get("discord_webhook_url")),
+        "user_discord_linked": bool((user or {}).get("discord_id")),
+        "user_discord_id": (user or {}).get("discord_id"),
+        "user_discord_username": (user or {}).get("discord_username"),
+    }
+

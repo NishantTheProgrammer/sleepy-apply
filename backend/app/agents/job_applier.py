@@ -89,6 +89,13 @@ class JobApplierAgent:
             profile=profile,
         )
 
+        # Notification targets
+        cand_discord_id = user.get("discord_id") if user else None
+        notif_prefs = (settings_doc or {}).get("notification_preferences", {})
+        user_webhook_url = notif_prefs.get("discord_webhook_url")
+        send_dm = notif_prefs.get("discord_dm", True)
+        target_discord_id = cand_discord_id if send_dm else None
+
         if result.status == "APPLIED":
             await self._update_status(app_doc["_id"], "APPLIED", reason=result.message)
             await db.applications.update_one(
@@ -99,6 +106,8 @@ class JobApplierAgent:
                 job_title=job.get("title", ""),
                 company=job.get("company", ""),
                 score=score,
+                discord_user_id=target_discord_id,
+                webhook_url=user_webhook_url,
             )
         elif result.status == "REQUIRES_USER_ACTION":
             action_info = {
@@ -116,6 +125,8 @@ class JobApplierAgent:
                 company=job.get("company", ""),
                 action_type=result.action_type or "manual_form",
                 action_url=job.get("application_url", ""),
+                discord_user_id=target_discord_id,
+                webhook_url=user_webhook_url,
             )
         else:
             await self._update_status(app_doc["_id"], "FAILED", reason=result.message)

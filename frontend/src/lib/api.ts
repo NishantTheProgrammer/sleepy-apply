@@ -201,6 +201,21 @@ export const settingsApi = {
   testAI: () => request("/api/settings/test-ai", { method: "POST" }),
   getModelSuggestions: () =>
     request<Record<string, string[]>>("/api/settings/models"),
+  testDiscord: (webhookUrl?: string) =>
+    request<{ ok: boolean; webhook_sent?: boolean; dm_sent?: boolean; message?: string; error?: string }>(
+      "/api/settings/test-discord",
+      { method: "POST", body: JSON.stringify({ webhook_url: webhookUrl || null }) }
+    ),
+  getDiscordStatus: () =>
+    request<{
+      bot_configured: boolean;
+      bot_connected: boolean;
+      global_webhook_configured: boolean;
+      user_webhook_configured: boolean;
+      user_discord_linked: boolean;
+      user_discord_id: string | null;
+      user_discord_username: string | null;
+    }>("/api/settings/discord-status"),
 };
 
 // ── Admin ─────────────────────────────────────────────────

@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Cpu, Key, Bell, Zap, CheckCircle, X, Loader2, ChevronDown,
-  Sliders, Sparkles, Shield, Target, FileText, Check, AlertCircle
+  Sliders, Sparkles, Shield, Target, FileText, Check, AlertCircle,
+  Bot, Send, MessageSquare
 } from "lucide-react";
 import { settingsApi } from "@/lib/api";
 
@@ -31,10 +32,31 @@ interface AppPreferences {
   daily_apply_limit?: number;
 }
 
+interface NotificationPreferences {
+  discord_dm?: boolean;
+  discord_webhook_url?: string;
+  email?: boolean;
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [models, setModels] = useState<Record<string, string[]>>({});
+  const [discordStatus, setDiscordStatus] = useState<{
+    bot_configured: boolean;
+    bot_connected: boolean;
+    global_webhook_configured: boolean;
+    user_webhook_configured: boolean;
+    user_discord_linked: boolean;
+    user_discord_id: string | null;
+    user_discord_username: string | null;
+  } | null>(null);
+
   const [form, setForm] = useState<Record<string, unknown>>({
+    notification_preferences: {
+      discord_dm: true,
+      discord_webhook_url: "",
+      email: false,
+    },
     application_preferences: {
       auto_apply: false,
       auto_apply_threshold: 70,
@@ -52,20 +74,34 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string; response?: string } | null>(null);
+  const [testingDiscord, setTestingDiscord] = useState(false);
+  const [discordTestResult, setDiscordTestResult] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    Promise.all([settingsApi.get(), settingsApi.getModelSuggestions()]).then(([s, m]) => {
+    Promise.all([
+      settingsApi.get(),
+      settingsApi.getModelSuggestions(),
+      settingsApi.getDiscordStatus().catch(() => null),
+    ]).then(([s, m, dStatus]) => {
       const sDoc = (s as Record<string, unknown>) ?? {};
       setSettings(sDoc);
       setModels((m as Record<string, string[]>) ?? {});
+      if (dStatus) setDiscordStatus(dStatus);
+
       const existingPrefs = (sDoc.application_preferences as AppPreferences) ?? {};
+      const existingNotif = (sDoc.notification_preferences as NotificationPreferences) ?? {};
 
       setForm({
         ai_provider: sDoc.ai_provider ?? "ollama",
         ai_model: sDoc.ai_model ?? "qwen2.5-coder:14b",
         ai_base_url: "",
         ai_api_key: "",
+        notification_preferences: {
+          discord_dm: existingNotif.discord_dm !== false,
+          discord_webhook_url: existingNotif.discord_webhook_url || "",
+          email: Boolean(existingNotif.email),
+        },
         application_preferences: {
           auto_apply: Boolean(existingPrefs.auto_apply),
           auto_apply_threshold: Number(existingPrefs.auto_apply_threshold ?? existingPrefs.min_compatibility_score ?? 70),
@@ -86,6 +122,7 @@ export default function SettingsPage() {
   const provider = (form.ai_provider ?? "ollama") as Provider;
   const isOllama = provider === "ollama";
   const appPrefs = ((form.application_preferences as AppPreferences) ?? {}) as AppPreferences;
+  const notifPrefs = ((form.notification_preferences as NotificationPreferences) ?? {}) as NotificationPreferences;
 
   const updateAppPref = (key: keyof AppPreferences, value: unknown) => {
     setForm((prev) => ({
@@ -97,6 +134,33 @@ export default function SettingsPage() {
         ...(key === "min_compatibility_score" ? { auto_apply_threshold: value } : {}),
       },
     }));
+  };
+
+  const updateNotifPref = (key: keyof NotificationPreferences, value: unknown) => {
+    setForm((prev) => ({
+      ...prev,
+      notification_preferences: {
+        ...((prev.notification_preferences as Record<string, unknown>) ?? {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const testDiscord = async () => {
+    setTestingDiscord(true);
+    setDiscordTestResult(null);
+    try {
+      await settingsApi.update(form);
+      const res = await settingsApi.testDiscord(notifPrefs.discord_webhook_url);
+      setDiscordTestResult(res);
+    } catch (err: unknown) {
+      setDiscordTestResult({
+        ok: false,
+        error: err instanceof Error ? err.message : "Failed to trigger test notification",
+      });
+    } finally {
+      setTestingDiscord(false);
+    }
   };
 
   const save = async () => {
@@ -451,6 +515,121 @@ export default function SettingsPage() {
               className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50"
             />
             <p className="text-[11px] text-slate-400 mt-1">Top relevant projects to highlight (2-3 recommended)</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Discord Notifications & Interactive Bot */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass rounded-2xl p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-indigo-400" />
+            <h2 className="font-bold text-sm text-white">Discord Notifications & Interactive Bot</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {discordStatus?.user_discord_linked ? (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> @{discordStatus.user_discord_username}
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> Not Linked
+              </span>
+            )}
+            {discordStatus?.bot_connected ? (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                ● Gateway Online
+              </span>
+            ) : discordStatus?.bot_configured ? (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                ● Bot Configured
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                Webhook / REST
+              </span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-400 mb-5">
+          Get real-time alerts when applications are submitted, when action is required, and run two-way commands directly from Discord.
+        </p>
+
+        {/* Discord DM Toggle */}
+        <div className="flex items-center justify-between p-3.5 bg-white/5 border border-white/10 rounded-xl mb-4">
+          <div>
+            <span className="text-xs font-medium text-white block">Discord Direct Messages (DMs)</span>
+            <span className="text-[11px] text-slate-400">Receive private messages from the Sleepy Apply Bot for key application events</span>
+          </div>
+          <button
+            onClick={() => updateNotifPref("discord_dm", !notifPrefs.discord_dm)}
+            className={`relative w-10 h-5.5 rounded-full transition-colors ${notifPrefs.discord_dm ? "bg-indigo-600" : "bg-white/10"}`}
+          >
+            <span className={`absolute top-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${notifPrefs.discord_dm ? "left-5" : "left-0.5"}`} />
+          </button>
+        </div>
+
+        {/* Discord Webhook URL */}
+        <div className="mb-5">
+          <label className="text-xs text-slate-300 font-medium block mb-1.5">
+            Channel Webhook URL (Optional)
+          </label>
+          <input
+            type="text"
+            placeholder="https://discord.com/api/webhooks/..."
+            value={notifPrefs.discord_webhook_url || ""}
+            onChange={(e) => updateNotifPref("discord_webhook_url", e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
+          />
+          <p className="text-[11px] text-slate-400 mt-1">
+            Broadcast job discoveries and submissions to your private Discord server channel.
+          </p>
+        </div>
+
+        {/* Test Discord Notification Button */}
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            onClick={testDiscord}
+            disabled={testingDiscord}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs transition-colors disabled:opacity-50"
+          >
+            {testingDiscord ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            {testingDiscord ? "Testing Discord…" : "Test Discord Notification"}
+          </button>
+          {discordTestResult && (
+            <span
+              className={`text-xs flex items-center gap-1.5 ${
+                discordTestResult.ok ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {discordTestResult.ok ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+              {discordTestResult.message || discordTestResult.error || "Completed"}
+            </span>
+          )}
+        </div>
+
+        {/* Two-Way Bot Commands Cheatsheet */}
+        <div className="mt-5 p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/20">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 mb-2">
+            <MessageSquare className="w-3.5 h-3.5" /> Interactive Bot Commands
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300">
+            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+              <code className="text-indigo-300 font-bold">!status</code> — Check profile & application pipeline stats
+            </div>
+            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+              <code className="text-indigo-300 font-bold">!jobs</code> — View top 5 matched job openings
+            </div>
+            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+              <code className="text-indigo-300 font-bold">!tailor &lt;job_id&gt;</code> — Tailor resume for a job
+            </div>
+            <div className="bg-black/30 p-2 rounded-lg border border-white/5">
+              <code className="text-indigo-300 font-bold">!apply &lt;job_id&gt;</code> — Apply to job immediately
+            </div>
+            <div className="bg-black/30 p-2 rounded-lg border border-white/5 sm:col-span-2">
+              <code className="text-indigo-300 font-bold">!profile</code> — Review verified skills, headline, & experience
+            </div>
           </div>
         </div>
       </motion.div>

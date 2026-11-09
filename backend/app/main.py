@@ -10,6 +10,7 @@ from app.db.client import get_db
 from app.api import auth, profile, jobs, settings, admin, pipeline, companies, templates
 from app.db.seed_companies import seed_target_companies
 from app.db.seed_jobs import seed_jobs_collection
+from app.agents.discord_bot import start_discord_bot, stop_discord_bot
 
 logger = structlog.get_logger()
 
@@ -30,9 +31,13 @@ async def lifespan(app: FastAPI):
     if await db.jobs.count_documents({}) == 0:
         await seed_jobs_collection(db)
 
+    # Start Discord bot in background (if configured)
+    await start_discord_bot()
+
     logger.info("Sleepy Apply backend started", env=settings_cfg.environment)
     yield
     # Shutdown
+    await stop_discord_bot()
     await close_db()
     logger.info("Sleepy Apply backend stopped")
 

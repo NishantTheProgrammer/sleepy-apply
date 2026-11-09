@@ -374,7 +374,7 @@
       }
     ],
     "template": "default",
-    "generated_at": "2026-11-09T09:30:10.531057+00:00",
+    "generated_at": "2026-11-09T10:35:07.498459+00:00",
     "validation_report": {
       "is_valid": true,
       "sanitized": false,
@@ -386,6 +386,6 @@
   },
   "pdf_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99.pdf",
   "docx_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99_default.docx",
-  "generated_at": "2026-11-09T09:30:10.531057+00:00",
+  "generated_at": "2026-11-09T10:35:07.498459+00:00",
   "_id": "671b5fa8618e9f291071da50"
 }

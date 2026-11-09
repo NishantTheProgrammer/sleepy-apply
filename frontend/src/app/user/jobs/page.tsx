@@ -6,7 +6,7 @@ import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
-  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2
+  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -349,6 +349,23 @@ function JobsPageContent() {
     }
   };
 
+  const [crawlingNcr, setCrawlingNcr] = useState(false);
+
+  const handleCrawlDelhiNcr = async () => {
+    setCrawlingNcr(true);
+    try {
+      const res = await jobsApi.crawlDelhiNcr();
+      setDiscoverMsg(res.message);
+      setSourceFilter("career-crawled");
+      await load(1);
+      setTimeout(() => setDiscoverMsg(""), 8000);
+    } catch (err: unknown) {
+      setDiscoverMsg(err instanceof Error ? err.message : "Failed to start Delhi NCR crawler");
+    } finally {
+      setCrawlingNcr(false);
+    }
+  };
+
   const handleApply = async (jobId: string) => {
     setApplying(jobId);
     try {
@@ -503,14 +520,26 @@ function JobsPageContent() {
           </p>
         </div>
 
-        <button
-          onClick={handleDiscoverJobs}
-          disabled={discovering}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto shrink-0"
-        >
-          {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          {discovering ? "Discovering & Scoring…" : "Discover Jobs Now"}
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto shrink-0">
+          <button
+            onClick={handleCrawlDelhiNcr}
+            disabled={crawlingNcr || discovering}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 hover:from-fuchsia-600/40 hover:to-purple-600/40 text-fuchsia-200 border border-fuchsia-500/40 font-bold text-xs shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50 cursor-pointer"
+            title="Crawl top Delhi NCR tech career portals using the AI Browser Agent"
+          >
+            {crawlingNcr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-fuchsia-400" />}
+            {crawlingNcr ? "Crawling Portals…" : "Crawl Delhi NCR"}
+          </button>
+
+          <button
+            onClick={handleDiscoverJobs}
+            disabled={discovering || crawlingNcr}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {discovering ? "Discovering & Scoring…" : "Discover Jobs Now"}
+          </button>
+        </div>
       </div>
 
       {discoverMsg && (

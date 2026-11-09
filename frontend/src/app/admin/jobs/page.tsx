@@ -76,16 +76,36 @@ export default function AdminAllJobsPage() {
     return () => clearInterval(interval);
   }, [crawlerStatus?.is_running, page, search, selectedCompany, selectedSource, remoteFilter, pollCrawlerStatus]);
 
-  const handleStartCrawler = async () => {
+  const [resettingCheckpoint, setResettingCheckpoint] = useState(false);
+
+  const handleStartCrawler = async (restart = false) => {
     try {
       setShowProgressBanner(true);
-      const res = await adminApi.startCrawler({ headless: false });
+      const res = await adminApi.startCrawler({ headless: false, restart });
       setActionMsg(res.message);
       await pollCrawlerStatus();
       setTimeout(() => setActionMsg(""), 6000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to start AI crawler";
       alert(msg);
+    }
+  };
+
+  const handleResetCheckpoint = async () => {
+    if (!confirm("Are you sure you want to reset the crawl checkpoint to Rank 1?")) {
+      return;
+    }
+    setResettingCheckpoint(true);
+    try {
+      const res = await adminApi.resetCrawlerCheckpoint();
+      setActionMsg(res.message);
+      await pollCrawlerStatus();
+      setTimeout(() => setActionMsg(""), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reset checkpoint";
+      alert(msg);
+    } finally {
+      setResettingCheckpoint(false);
     }
   };
 
@@ -307,15 +327,26 @@ export default function AdminAllJobsPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
 
-          {/* Sync Crawler Jobs */}
+          {/* Crawl Delhi NCR Portals (Resumable) */}
           <button
-            onClick={handleStartCrawler}
+            onClick={() => handleStartCrawler(false)}
             disabled={crawlerStatus?.is_running}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-fuchsia-600/25 hover:bg-fuchsia-600/35 text-fuchsia-200 font-bold text-xs border border-fuchsia-500/40 shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50 cursor-pointer"
-            title="Run AI browser crawler across 10 top tech company career portals"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 hover:from-fuchsia-600/40 hover:to-purple-600/40 text-fuchsia-200 font-bold text-xs border border-fuchsia-500/40 shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50 cursor-pointer"
+            title="Crawl top Delhi NCR tech portals (resumable from checkpoint)"
           >
             {crawlerStatus?.is_running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-fuchsia-400" />}
-            {crawlerStatus?.is_running ? "Crawling Portals..." : "Sync Crawler Jobs"}
+            {crawlerStatus?.is_running ? "Crawling Portals…" : "Crawl Delhi NCR (Resumable)"}
+          </button>
+
+          {/* Reset Checkpoint Button */}
+          <button
+            onClick={handleResetCheckpoint}
+            disabled={crawlerStatus?.is_running || resettingCheckpoint}
+            className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer disabled:opacity-50"
+            title="Reset crawl checkpoint to start fresh from Rank 1"
+          >
+            {resettingCheckpoint ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 text-slate-400" />}
+            Reset Checkpoint
           </button>
 
           {/* System Logs Link */}
@@ -476,6 +507,19 @@ export default function AdminAllJobsPage() {
               style={{ width: `${Math.max(crawlerStatus.percent, 3)}%` }}
             />
           </div>
+
+          {/* Checkpoint Status Badge */}
+          {crawlerStatus.checkpoint && (
+            <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                Persistent Checkpoint: <strong className="text-white">{crawlerStatus.checkpoint.completed_count}</strong> companies completed
+              </span>
+              <span>
+                Total Jobs Saved: <strong className="text-emerald-300 font-bold">{crawlerStatus.checkpoint.total_jobs_saved}</strong>
+              </span>
+            </div>
+          )}
 
           {/* Captcha Alert Notice */}
           {crawlerStatus.captchas_encountered > 0 && (

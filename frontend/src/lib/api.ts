@@ -191,6 +191,10 @@ export const jobsApi = {
     `${API_URL}/api/jobs/${jobId}/resume/download${template ? `?template=${template}` : ""}`,
   deleteResume: (jobId: string) =>
     request<{ ok: boolean; message: string; job_id: string }>(`/api/jobs/${jobId}/resume`, { method: "DELETE" }),
+  crawlDelhiNcr: () =>
+    request<{ ok: boolean; message: string; status?: CrawlerStatusResponse }>("/api/jobs/crawl-delhi-ncr", { method: "POST" }),
+  getCrawlerStatus: () =>
+    request<CrawlerStatusResponse>("/api/jobs/crawler-status"),
 };
 
 // ── Settings ──────────────────────────────────────────────
@@ -263,10 +267,12 @@ export const adminApi = {
   fetchLiveJobs: (source: "all" | "career" | "career-crawled" | "linkedin" | "naukri" = "all") =>
     request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
   // Crawler Sync & Status
-  startCrawler: (options?: { companies?: string[]; headless?: boolean; limit_per_company?: number }) =>
+  startCrawler: (options?: { companies?: string[]; headless?: boolean; limit_per_company?: number; restart?: boolean }) =>
     request<{ ok: boolean; message: string }>("/api/admin/crawler/start", { method: "POST", body: JSON.stringify(options || {}) }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/admin/crawler/status"),
+  resetCrawlerCheckpoint: () =>
+    request<{ ok: boolean; message: string }>("/api/admin/crawler/reset", { method: "POST" }),
   // System Logs
   getLogs: (params?: { page?: number; limit?: number; level?: string; category?: string; search?: string }) => {
     const q = new URLSearchParams();
@@ -302,6 +308,12 @@ export interface CrawlerStatusResponse {
   started_at: string | null;
   finished_at: string | null;
   history: CrawlerHistoryItem[];
+  checkpoint?: {
+    completed_count: number;
+    total_jobs_discovered: number;
+    total_jobs_saved: number;
+    last_updated?: string | null;
+  };
 }
 
 export interface SystemLogRecord {

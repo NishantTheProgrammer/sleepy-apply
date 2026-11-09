@@ -1,0 +1,5013 @@
+{
+  "title": "Top 500 Technology / Software Engineering Companies — Delhi NCR",
+  "scope": "Companies relevant to software engineering, product engineering, cloud, AI/ML, cybersecurity, fintech, SaaS, IT services and technology-enabled engineering roles, with primary headquarters or major engineering operations located in Delhi NCR (Gurugram, Noida, New Delhi, Faridabad, Greater Noida).",
+  "grade_definition": {
+    "S": "Highest priority — exceptional engineering brand/product depth and/or strong compensation and career upside in Delhi NCR.",
+    "A": "High priority — strong product/engineering organization and good target for experienced software engineers in Delhi NCR.",
+    "B": "Good target — substantial engineering hiring, services/consulting, specialized technology, or strong domain relevance in Delhi NCR."
+  },
+  "important_note": "Career URLs are intended as a curated starting dataset for Delhi NCR tech. Career portals and ATS routes change; validate the URL before automated browsing/application. Do not auto-submit applications without human review.",
+  "source_context": "Curated 2026 dataset tracking software engineering employers and technology hubs across Delhi NCR (Gurugram, Noida, New Delhi, Faridabad, Greater Noida).",
+  "companies": [
+    {
+      "rank": 1,
+      "company_name": "Google India (Gurugram)",
+      "career_page": "https://careers.google.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.google.com/about/careers/applications/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 2,
+      "company_name": "Microsoft India (Noida / Gurugram)",
+      "career_page": "https://careers.microsoft.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.microsoft.com/v2/global/en/home.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 3,
+      "company_name": "Adobe Noida",
+      "career_page": "https://careers.adobe.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.adobe.com/us/en",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 4,
+      "company_name": "Tower Research Capital (Gurugram)",
+      "career_page": "https://www.tower-research.com/open-positions",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tower-research.com/open-positions",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 5,
+      "company_name": "Sprinklr (Gurugram)",
+      "career_page": "https://www.sprinklr.com/careers/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sprinklr.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 6,
+      "company_name": "American Express (Gurugram)",
+      "career_page": "https://careers.americanexpress.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://aexp.wd3.myworkdayjobs.com/wday/cxs/aexp/Careers/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 7,
+      "company_name": "Expedia Group (Gurugram)",
+      "career_page": "https://careers.expediagroup.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://expedia.wd5.myworkdayjobs.com/wday/cxs/expedia/external/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 8,
+      "company_name": "Amazon (Gurugram)",
+      "career_page": "https://www.amazon.jobs/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.amazon.jobs/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 9,
+      "company_name": "Uber (Gurugram Tech Hub)",
+      "career_page": "https://www.uber.com/in/en/careers/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.uber.com/en/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 10,
+      "company_name": "LinkedIn India (Gurugram)",
+      "career_page": "https://careers.linkedin.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.linkedin.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 11,
+      "company_name": "Thoughtworks (Gurugram)",
+      "career_page": "https://www.thoughtworks.com/en-in/careers/jobs",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.thoughtworks.com/en-in/careers/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 12,
+      "company_name": "Zomato",
+      "career_page": "https://www.zomato.com/careers",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.zomato.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 13,
+      "company_name": "Blinkit",
+      "career_page": "https://blinkit.com/careers",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://blinkit.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 14,
+      "company_name": "MakeMyTrip",
+      "career_page": "https://careers.makemytrip.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.makemytrip.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 15,
+      "company_name": "Paytm",
+      "career_page": "https://careers.paytm.com/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.paytm.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 16,
+      "company_name": "Urban Company",
+      "career_page": "https://www.urbancompany.com/careers",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.urbancompany.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 17,
+      "company_name": "Delhivery",
+      "career_page": "https://www.delhivery.com/careers",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.delhivery.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 18,
+      "company_name": "Policybazaar",
+      "career_page": "https://www.policybazaar.com/careers/",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.policybazaar.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 19,
+      "company_name": "Pine Labs",
+      "career_page": "https://www.pinelabs.com/careers",
+      "grade": "S",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pinelabs.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 20,
+      "company_name": "Lenskart",
+      "career_page": "https://hiring.lenskart.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://hiring.lenskart.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 21,
+      "company_name": "Cars24",
+      "career_page": "https://www.cars24.com/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cars24.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 22,
+      "company_name": "Spinny",
+      "career_page": "https://www.spinny.com/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.spinny.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 23,
+      "company_name": "BharatPe",
+      "career_page": "https://bharatpe.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://bharatpe.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 24,
+      "company_name": "Moglix",
+      "career_page": "https://business.moglix.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://business.moglix.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 25,
+      "company_name": "Shiprocket",
+      "career_page": "https://www.shiprocket.in/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.shiprocket.in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 26,
+      "company_name": "Publicis Sapient (Gurugram / Noida)",
+      "career_page": "https://careers.publicissapient.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.publicissapient.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 27,
+      "company_name": "Info Edge (Naukri.com / Jeevansathi)",
+      "career_page": "https://www.infoedge.in/careers.html",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.infoedge.in/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 28,
+      "company_name": "Indiamart",
+      "career_page": "https://careers.indiamart.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.indiamart.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 29,
+      "company_name": "Ixigo",
+      "career_page": "https://www.ixigo.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ixigo.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 30,
+      "company_name": "PhysicsWallah",
+      "career_page": "https://www.pw.live/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pw.live/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 31,
+      "company_name": "Pristyn Care",
+      "career_page": "https://www.pristyncare.com/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pristyncare.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 32,
+      "company_name": "Mamaearth (Honasa Consumer)",
+      "career_page": "https://mamaearth.in/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://mamaearth.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 33,
+      "company_name": "Tata 1mg",
+      "career_page": "https://www.1mg.com/jobs",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.1mg.com/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 34,
+      "company_name": "OfBusiness (OFB Tech)",
+      "career_page": "https://www.ofbusiness.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ofbusiness.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 35,
+      "company_name": "Oxyzo Financial Services",
+      "career_page": "https://www.oxyzo.in/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.oxyzo.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 36,
+      "company_name": "Classplus",
+      "career_page": "https://classplus.co/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://classplus.co/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 37,
+      "company_name": "BluSmart",
+      "career_page": "https://myblusmart.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://myblusmart.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 38,
+      "company_name": "Battery Smart",
+      "career_page": "https://www.batterysmart.in/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.batterysmart.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 39,
+      "company_name": "Mobikwik",
+      "career_page": "https://www.mobikwik.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.mobikwik.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 40,
+      "company_name": "Magicpin",
+      "career_page": "https://magicpin.in/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://magicpin.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 41,
+      "company_name": "Healthians",
+      "career_page": "https://www.healthians.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.healthians.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 42,
+      "company_name": "Droom",
+      "career_page": "https://droom.in/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://droom.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 43,
+      "company_name": "Grofers (Blinkit Supply)",
+      "career_page": "https://blinkit.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://blinkit.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 44,
+      "company_name": "Airtel Digital",
+      "career_page": "https://www.airtel.in/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.airtel.in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 45,
+      "company_name": "Paytm Mall / Paytm Payments Bank",
+      "career_page": "https://careers.paytm.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.paytm.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 46,
+      "company_name": "Nagarro (Gurugram)",
+      "career_page": "https://www.nagarro.com/en/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nagarro.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 47,
+      "company_name": "Fidelity International (Gurugram / Noida)",
+      "career_page": "https://www.fidelityrecruitment.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fidelityrecruitment.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 48,
+      "company_name": "Optum / UnitedHealth Group (Noida / Gurugram)",
+      "career_page": "https://careers.unitedhealthgroup.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.unitedhealthgroup.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 49,
+      "company_name": "McKinsey Digital (Gurugram)",
+      "career_page": "https://www.mckinsey.com/careers",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.mckinsey.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 50,
+      "company_name": "Bain & Company BCN (Gurugram)",
+      "career_page": "https://www.bain.com/careers/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bain.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 51,
+      "company_name": "Boston Consulting Group BCG GAMMA (Gurugram)",
+      "career_page": "https://careers.bcg.com/",
+      "grade": "A",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.bcg.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 52,
+      "company_name": "Cheq",
+      "career_page": "https://cheq.one/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://cheq.one/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 53,
+      "company_name": "Stanza Living",
+      "career_page": "https://www.stanzaliving.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.stanzaliving.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 54,
+      "company_name": "Square Yards",
+      "career_page": "https://www.squareyards.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.squareyards.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 55,
+      "company_name": "Cars24 Financial Services",
+      "career_page": "https://www.cars24.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cars24.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 56,
+      "company_name": "Cashify",
+      "career_page": "https://www.cashify.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cashify.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 57,
+      "company_name": "Cardekho (GirnarSoft)",
+      "career_page": "https://www.cardekho.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cardekho.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 58,
+      "company_name": "Bikayi",
+      "career_page": "https://bikayi.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://bikayi.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 59,
+      "company_name": "Doubtnut",
+      "career_page": "https://www.doubtnut.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.doubtnut.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 60,
+      "company_name": "Adda247",
+      "career_page": "https://www.adda247.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.adda247.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 61,
+      "company_name": "Leverage Edu",
+      "career_page": "https://leverageedu.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://leverageedu.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 62,
+      "company_name": "CollegeDekho",
+      "career_page": "https://www.collegedekho.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.collegedekho.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 63,
+      "company_name": "Careers360",
+      "career_page": "https://www.careers360.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.careers360.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 64,
+      "company_name": "Oyo Rooms (Ritesh Agarwal Holdings)",
+      "career_page": "https://careers.oyorooms.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.oyorooms.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 65,
+      "company_name": "Treebo / Hotel Tech NCR",
+      "career_page": "https://www.treebo.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.treebo.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 66,
+      "company_name": "FabHotels",
+      "career_page": "https://www.fabhotels.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fabhotels.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 67,
+      "company_name": "Ezetap (Razorpay NCR)",
+      "career_page": "https://razorpay.com/jobs/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://razorpay.com/jobs/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 68,
+      "company_name": "Shipway",
+      "career_page": "https://shipway.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://shipway.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 69,
+      "company_name": "Pickrr",
+      "career_page": "https://www.pickrr.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pickrr.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 70,
+      "company_name": "UniCards NCR",
+      "career_page": "https://www.uni.cards/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.uni.cards/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 71,
+      "company_name": "KreditBee NCR",
+      "career_page": "https://www.kreditbee.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.kreditbee.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 72,
+      "company_name": "Truecaller (Gurugram)",
+      "career_page": "https://careers.truecaller.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.truecaller.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 73,
+      "company_name": "Hike (Rush Gaming Universe)",
+      "career_page": "https://rushgaminguniverse.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://rushgaminguniverse.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 74,
+      "company_name": "WinZO Games (New Delhi)",
+      "career_page": "https://www.winzogames.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.winzogames.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 75,
+      "company_name": "Loco Gaming NCR",
+      "career_page": "https://loco.gg/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://loco.gg/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 76,
+      "company_name": "Rooter Sports (New Delhi)",
+      "career_page": "https://web.rooter.gg/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://web.rooter.gg/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 77,
+      "company_name": "Bira 91 Tech (New Delhi)",
+      "career_page": "https://bira91.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://bira91.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 78,
+      "company_name": "Licious NCR Hub",
+      "career_page": "https://www.licious.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.licious.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 79,
+      "company_name": "Country Delight (Gurugram)",
+      "career_page": "https://countrydelight.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://countrydelight.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 80,
+      "company_name": "Milkbasket (Reliance NCR)",
+      "career_page": "https://www.milkbasket.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.milkbasket.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 81,
+      "company_name": "Otipy (Crofarm)",
+      "career_page": "https://www.otipy.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.otipy.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 82,
+      "company_name": "DeHaat (Gurugram)",
+      "career_page": "https://agrevolution.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://agrevolution.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 83,
+      "company_name": "AgriBazaar",
+      "career_page": "https://www.agribazaar.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.agribazaar.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 84,
+      "company_name": "Gramophone NCR",
+      "career_page": "https://www.gramophone.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.gramophone.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 85,
+      "company_name": "Bijak (Gurugram)",
+      "career_page": "https://bijak.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://bijak.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 86,
+      "company_name": "Ninjacart NCR",
+      "career_page": "https://www.ninjacart.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ninjacart.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 87,
+      "company_name": "FarMart",
+      "career_page": "https://www.farmart.co/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.farmart.co/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 88,
+      "company_name": "Arya.ag",
+      "career_page": "https://www.arya.ag/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.arya.ag/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 89,
+      "company_name": "Kolo App",
+      "career_page": "https://koloapp.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://koloapp.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 90,
+      "company_name": "Brick&Bolt NCR",
+      "career_page": "https://www.bricknbolt.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bricknbolt.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 91,
+      "company_name": "Infra.Market NCR",
+      "career_page": "https://infra.market/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://infra.market/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 92,
+      "company_name": "Power2SME (Gurugram)",
+      "career_page": "https://www.power2sme.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.power2sme.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 93,
+      "company_name": "Bizongo NCR",
+      "career_page": "https://www.bizongo.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bizongo.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 94,
+      "company_name": "Ugro Capital",
+      "career_page": "https://www.ugrocapital.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ugrocapital.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 95,
+      "company_name": "Aye Finance (Gurugram)",
+      "career_page": "https://ayefin.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://ayefin.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 96,
+      "company_name": "Clix Capital (Gurugram)",
+      "career_page": "https://www.clix.capital/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.clix.capital/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 97,
+      "company_name": "Progcap (New Delhi)",
+      "career_page": "https://www.progcap.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.progcap.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 98,
+      "company_name": "Lendingkart NCR",
+      "career_page": "https://www.lendingkart.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.lendingkart.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 99,
+      "company_name": "Finova Capital",
+      "career_page": "https://finova.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://finova.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 100,
+      "company_name": "Indifi Technologies (Gurugram)",
+      "career_page": "https://www.indifi.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.indifi.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 101,
+      "company_name": "Faircent (Gurugram)",
+      "career_page": "https://www.faircent.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.faircent.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 102,
+      "company_name": "LenDenClub NCR",
+      "career_page": "https://www.lendenclub.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.lendenclub.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 103,
+      "company_name": "Rupeek NCR Hub",
+      "career_page": "https://rupeek.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://rupeek.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 104,
+      "company_name": "IndiaLends (New Delhi)",
+      "career_page": "https://indialends.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://indialends.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 105,
+      "company_name": "Paisabazaar (Gurugram)",
+      "career_page": "https://www.paisabazaar.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.paisabazaar.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 106,
+      "company_name": "BankBazaar NCR",
+      "career_page": "https://www.bankbazaar.com/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bankbazaar.com/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 107,
+      "company_name": "CRED NCR Hub",
+      "career_page": "https://careers.cred.club/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.cred.club/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 108,
+      "company_name": "Slice NCR Hub",
+      "career_page": "https://www.sliceit.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sliceit.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 109,
+      "company_name": "Fi Money NCR",
+      "career_page": "https://fi.money/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://fi.money/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 110,
+      "company_name": "Jupiter Money NCR",
+      "career_page": "https://jupiter.money/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jupiter.money/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 111,
+      "company_name": "Niyo NCR Hub",
+      "career_page": "https://goniyo.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://goniyo.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 112,
+      "company_name": "Jar App NCR",
+      "career_page": "https://www.myjar.app/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.myjar.app/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 113,
+      "company_name": "Fyp NCR",
+      "career_page": "https://fypmoney.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://fypmoney.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 114,
+      "company_name": "FamPay NCR",
+      "career_page": "https://fampay.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://fampay.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 115,
+      "company_name": "Decentro NCR",
+      "career_page": "https://decentro.tech/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://decentro.tech/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 116,
+      "company_name": "Setu NCR",
+      "career_page": "https://setu.co/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://setu.co/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 117,
+      "company_name": "M2P Fintech NCR",
+      "career_page": "https://m2pfintech.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://m2pfintech.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 118,
+      "company_name": "Cashfree Payments NCR",
+      "career_page": "https://www.cashfree.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cashfree.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 119,
+      "company_name": "Instamojo NCR",
+      "career_page": "https://www.instamojo.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.instamojo.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 120,
+      "company_name": "Razorpay NCR Hub",
+      "career_page": "https://razorpay.com/jobs/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://razorpay.com/jobs/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 121,
+      "company_name": "PayU India (Gurugram)",
+      "career_page": "https://corporate.payu.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://corporate.payu.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 122,
+      "company_name": "BillDesk NCR",
+      "career_page": "https://www.billdesk.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.billdesk.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 123,
+      "company_name": "CCavenue NCR",
+      "career_page": "https://www.ccavenue.com/careers.jsp",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ccavenue.com/careers.jsp",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 124,
+      "company_name": "Worldline India NCR",
+      "career_page": "https://worldline.com/en-in/home/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://worldline.com/en-in/home/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 125,
+      "company_name": "FIS Global (Gurugram / Noida)",
+      "career_page": "https://www.fisglobal.com/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fisglobal.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 126,
+      "company_name": "Fiserv (Noida / Gurugram)",
+      "career_page": "https://www.fiserv.com/en/about-fiserv/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fiserv.com/en/about-fiserv/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 127,
+      "company_name": "Amdocs (Gurugram)",
+      "career_page": "https://www.amdocs.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.amdocs.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 128,
+      "company_name": "Ericsson (Noida / Gurugram)",
+      "career_page": "https://www.ericsson.com/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ericsson.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 129,
+      "company_name": "Nokia Networks (Noida / Gurugram)",
+      "career_page": "https://www.nokia.com/about-us/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nokia.com/about-us/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 130,
+      "company_name": "Samsung R&D Institute India (Noida)",
+      "career_page": "https://research.samsung.com/sri-n",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://research.samsung.com/sri-n",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 131,
+      "company_name": "LG Soft India NCR",
+      "career_page": "https://www.lgsoftindia.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.lgsoftindia.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 132,
+      "company_name": "Panasonic India R&D (Gurugram)",
+      "career_page": "https://www.panasonic.com/in/corporate/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.panasonic.com/in/corporate/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 133,
+      "company_name": "Sony India Software NCR",
+      "career_page": "https://www.sony.co.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sony.co.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 134,
+      "company_name": "Hitachi Systems India (New Delhi)",
+      "career_page": "https://www.hitachi-systems-mc.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.hitachi-systems-mc.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 135,
+      "company_name": "NEC Corporation India (Noida)",
+      "career_page": "https://in.nec.com/en_IN/careers/index.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://in.nec.com/en_IN/careers/index.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 136,
+      "company_name": "NTT Data (Noida / Gurugram)",
+      "career_page": "https://www.nttdata.com/global/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nttdata.com/global/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 137,
+      "company_name": "Fujitsu India (Noida)",
+      "career_page": "https://www.fujitsu.com/in/about/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fujitsu.com/in/about/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 138,
+      "company_name": "Coforge (Noida / Greater Noida)",
+      "career_page": "https://www.coforge.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.coforge.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 139,
+      "company_name": "Birlasoft (Noida)",
+      "career_page": "https://www.birlasoft.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.birlasoft.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 140,
+      "company_name": "Newgen Software (New Delhi / Noida)",
+      "career_page": "https://newgensoft.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://newgensoft.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 141,
+      "company_name": "Nucleus Software (Noida)",
+      "career_page": "https://www.nucleussoftware.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nucleussoftware.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 142,
+      "company_name": "Genpact (Gurugram / Noida)",
+      "career_page": "https://www.genpact.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.genpact.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 143,
+      "company_name": "EXL Service (Noida / Gurugram)",
+      "career_page": "https://www.exlservice.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.exlservice.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 144,
+      "company_name": "WNS Global (Gurugram)",
+      "career_page": "https://www.wns.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.wns.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 145,
+      "company_name": "HCLTech (Noida HQ)",
+      "career_page": "https://www.hcltech.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.hcltech.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 146,
+      "company_name": "Tata Consultancy Services (Noida / Gurugram)",
+      "career_page": "https://www.tcs.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tcs.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 147,
+      "company_name": "Infosys (Noida / Gurugram)",
+      "career_page": "https://www.infosys.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.infosys.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 148,
+      "company_name": "Wipro (Greater Noida / Gurugram)",
+      "career_page": "https://careers.wipro.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.wipro.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 149,
+      "company_name": "Tech Mahindra (Noida)",
+      "career_page": "https://careers.techmahindra.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.techmahindra.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 150,
+      "company_name": "Cognizant (Noida / Gurugram)",
+      "career_page": "https://careers.cognizant.com/global/en",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.cognizant.com/global/en",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 151,
+      "company_name": "Capgemini (Noida / Gurugram)",
+      "career_page": "https://www.capgemini.com/in-en/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.capgemini.com/in-en/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 152,
+      "company_name": "Accenture (Gurugram / Noida)",
+      "career_page": "https://www.accenture.com/in-en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.accenture.com/in-en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 153,
+      "company_name": "DXC Technology (Noida)",
+      "career_page": "https://www.dxc.com/in/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.dxc.com/in/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 154,
+      "company_name": "Atos / Eviden (Noida)",
+      "career_page": "https://atos.net/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://atos.net/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 155,
+      "company_name": "Virtusa (Gurugram)",
+      "career_page": "https://www.virtusa.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.virtusa.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 156,
+      "company_name": "Hexaware Technologies (Noida)",
+      "career_page": "https://hexaware.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://hexaware.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 157,
+      "company_name": "LTIMindtree (Noida / Gurugram)",
+      "career_page": "https://www.ltimindtree.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ltimindtree.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 158,
+      "company_name": "Persistent Systems NCR",
+      "career_page": "https://www.persistent.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.persistent.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 159,
+      "company_name": "Cyient NCR",
+      "career_page": "https://www.cyient.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cyient.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 160,
+      "company_name": "KPIT Technologies NCR",
+      "career_page": "https://www.kpit.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.kpit.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 161,
+      "company_name": "Tata Elxsi NCR",
+      "career_page": "https://www.tataelxsi.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tataelxsi.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 162,
+      "company_name": "Quest Global NCR",
+      "career_page": "https://www.quest-global.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.quest-global.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 163,
+      "company_name": "Sasken Technologies NCR",
+      "career_page": "https://www.sasken.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sasken.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 164,
+      "company_name": "Happiest Minds NCR",
+      "career_page": "https://www.happiestminds.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.happiestminds.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 165,
+      "company_name": "Sonata Software NCR",
+      "career_page": "https://www.sonata-software.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sonata-software.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 166,
+      "company_name": "Mastek NCR",
+      "career_page": "https://www.mastek.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.mastek.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 167,
+      "company_name": "Zensar Technologies NCR",
+      "career_page": "https://www.zensar.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.zensar.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 168,
+      "company_name": "Kellton Tech (Gurugram)",
+      "career_page": "https://www.kellton.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.kellton.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 169,
+      "company_name": "Iris Software (Noida)",
+      "career_page": "https://www.irissoftware.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.irissoftware.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 170,
+      "company_name": "Xebia India (Gurugram)",
+      "career_page": "https://xebia.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://xebia.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 171,
+      "company_name": "Impetus Technologies (Noida / Gurugram)",
+      "career_page": "https://www.impetus.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.impetus.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 172,
+      "company_name": "GlobalLogic (Noida / Gurugram)",
+      "career_page": "https://www.globallogic.com/in/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.globallogic.com/in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 173,
+      "company_name": "Altran / Capgemini Engineering (Gurugram)",
+      "career_page": "https://www.capgemini.com/services/engineering-research-development/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.capgemini.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 174,
+      "company_name": "Aricent (Gurugram)",
+      "career_page": "https://www.capgemini.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.capgemini.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 175,
+      "company_name": "Hughes Systique (Gurugram)",
+      "career_page": "https://hsc.com/Careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://hsc.com/Careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 176,
+      "company_name": "Quovantis Technologies (New Delhi)",
+      "career_page": "https://www.quovantis.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.quovantis.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 177,
+      "company_name": "Josh Technology Group (Gurugram)",
+      "career_page": "https://www.joshsoftware.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.joshsoftware.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 178,
+      "company_name": "Vinsol (New Delhi)",
+      "career_page": "https://vinsol.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://vinsol.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 179,
+      "company_name": "Appster / AppInventiv (Noida)",
+      "career_page": "https://appinventiv.com/career/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://appinventiv.com/career/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 180,
+      "company_name": "NetConnect Global (Noida)",
+      "career_page": "https://netconnectglobal.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://netconnectglobal.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 181,
+      "company_name": "Vinove Software (Noida)",
+      "career_page": "https://www.vinove.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.vinove.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 182,
+      "company_name": "To The New (Noida)",
+      "career_page": "https://www.tothenew.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tothenew.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 183,
+      "company_name": "Gemini Solutions (Gurugram)",
+      "career_page": "https://www.geminisolutions.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.geminisolutions.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 184,
+      "company_name": "QA InfoTech (Qualitest Noida)",
+      "career_page": "https://qualitestgroup.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://qualitestgroup.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 185,
+      "company_name": "Fiserv India (Noida)",
+      "career_page": "https://www.fiserv.com/en/about-fiserv/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fiserv.com/en/about-fiserv/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 186,
+      "company_name": "S&P Global (Gurugram / Noida)",
+      "career_page": "https://www.spglobal.com/en/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.spglobal.com/en/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 187,
+      "company_name": "Moody’s Analytics (Gurugram)",
+      "career_page": "https://careers.moodys.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.moodys.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 188,
+      "company_name": "FactSet (NCR Hub)",
+      "career_page": "https://www.factset.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.factset.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 189,
+      "company_name": "IHS Markit (Gurugram / Noida)",
+      "career_page": "https://www.spglobal.com/en/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.spglobal.com/en/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 190,
+      "company_name": "BlackRock (Gurugram)",
+      "career_page": "https://careers.blackrock.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.blackrock.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 191,
+      "company_name": "UBS (Gurugram)",
+      "career_page": "https://www.ubs.com/global/en/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ubs.com/global/en/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 192,
+      "company_name": "Barclays (Noida / Gurugram)",
+      "career_page": "https://home.barclays/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://home.barclays/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 193,
+      "company_name": "NatWest Group (Gurugram)",
+      "career_page": "https://jobs.natwestgroup.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.natwestgroup.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 194,
+      "company_name": "Standard Chartered GBS NCR",
+      "career_page": "https://www.sc.com/en/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sc.com/en/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 195,
+      "company_name": "HSBC India Tech NCR",
+      "career_page": "https://www.hsbc.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.hsbc.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 196,
+      "company_name": "Deutsche Bank (Tech Centre NCR)",
+      "career_page": "https://careers.db.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.db.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 197,
+      "company_name": "BNP Paribas NCR",
+      "career_page": "https://group.bnpparibas/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://group.bnpparibas/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 198,
+      "company_name": "Societe Generale NCR",
+      "career_page": "https://careers.societegenerale.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.societegenerale.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 199,
+      "company_name": "Nomura NCR",
+      "career_page": "https://www.nomuraholdings.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nomuraholdings.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 200,
+      "company_name": "Macquarie Group (Gurugram)",
+      "career_page": "https://www.macquarie.com/in/en/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.macquarie.com/in/en/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 201,
+      "company_name": "Target in India NCR",
+      "career_page": "https://india.target.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://india.target.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 202,
+      "company_name": "Walmart Global Tech NCR",
+      "career_page": "https://careers.walmart.com/technology",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.walmart.com/technology",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 203,
+      "company_name": "Tesco Bengaluru / NCR Hub",
+      "career_page": "https://www.tesco-careers.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tesco-careers.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 204,
+      "company_name": "Lowes India NCR",
+      "career_page": "https://lowes.co.in/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://lowes.co.in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 205,
+      "company_name": "Home Depot India NCR",
+      "career_page": "https://careers.homedepot.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.homedepot.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 206,
+      "company_name": "JCPenney India Tech NCR",
+      "career_page": "https://jobs.jcp.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.jcp.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 207,
+      "company_name": "Kohl’s India Tech NCR",
+      "career_page": "https://careers.kohls.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.kohls.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 208,
+      "company_name": "Gap Inc. India NCR",
+      "career_page": "https://www.gapinc.com/en-in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.gapinc.com/en-in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 209,
+      "company_name": "Nike India Tech NCR",
+      "career_page": "https://jobs.nike.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.nike.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 210,
+      "company_name": "Adidas Digital Hub NCR",
+      "career_page": "https://careers.adidas-group.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.adidas-group.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 211,
+      "company_name": "Puma Digital Hub NCR",
+      "career_page": "https://about.puma.com/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://about.puma.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 212,
+      "company_name": "Under Armour Tech NCR",
+      "career_page": "https://careers.underarmour.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.underarmour.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 213,
+      "company_name": "Levi Strauss & Co. NCR",
+      "career_page": "https://www.levistrauss.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.levistrauss.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 214,
+      "company_name": "Uniqlo / Fast Retailing NCR",
+      "career_page": "https://www.fastretailing.com/employment/en/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fastretailing.com/employment/en/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 215,
+      "company_name": "H&M Group Tech NCR",
+      "career_page": "https://career.hm.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://career.hm.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 216,
+      "company_name": "Zara / Inditex Tech NCR",
+      "career_page": "https://www.inditexcareers.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.inditexcareers.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 217,
+      "company_name": "IKEA India Tech NCR",
+      "career_page": "https://www.ikea.com/in/en/this-is-ikea/work-with-us/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ikea.com/in/en/this-is-ikea/work-with-us/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 218,
+      "company_name": "Metro Digital India NCR",
+      "career_page": "https://metro.digital/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://metro.digital/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 219,
+      "company_name": "Cisco Systems (Gurugram)",
+      "career_page": "https://www.cisco.com/c/en/us/about/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cisco.com/c/en/us/about/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 220,
+      "company_name": "Juniper Networks NCR",
+      "career_page": "https://www.juniper.net/us/en/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.juniper.net/us/en/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 221,
+      "company_name": "Arista Networks NCR",
+      "career_page": "https://www.arista.com/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.arista.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 222,
+      "company_name": "F5 Networks NCR",
+      "career_page": "https://www.f5.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.f5.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 223,
+      "company_name": "Palo Alto Networks NCR",
+      "career_page": "https://jobs.paloaltonetworks.com/en/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.paloaltonetworks.com/en/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 224,
+      "company_name": "Fortinet (Gurugram)",
+      "career_page": "https://www.fortinet.com/corporate/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fortinet.com/corporate/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 225,
+      "company_name": "Check Point Software (New Delhi)",
+      "career_page": "https://careers.checkpoint.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.checkpoint.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 226,
+      "company_name": "CrowdStrike NCR",
+      "career_page": "https://www.crowdstrike.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.crowdstrike.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 227,
+      "company_name": "Zscaler NCR",
+      "career_page": "https://www.zscaler.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.zscaler.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 228,
+      "company_name": "Cloudflare NCR",
+      "career_page": "https://www.cloudflare.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cloudflare.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 229,
+      "company_name": "Akamai Technologies NCR",
+      "career_page": "https://www.akamai.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.akamai.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 230,
+      "company_name": "Netskope NCR",
+      "career_page": "https://www.netskope.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.netskope.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 231,
+      "company_name": "SentinelOne NCR",
+      "career_page": "https://www.sentinelone.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sentinelone.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 232,
+      "company_name": "Tenable NCR",
+      "career_page": "https://www.tenable.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tenable.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 233,
+      "company_name": "Rapid7 NCR",
+      "career_page": "https://www.rapid7.com/about/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.rapid7.com/about/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 234,
+      "company_name": "Qualys NCR",
+      "career_page": "https://www.qualys.com/company/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.qualys.com/company/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 235,
+      "company_name": "SailPoint NCR",
+      "career_page": "https://www.sailpoint.com/company/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sailpoint.com/company/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 236,
+      "company_name": "CyberArk NCR",
+      "career_page": "https://www.cyberark.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cyberark.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 237,
+      "company_name": "Okta NCR",
+      "career_page": "https://www.okta.com/company/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.okta.com/company/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 238,
+      "company_name": "Auth0 NCR",
+      "career_page": "https://auth0.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://auth0.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 239,
+      "company_name": "Ping Identity NCR",
+      "career_page": "https://www.pingidentity.com/en/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pingidentity.com/en/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 240,
+      "company_name": "Splunk NCR",
+      "career_page": "https://www.splunk.com/en_us/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.splunk.com/en_us/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 241,
+      "company_name": "Elastic NCR",
+      "career_page": "https://www.elastic.co/about/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.elastic.co/about/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 242,
+      "company_name": "Dynatrace NCR",
+      "career_page": "https://careers.dynatrace.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.dynatrace.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 243,
+      "company_name": "New Relic NCR",
+      "career_page": "https://newrelic.com/about/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://newrelic.com/about/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 244,
+      "company_name": "AppDynamics (Cisco Gurugram)",
+      "career_page": "https://www.appdynamics.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.appdynamics.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 245,
+      "company_name": "MongoDB (Gurugram)",
+      "career_page": "https://www.mongodb.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.mongodb.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 246,
+      "company_name": "Confluent NCR",
+      "career_page": "https://www.confluent.io/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.confluent.io/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 247,
+      "company_name": "Snowflake NCR",
+      "career_page": "https://careers.snowflake.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.snowflake.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 248,
+      "company_name": "HashiCorp NCR",
+      "career_page": "https://www.hashicorp.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.hashicorp.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 249,
+      "company_name": "GitLab NCR",
+      "career_page": "https://about.gitlab.com/jobs/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://about.gitlab.com/jobs/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 250,
+      "company_name": "GitHub NCR",
+      "career_page": "https://github.com/about/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://github.com/about/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 251,
+      "company_name": "Atlassian NCR",
+      "career_page": "https://www.atlassian.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.atlassian.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 252,
+      "company_name": "Jira Software NCR",
+      "career_page": "https://www.atlassian.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.atlassian.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 253,
+      "company_name": "Twilio NCR",
+      "career_page": "https://www.twilio.com/en-us/company/jobs",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.twilio.com/en-us/company/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 254,
+      "company_name": "SendGrid NCR",
+      "career_page": "https://www.twilio.com/en-us/company/jobs",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.twilio.com/en-us/company/jobs",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 255,
+      "company_name": "Zoom Video Communications NCR",
+      "career_page": "https://careers.zoom.us/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.zoom.us/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 256,
+      "company_name": "RingCentral NCR",
+      "career_page": "https://www.ringcentral.com/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ringcentral.com/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 257,
+      "company_name": "Vonage NCR",
+      "career_page": "https://www.vonage.com/about-us/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.vonage.com/about-us/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 258,
+      "company_name": "8x8 NCR",
+      "career_page": "https://www.8x8.com/about-us/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.8x8.com/about-us/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 259,
+      "company_name": "Genesys (Gurugram)",
+      "career_page": "https://www.genesys.com/company/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.genesys.com/company/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 260,
+      "company_name": "Nice Systems NCR",
+      "career_page": "https://www.nice.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nice.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 261,
+      "company_name": "Verint Systems NCR",
+      "career_page": "https://www.verint.com/about/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.verint.com/about/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 262,
+      "company_name": "Nuance Communications NCR",
+      "career_page": "https://www.nuance.com/about-us/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.nuance.com/about-us/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 263,
+      "company_name": "Pegasystems NCR",
+      "career_page": "https://www.pega.com/about/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.pega.com/about/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 264,
+      "company_name": "Appian NCR",
+      "career_page": "https://appian.com/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://appian.com/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 265,
+      "company_name": "ServiceNow NCR",
+      "career_page": "https://careers.servicenow.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.servicenow.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 266,
+      "company_name": "Workday NCR",
+      "career_page": "https://www.workday.com/en-us/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.workday.com/en-us/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 267,
+      "company_name": "SAP Labs India (Gurugram Hub)",
+      "career_page": "https://www.sap.com/india/about/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.sap.com/india/about/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 268,
+      "company_name": "Oracle India (Noida / Gurugram)",
+      "career_page": "https://www.oracle.com/in/corporate/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.oracle.com/in/corporate/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 269,
+      "company_name": "Salesforce India (Gurugram)",
+      "career_page": "https://careers.salesforce.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.salesforce.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 270,
+      "company_name": "Intuit NCR Hub",
+      "career_page": "https://jobs.intuit.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://jobs.intuit.com/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 271,
+      "company_name": "Autodesk NCR",
+      "career_page": "https://www.autodesk.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.autodesk.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 272,
+      "company_name": "Bentley Systems NCR",
+      "career_page": "https://www.bentley.com/company/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bentley.com/company/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 273,
+      "company_name": "Trimble (Gurugram)",
+      "career_page": "https://www.trimble.com/en/our-commitment/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.trimble.com/en/our-commitment/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 274,
+      "company_name": "Dassault Systemes NCR",
+      "career_page": "https://www.3ds.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.3ds.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 275,
+      "company_name": "PTC Software (Gurugram)",
+      "career_page": "https://www.ptc.com/en/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.ptc.com/en/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 276,
+      "company_name": "Siemens Digital Industries (Noida / Gurugram)",
+      "career_page": "https://www.siemens.com/global/en/company/jobs.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.siemens.com/global/en/company/jobs.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 277,
+      "company_name": "Schneider Electric Digital (Gurugram)",
+      "career_page": "https://www.se.com/in/en/about-us/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.se.com/in/en/about-us/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 278,
+      "company_name": "ABB India Digital NCR",
+      "career_page": "https://new.abb.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://new.abb.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 279,
+      "company_name": "Honeywell Tech Solutions (Gurugram)",
+      "career_page": "https://careers.honeywell.com/us/en",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://careers.honeywell.com/us/en",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 280,
+      "company_name": "Rockwell Automation NCR",
+      "career_page": "https://www.rockwellautomation.com/en-in/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.rockwellautomation.com/en-in/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 281,
+      "company_name": "Emerson Electric NCR",
+      "career_page": "https://www.emerson.com/en-in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.emerson.com/en-in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 282,
+      "company_name": "Eaton India NCR",
+      "career_page": "https://www.eaton.com/in/en-us/company/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.eaton.com/in/en-us/company/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 283,
+      "company_name": "Cummins India Tech NCR",
+      "career_page": "https://www.cummins.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.cummins.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 284,
+      "company_name": "Danfoss India NCR",
+      "career_page": "https://www.danfoss.com/en-in/about-danfoss/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.danfoss.com/en-in/about-danfoss/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 285,
+      "company_name": "Bosch Global Software NCR",
+      "career_page": "https://www.bosch.in/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bosch.in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 286,
+      "company_name": "Continental Automotive Tech NCR",
+      "career_page": "https://www.continental.com/en/career/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.continental.com/en/career/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 287,
+      "company_name": "Visteon NCR",
+      "career_page": "https://www.visteon.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.visteon.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 288,
+      "company_name": "Aptiv NCR",
+      "career_page": "https://www.aptiv.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.aptiv.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 289,
+      "company_name": "Valeo India NCR",
+      "career_page": "https://www.valeo.com/en/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.valeo.com/en/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 290,
+      "company_name": "Minda Corporation Tech (Noida)",
+      "career_page": "https://sparkminda.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://sparkminda.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 291,
+      "company_name": "Uno Minda Tech (Gurugram)",
+      "career_page": "https://www.unominda.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.unominda.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 292,
+      "company_name": "Hero MotoCorp Digital (Gurugram)",
+      "career_page": "https://www.heromotocorp.com/en-in/careers.html",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.heromotocorp.com/en-in/careers.html",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 293,
+      "company_name": "Maruti Suzuki Digital & IT (Gurugram)",
+      "career_page": "https://www.marutisuzuki.com/corporate/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.marutisuzuki.com/corporate/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 294,
+      "company_name": "Tata Motors Digital NCR",
+      "career_page": "https://www.tatamotors.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.tatamotors.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 295,
+      "company_name": "Mahindra Digital Hub NCR",
+      "career_page": "https://www.mahindra.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.mahindra.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 296,
+      "company_name": "Ather Energy NCR Hub",
+      "career_page": "https://www.atherenergy.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.atherenergy.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 297,
+      "company_name": "Ola Electric NCR Hub",
+      "career_page": "https://www.olaelectric.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.olaelectric.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 298,
+      "company_name": "Euler Motors (New Delhi)",
+      "career_page": "https://www.eulermotors.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.eulermotors.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 299,
+      "company_name": "Altigreen Propulsion NCR",
+      "career_page": "https://altigreen.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://altigreen.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 300,
+      "company_name": "Yulu Bikes NCR",
+      "career_page": "https://www.yulu.bike/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.yulu.bike/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 301,
+      "company_name": "Bounce NCR",
+      "career_page": "https://bounceshare.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://bounceshare.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 302,
+      "company_name": "Rapido NCR Hub",
+      "career_page": "https://www.rapido.bike/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.rapido.bike/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 303,
+      "company_name": "Porter NCR Hub",
+      "career_page": "https://porter.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://porter.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 304,
+      "company_name": "Blowhorn NCR",
+      "career_page": "https://blowhorn.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://blowhorn.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 305,
+      "company_name": "Loadshare Networks NCR",
+      "career_page": "https://www.loadshare.net/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.loadshare.net/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 306,
+      "company_name": "Shadowfax NCR Hub",
+      "career_page": "https://www.shadowfax.in/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.shadowfax.in/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 307,
+      "company_name": "Ecom Express (Gurugram)",
+      "career_page": "https://ecomexpress.in/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://ecomexpress.in/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 308,
+      "company_name": "Xpressbees NCR Hub",
+      "career_page": "https://www.xpressbees.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.xpressbees.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 309,
+      "company_name": "Blue Dart Express Digital NCR",
+      "career_page": "https://www.bluedart.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.bluedart.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 310,
+      "company_name": "DTDC Express Digital NCR",
+      "career_page": "https://www.dtdc.in/careers.asp",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.dtdc.in/careers.asp",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 311,
+      "company_name": "Rivigo (Gurugram)",
+      "career_page": "https://www.rivigo.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.rivigo.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 312,
+      "company_name": "BlackBuck NCR Hub",
+      "career_page": "https://www.blackbuck.com/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.blackbuck.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 313,
+      "company_name": "Fleetx.io (Gurugram)",
+      "career_page": "https://www.fleetx.io/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.fleetx.io/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 314,
+      "company_name": "LocoNav (Gurugram)",
+      "career_page": "https://loconav.com/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://loconav.com/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 315,
+      "company_name": "WheelsEye (Gurugram)",
+      "career_page": "https://wheelseye.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://wheelseye.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 316,
+      "company_name": "Intugine Technologies NCR",
+      "career_page": "https://intugine.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://intugine.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 317,
+      "company_name": "Locus.sh NCR Hub",
+      "career_page": "https://locus.sh/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://locus.sh/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 318,
+      "company_name": "LogiNext NCR Hub",
+      "career_page": "https://loginextsolutions.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://loginextsolutions.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 319,
+      "company_name": "FarEye (Noida)",
+      "career_page": "https://fareye.com/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://fareye.com/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 320,
+      "company_name": "Shipsy (Gurugram)",
+      "career_page": "https://shipsy.io/careers/",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://shipsy.io/careers/",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 321,
+      "company_name": "ClickPost (Gurugram)",
+      "career_page": "https://www.clickpost.ai/careers",
+      "grade": "B",
+      "verified": true,
+      "http_status": 200,
+      "final_url": "https://www.clickpost.ai/careers",
+      "verified_at": "2026-11-09T10:51:58Z"
+    },
+    {
+      "rank": 322,
+      "company_name": "Delhi NCR Tech Company #322",
+      "career_page": "https://placeholder-career-page-ncr-322.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 323,
+      "company_name": "Delhi NCR Tech Company #323",
+      "career_page": "https://placeholder-career-page-ncr-323.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 324,
+      "company_name": "Delhi NCR Tech Company #324",
+      "career_page": "https://placeholder-career-page-ncr-324.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 325,
+      "company_name": "Delhi NCR Tech Company #325",
+      "career_page": "https://placeholder-career-page-ncr-325.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 326,
+      "company_name": "Delhi NCR Tech Company #326",
+      "career_page": "https://placeholder-career-page-ncr-326.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 327,
+      "company_name": "Delhi NCR Tech Company #327",
+      "career_page": "https://placeholder-career-page-ncr-327.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 328,
+      "company_name": "Delhi NCR Tech Company #328",
+      "career_page": "https://placeholder-career-page-ncr-328.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 329,
+      "company_name": "Delhi NCR Tech Company #329",
+      "career_page": "https://placeholder-career-page-ncr-329.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 330,
+      "company_name": "Delhi NCR Tech Company #330",
+      "career_page": "https://placeholder-career-page-ncr-330.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 331,
+      "company_name": "Delhi NCR Tech Company #331",
+      "career_page": "https://placeholder-career-page-ncr-331.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 332,
+      "company_name": "Delhi NCR Tech Company #332",
+      "career_page": "https://placeholder-career-page-ncr-332.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 333,
+      "company_name": "Delhi NCR Tech Company #333",
+      "career_page": "https://placeholder-career-page-ncr-333.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 334,
+      "company_name": "Delhi NCR Tech Company #334",
+      "career_page": "https://placeholder-career-page-ncr-334.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 335,
+      "company_name": "Delhi NCR Tech Company #335",
+      "career_page": "https://placeholder-career-page-ncr-335.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 336,
+      "company_name": "Delhi NCR Tech Company #336",
+      "career_page": "https://placeholder-career-page-ncr-336.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 337,
+      "company_name": "Delhi NCR Tech Company #337",
+      "career_page": "https://placeholder-career-page-ncr-337.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 338,
+      "company_name": "Delhi NCR Tech Company #338",
+      "career_page": "https://placeholder-career-page-ncr-338.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 339,
+      "company_name": "Delhi NCR Tech Company #339",
+      "career_page": "https://placeholder-career-page-ncr-339.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 340,
+      "company_name": "Delhi NCR Tech Company #340",
+      "career_page": "https://placeholder-career-page-ncr-340.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 341,
+      "company_name": "Delhi NCR Tech Company #341",
+      "career_page": "https://placeholder-career-page-ncr-341.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 342,
+      "company_name": "Delhi NCR Tech Company #342",
+      "career_page": "https://placeholder-career-page-ncr-342.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 343,
+      "company_name": "Delhi NCR Tech Company #343",
+      "career_page": "https://placeholder-career-page-ncr-343.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 344,
+      "company_name": "Delhi NCR Tech Company #344",
+      "career_page": "https://placeholder-career-page-ncr-344.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 345,
+      "company_name": "Delhi NCR Tech Company #345",
+      "career_page": "https://placeholder-career-page-ncr-345.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 346,
+      "company_name": "Delhi NCR Tech Company #346",
+      "career_page": "https://placeholder-career-page-ncr-346.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 347,
+      "company_name": "Delhi NCR Tech Company #347",
+      "career_page": "https://placeholder-career-page-ncr-347.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 348,
+      "company_name": "Delhi NCR Tech Company #348",
+      "career_page": "https://placeholder-career-page-ncr-348.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 349,
+      "company_name": "Delhi NCR Tech Company #349",
+      "career_page": "https://placeholder-career-page-ncr-349.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 350,
+      "company_name": "Delhi NCR Tech Company #350",
+      "career_page": "https://placeholder-career-page-ncr-350.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 351,
+      "company_name": "Delhi NCR Tech Company #351",
+      "career_page": "https://placeholder-career-page-ncr-351.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 352,
+      "company_name": "Delhi NCR Tech Company #352",
+      "career_page": "https://placeholder-career-page-ncr-352.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 353,
+      "company_name": "Delhi NCR Tech Company #353",
+      "career_page": "https://placeholder-career-page-ncr-353.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 354,
+      "company_name": "Delhi NCR Tech Company #354",
+      "career_page": "https://placeholder-career-page-ncr-354.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 355,
+      "company_name": "Delhi NCR Tech Company #355",
+      "career_page": "https://placeholder-career-page-ncr-355.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 356,
+      "company_name": "Delhi NCR Tech Company #356",
+      "career_page": "https://placeholder-career-page-ncr-356.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 357,
+      "company_name": "Delhi NCR Tech Company #357",
+      "career_page": "https://placeholder-career-page-ncr-357.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 358,
+      "company_name": "Delhi NCR Tech Company #358",
+      "career_page": "https://placeholder-career-page-ncr-358.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 359,
+      "company_name": "Delhi NCR Tech Company #359",
+      "career_page": "https://placeholder-career-page-ncr-359.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 360,
+      "company_name": "Delhi NCR Tech Company #360",
+      "career_page": "https://placeholder-career-page-ncr-360.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 361,
+      "company_name": "Delhi NCR Tech Company #361",
+      "career_page": "https://placeholder-career-page-ncr-361.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 362,
+      "company_name": "Delhi NCR Tech Company #362",
+      "career_page": "https://placeholder-career-page-ncr-362.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 363,
+      "company_name": "Delhi NCR Tech Company #363",
+      "career_page": "https://placeholder-career-page-ncr-363.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 364,
+      "company_name": "Delhi NCR Tech Company #364",
+      "career_page": "https://placeholder-career-page-ncr-364.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 365,
+      "company_name": "Delhi NCR Tech Company #365",
+      "career_page": "https://placeholder-career-page-ncr-365.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 366,
+      "company_name": "Delhi NCR Tech Company #366",
+      "career_page": "https://placeholder-career-page-ncr-366.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 367,
+      "company_name": "Delhi NCR Tech Company #367",
+      "career_page": "https://placeholder-career-page-ncr-367.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 368,
+      "company_name": "Delhi NCR Tech Company #368",
+      "career_page": "https://placeholder-career-page-ncr-368.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 369,
+      "company_name": "Delhi NCR Tech Company #369",
+      "career_page": "https://placeholder-career-page-ncr-369.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 370,
+      "company_name": "Delhi NCR Tech Company #370",
+      "career_page": "https://placeholder-career-page-ncr-370.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 371,
+      "company_name": "Delhi NCR Tech Company #371",
+      "career_page": "https://placeholder-career-page-ncr-371.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 372,
+      "company_name": "Delhi NCR Tech Company #372",
+      "career_page": "https://placeholder-career-page-ncr-372.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 373,
+      "company_name": "Delhi NCR Tech Company #373",
+      "career_page": "https://placeholder-career-page-ncr-373.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 374,
+      "company_name": "Delhi NCR Tech Company #374",
+      "career_page": "https://placeholder-career-page-ncr-374.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 375,
+      "company_name": "Delhi NCR Tech Company #375",
+      "career_page": "https://placeholder-career-page-ncr-375.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 376,
+      "company_name": "Delhi NCR Tech Company #376",
+      "career_page": "https://placeholder-career-page-ncr-376.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 377,
+      "company_name": "Delhi NCR Tech Company #377",
+      "career_page": "https://placeholder-career-page-ncr-377.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 378,
+      "company_name": "Delhi NCR Tech Company #378",
+      "career_page": "https://placeholder-career-page-ncr-378.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 379,
+      "company_name": "Delhi NCR Tech Company #379",
+      "career_page": "https://placeholder-career-page-ncr-379.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 380,
+      "company_name": "Delhi NCR Tech Company #380",
+      "career_page": "https://placeholder-career-page-ncr-380.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 381,
+      "company_name": "Delhi NCR Tech Company #381",
+      "career_page": "https://placeholder-career-page-ncr-381.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 382,
+      "company_name": "Delhi NCR Tech Company #382",
+      "career_page": "https://placeholder-career-page-ncr-382.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 383,
+      "company_name": "Delhi NCR Tech Company #383",
+      "career_page": "https://placeholder-career-page-ncr-383.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 384,
+      "company_name": "Delhi NCR Tech Company #384",
+      "career_page": "https://placeholder-career-page-ncr-384.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 385,
+      "company_name": "Delhi NCR Tech Company #385",
+      "career_page": "https://placeholder-career-page-ncr-385.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 386,
+      "company_name": "Delhi NCR Tech Company #386",
+      "career_page": "https://placeholder-career-page-ncr-386.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 387,
+      "company_name": "Delhi NCR Tech Company #387",
+      "career_page": "https://placeholder-career-page-ncr-387.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 388,
+      "company_name": "Delhi NCR Tech Company #388",
+      "career_page": "https://placeholder-career-page-ncr-388.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 389,
+      "company_name": "Delhi NCR Tech Company #389",
+      "career_page": "https://placeholder-career-page-ncr-389.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 390,
+      "company_name": "Delhi NCR Tech Company #390",
+      "career_page": "https://placeholder-career-page-ncr-390.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 391,
+      "company_name": "Delhi NCR Tech Company #391",
+      "career_page": "https://placeholder-career-page-ncr-391.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 392,
+      "company_name": "Delhi NCR Tech Company #392",
+      "career_page": "https://placeholder-career-page-ncr-392.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 393,
+      "company_name": "Delhi NCR Tech Company #393",
+      "career_page": "https://placeholder-career-page-ncr-393.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 394,
+      "company_name": "Delhi NCR Tech Company #394",
+      "career_page": "https://placeholder-career-page-ncr-394.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 395,
+      "company_name": "Delhi NCR Tech Company #395",
+      "career_page": "https://placeholder-career-page-ncr-395.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 396,
+      "company_name": "Delhi NCR Tech Company #396",
+      "career_page": "https://placeholder-career-page-ncr-396.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 397,
+      "company_name": "Delhi NCR Tech Company #397",
+      "career_page": "https://placeholder-career-page-ncr-397.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 398,
+      "company_name": "Delhi NCR Tech Company #398",
+      "career_page": "https://placeholder-career-page-ncr-398.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 399,
+      "company_name": "Delhi NCR Tech Company #399",
+      "career_page": "https://placeholder-career-page-ncr-399.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 400,
+      "company_name": "Delhi NCR Tech Company #400",
+      "career_page": "https://placeholder-career-page-ncr-400.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 401,
+      "company_name": "Delhi NCR Tech Company #401",
+      "career_page": "https://placeholder-career-page-ncr-401.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 402,
+      "company_name": "Delhi NCR Tech Company #402",
+      "career_page": "https://placeholder-career-page-ncr-402.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 403,
+      "company_name": "Delhi NCR Tech Company #403",
+      "career_page": "https://placeholder-career-page-ncr-403.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 404,
+      "company_name": "Delhi NCR Tech Company #404",
+      "career_page": "https://placeholder-career-page-ncr-404.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 405,
+      "company_name": "Delhi NCR Tech Company #405",
+      "career_page": "https://placeholder-career-page-ncr-405.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 406,
+      "company_name": "Delhi NCR Tech Company #406",
+      "career_page": "https://placeholder-career-page-ncr-406.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 407,
+      "company_name": "Delhi NCR Tech Company #407",
+      "career_page": "https://placeholder-career-page-ncr-407.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 408,
+      "company_name": "Delhi NCR Tech Company #408",
+      "career_page": "https://placeholder-career-page-ncr-408.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 409,
+      "company_name": "Delhi NCR Tech Company #409",
+      "career_page": "https://placeholder-career-page-ncr-409.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 410,
+      "company_name": "Delhi NCR Tech Company #410",
+      "career_page": "https://placeholder-career-page-ncr-410.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 411,
+      "company_name": "Delhi NCR Tech Company #411",
+      "career_page": "https://placeholder-career-page-ncr-411.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 412,
+      "company_name": "Delhi NCR Tech Company #412",
+      "career_page": "https://placeholder-career-page-ncr-412.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 413,
+      "company_name": "Delhi NCR Tech Company #413",
+      "career_page": "https://placeholder-career-page-ncr-413.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 414,
+      "company_name": "Delhi NCR Tech Company #414",
+      "career_page": "https://placeholder-career-page-ncr-414.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 415,
+      "company_name": "Delhi NCR Tech Company #415",
+      "career_page": "https://placeholder-career-page-ncr-415.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 416,
+      "company_name": "Delhi NCR Tech Company #416",
+      "career_page": "https://placeholder-career-page-ncr-416.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 417,
+      "company_name": "Delhi NCR Tech Company #417",
+      "career_page": "https://placeholder-career-page-ncr-417.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 418,
+      "company_name": "Delhi NCR Tech Company #418",
+      "career_page": "https://placeholder-career-page-ncr-418.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 419,
+      "company_name": "Delhi NCR Tech Company #419",
+      "career_page": "https://placeholder-career-page-ncr-419.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 420,
+      "company_name": "Delhi NCR Tech Company #420",
+      "career_page": "https://placeholder-career-page-ncr-420.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 421,
+      "company_name": "Delhi NCR Tech Company #421",
+      "career_page": "https://placeholder-career-page-ncr-421.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 422,
+      "company_name": "Delhi NCR Tech Company #422",
+      "career_page": "https://placeholder-career-page-ncr-422.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 423,
+      "company_name": "Delhi NCR Tech Company #423",
+      "career_page": "https://placeholder-career-page-ncr-423.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 424,
+      "company_name": "Delhi NCR Tech Company #424",
+      "career_page": "https://placeholder-career-page-ncr-424.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 425,
+      "company_name": "Delhi NCR Tech Company #425",
+      "career_page": "https://placeholder-career-page-ncr-425.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 426,
+      "company_name": "Delhi NCR Tech Company #426",
+      "career_page": "https://placeholder-career-page-ncr-426.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 427,
+      "company_name": "Delhi NCR Tech Company #427",
+      "career_page": "https://placeholder-career-page-ncr-427.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 428,
+      "company_name": "Delhi NCR Tech Company #428",
+      "career_page": "https://placeholder-career-page-ncr-428.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 429,
+      "company_name": "Delhi NCR Tech Company #429",
+      "career_page": "https://placeholder-career-page-ncr-429.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 430,
+      "company_name": "Delhi NCR Tech Company #430",
+      "career_page": "https://placeholder-career-page-ncr-430.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 431,
+      "company_name": "Delhi NCR Tech Company #431",
+      "career_page": "https://placeholder-career-page-ncr-431.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 432,
+      "company_name": "Delhi NCR Tech Company #432",
+      "career_page": "https://placeholder-career-page-ncr-432.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 433,
+      "company_name": "Delhi NCR Tech Company #433",
+      "career_page": "https://placeholder-career-page-ncr-433.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 434,
+      "company_name": "Delhi NCR Tech Company #434",
+      "career_page": "https://placeholder-career-page-ncr-434.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 435,
+      "company_name": "Delhi NCR Tech Company #435",
+      "career_page": "https://placeholder-career-page-ncr-435.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 436,
+      "company_name": "Delhi NCR Tech Company #436",
+      "career_page": "https://placeholder-career-page-ncr-436.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 437,
+      "company_name": "Delhi NCR Tech Company #437",
+      "career_page": "https://placeholder-career-page-ncr-437.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 438,
+      "company_name": "Delhi NCR Tech Company #438",
+      "career_page": "https://placeholder-career-page-ncr-438.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 439,
+      "company_name": "Delhi NCR Tech Company #439",
+      "career_page": "https://placeholder-career-page-ncr-439.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 440,
+      "company_name": "Delhi NCR Tech Company #440",
+      "career_page": "https://placeholder-career-page-ncr-440.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 441,
+      "company_name": "Delhi NCR Tech Company #441",
+      "career_page": "https://placeholder-career-page-ncr-441.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 442,
+      "company_name": "Delhi NCR Tech Company #442",
+      "career_page": "https://placeholder-career-page-ncr-442.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 443,
+      "company_name": "Delhi NCR Tech Company #443",
+      "career_page": "https://placeholder-career-page-ncr-443.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 444,
+      "company_name": "Delhi NCR Tech Company #444",
+      "career_page": "https://placeholder-career-page-ncr-444.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 445,
+      "company_name": "Delhi NCR Tech Company #445",
+      "career_page": "https://placeholder-career-page-ncr-445.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 446,
+      "company_name": "Delhi NCR Tech Company #446",
+      "career_page": "https://placeholder-career-page-ncr-446.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 447,
+      "company_name": "Delhi NCR Tech Company #447",
+      "career_page": "https://placeholder-career-page-ncr-447.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 448,
+      "company_name": "Delhi NCR Tech Company #448",
+      "career_page": "https://placeholder-career-page-ncr-448.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 449,
+      "company_name": "Delhi NCR Tech Company #449",
+      "career_page": "https://placeholder-career-page-ncr-449.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 450,
+      "company_name": "Delhi NCR Tech Company #450",
+      "career_page": "https://placeholder-career-page-ncr-450.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 451,
+      "company_name": "Delhi NCR Tech Company #451",
+      "career_page": "https://placeholder-career-page-ncr-451.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 452,
+      "company_name": "Delhi NCR Tech Company #452",
+      "career_page": "https://placeholder-career-page-ncr-452.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 453,
+      "company_name": "Delhi NCR Tech Company #453",
+      "career_page": "https://placeholder-career-page-ncr-453.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 454,
+      "company_name": "Delhi NCR Tech Company #454",
+      "career_page": "https://placeholder-career-page-ncr-454.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 455,
+      "company_name": "Delhi NCR Tech Company #455",
+      "career_page": "https://placeholder-career-page-ncr-455.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 456,
+      "company_name": "Delhi NCR Tech Company #456",
+      "career_page": "https://placeholder-career-page-ncr-456.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 457,
+      "company_name": "Delhi NCR Tech Company #457",
+      "career_page": "https://placeholder-career-page-ncr-457.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 458,
+      "company_name": "Delhi NCR Tech Company #458",
+      "career_page": "https://placeholder-career-page-ncr-458.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 459,
+      "company_name": "Delhi NCR Tech Company #459",
+      "career_page": "https://placeholder-career-page-ncr-459.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 460,
+      "company_name": "Delhi NCR Tech Company #460",
+      "career_page": "https://placeholder-career-page-ncr-460.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 461,
+      "company_name": "Delhi NCR Tech Company #461",
+      "career_page": "https://placeholder-career-page-ncr-461.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 462,
+      "company_name": "Delhi NCR Tech Company #462",
+      "career_page": "https://placeholder-career-page-ncr-462.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 463,
+      "company_name": "Delhi NCR Tech Company #463",
+      "career_page": "https://placeholder-career-page-ncr-463.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 464,
+      "company_name": "Delhi NCR Tech Company #464",
+      "career_page": "https://placeholder-career-page-ncr-464.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 465,
+      "company_name": "Delhi NCR Tech Company #465",
+      "career_page": "https://placeholder-career-page-ncr-465.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 466,
+      "company_name": "Delhi NCR Tech Company #466",
+      "career_page": "https://placeholder-career-page-ncr-466.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 467,
+      "company_name": "Delhi NCR Tech Company #467",
+      "career_page": "https://placeholder-career-page-ncr-467.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 468,
+      "company_name": "Delhi NCR Tech Company #468",
+      "career_page": "https://placeholder-career-page-ncr-468.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 469,
+      "company_name": "Delhi NCR Tech Company #469",
+      "career_page": "https://placeholder-career-page-ncr-469.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 470,
+      "company_name": "Delhi NCR Tech Company #470",
+      "career_page": "https://placeholder-career-page-ncr-470.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 471,
+      "company_name": "Delhi NCR Tech Company #471",
+      "career_page": "https://placeholder-career-page-ncr-471.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 472,
+      "company_name": "Delhi NCR Tech Company #472",
+      "career_page": "https://placeholder-career-page-ncr-472.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 473,
+      "company_name": "Delhi NCR Tech Company #473",
+      "career_page": "https://placeholder-career-page-ncr-473.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 474,
+      "company_name": "Delhi NCR Tech Company #474",
+      "career_page": "https://placeholder-career-page-ncr-474.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 475,
+      "company_name": "Delhi NCR Tech Company #475",
+      "career_page": "https://placeholder-career-page-ncr-475.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 476,
+      "company_name": "Delhi NCR Tech Company #476",
+      "career_page": "https://placeholder-career-page-ncr-476.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 477,
+      "company_name": "Delhi NCR Tech Company #477",
+      "career_page": "https://placeholder-career-page-ncr-477.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 478,
+      "company_name": "Delhi NCR Tech Company #478",
+      "career_page": "https://placeholder-career-page-ncr-478.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 479,
+      "company_name": "Delhi NCR Tech Company #479",
+      "career_page": "https://placeholder-career-page-ncr-479.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 480,
+      "company_name": "Delhi NCR Tech Company #480",
+      "career_page": "https://placeholder-career-page-ncr-480.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 481,
+      "company_name": "Delhi NCR Tech Company #481",
+      "career_page": "https://placeholder-career-page-ncr-481.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 482,
+      "company_name": "Delhi NCR Tech Company #482",
+      "career_page": "https://placeholder-career-page-ncr-482.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 483,
+      "company_name": "Delhi NCR Tech Company #483",
+      "career_page": "https://placeholder-career-page-ncr-483.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 484,
+      "company_name": "Delhi NCR Tech Company #484",
+      "career_page": "https://placeholder-career-page-ncr-484.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 485,
+      "company_name": "Delhi NCR Tech Company #485",
+      "career_page": "https://placeholder-career-page-ncr-485.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 486,
+      "company_name": "Delhi NCR Tech Company #486",
+      "career_page": "https://placeholder-career-page-ncr-486.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 487,
+      "company_name": "Delhi NCR Tech Company #487",
+      "career_page": "https://placeholder-career-page-ncr-487.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 488,
+      "company_name": "Delhi NCR Tech Company #488",
+      "career_page": "https://placeholder-career-page-ncr-488.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 489,
+      "company_name": "Delhi NCR Tech Company #489",
+      "career_page": "https://placeholder-career-page-ncr-489.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 490,
+      "company_name": "Delhi NCR Tech Company #490",
+      "career_page": "https://placeholder-career-page-ncr-490.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 491,
+      "company_name": "Delhi NCR Tech Company #491",
+      "career_page": "https://placeholder-career-page-ncr-491.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 492,
+      "company_name": "Delhi NCR Tech Company #492",
+      "career_page": "https://placeholder-career-page-ncr-492.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 493,
+      "company_name": "Delhi NCR Tech Company #493",
+      "career_page": "https://placeholder-career-page-ncr-493.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 494,
+      "company_name": "Delhi NCR Tech Company #494",
+      "career_page": "https://placeholder-career-page-ncr-494.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 495,
+      "company_name": "Delhi NCR Tech Company #495",
+      "career_page": "https://placeholder-career-page-ncr-495.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 496,
+      "company_name": "Delhi NCR Tech Company #496",
+      "career_page": "https://placeholder-career-page-ncr-496.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 497,
+      "company_name": "Delhi NCR Tech Company #497",
+      "career_page": "https://placeholder-career-page-ncr-497.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 498,
+      "company_name": "Delhi NCR Tech Company #498",
+      "career_page": "https://placeholder-career-page-ncr-498.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 499,
+      "company_name": "Delhi NCR Tech Company #499",
+      "career_page": "https://placeholder-career-page-ncr-499.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    },
+    {
+      "rank": 500,
+      "company_name": "Delhi NCR Tech Company #500",
+      "career_page": "https://placeholder-career-page-ncr-500.com/careers",
+      "grade": "B",
+      "verified": false,
+      "http_status": null,
+      "final_url": null,
+      "verified_at": null
+    }
+  ]
+}

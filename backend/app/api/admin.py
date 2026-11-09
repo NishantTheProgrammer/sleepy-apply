@@ -431,6 +431,7 @@ class StartCrawlerRequest(BaseModel):
     companies: list[str] | None = None
     headless: bool = False
     limit_per_company: int = 5
+    restart: bool = False
 
 
 @router.post("/crawler/start")
@@ -446,6 +447,10 @@ async def start_crawler_batch(
 
     req = body or StartCrawlerRequest()
 
+    if req.restart:
+        from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+        CrawlCheckpoint().reset()
+
     async def _runner():
         await crawler_manager.run_batch(
             companies=req.companies,
@@ -456,15 +461,33 @@ async def start_crawler_batch(
     background_tasks.add_task(_runner)
     return {
         "ok": True,
-        "message": "AI Browser Crawler started across target companies.",
+        "message": "AI Browser Crawler started across Delhi NCR target companies.",
         "status": crawler_manager.get_status(),
     }
+
+
+@router.post("/crawler/reset")
+async def reset_crawler_checkpoint(admin_id: str = Depends(require_admin)):
+    """Reset Delhi NCR crawler checkpoint to restart from rank 1."""
+    from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+    checkpoint = CrawlCheckpoint()
+    checkpoint.reset()
+    return {"ok": True, "message": "Delhi NCR crawler checkpoint reset to rank 1."}
 
 
 @router.get("/crawler/status")
 async def get_crawler_status(admin_id: str = Depends(require_admin)):
     """Retrieve live status and progress of the AI Browser Crawler."""
-    return crawler_manager.get_status()
+    from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+    status = crawler_manager.get_status()
+    checkpoint = CrawlCheckpoint()
+    status["checkpoint"] = {
+        "completed_count": len(checkpoint.data.get("completed_ranks", [])),
+        "total_jobs_discovered": checkpoint.data.get("stats", {}).get("total_jobs_discovered", 0),
+        "total_jobs_saved": checkpoint.data.get("stats", {}).get("total_jobs_saved", 0),
+        "last_updated": checkpoint.data.get("updated_at"),
+    }
+    return status
 
 
 @router.get("/logs")

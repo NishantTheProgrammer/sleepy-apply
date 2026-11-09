@@ -1,0 +1,71 @@
+{
+  "source_file": "",
+  "started_at": "2026-11-09T11:09:01.462260+00:00",
+  "updated_at": "2026-11-09T11:10:19.438333+00:00",
+  "completed_ranks": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "stats": {
+    "total_crawled": 5,
+    "total_jobs_discovered": 5,
+    "total_jobs_saved": 1,
+    "captchas_encountered": 0,
+    "errors_encountered": 3
+  },
+  "history": [
+    {
+      "rank": 1,
+      "company_name": "Zomato",
+      "url": "https://www.zomato.com/careers",
+      "status": "ERROR: Page.evaluate: SyntaxError: In",
+      "jobs_found": 0,
+      "jobs_new": 0,
+      "error": "Page.evaluate: SyntaxError: Invalid regular expression: missing /\n    at eval (<anonymous>)\n    at UtilityScript.evaluate (<anonymous>:370:30)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+      "timestamp": "2026-11-09T11:09:19.845407+00:00"
+    },
+    {
+      "rank": 2,
+      "company_name": "Blinkit",
+      "url": "https://blinkit.com/careers",
+      "status": "ERROR: Page.evaluate: SyntaxError: In",
+      "jobs_found": 0,
+      "jobs_new": 0,
+      "error": "Page.evaluate: SyntaxError: Invalid regular expression: missing /\n    at eval (<anonymous>)\n    at UtilityScript.evaluate (<anonymous>:370:30)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+      "timestamp": "2026-11-09T11:09:43.217001+00:00"
+    },
+    {
+      "rank": 3,
+      "company_name": "Paytm",
+      "url": "https://jobs.lever.co/paytm",
+      "status": "SUCCESS",
+      "jobs_found": 3,
+      "jobs_new": 1,
+      "error": null,
+      "timestamp": "2026-11-09T11:09:55.216922+00:00"
+    },
+    {
+      "rank": 4,
+      "company_name": "Delhivery",
+      "url": "https://www.delhivery.com/careers",
+      "status": "ERROR: Page.evaluate: SyntaxError: In",
+      "jobs_found": 0,
+      "jobs_new": 0,
+      "error": "Page.evaluate: SyntaxError: Invalid regular expression: missing /\n    at eval (<anonymous>)\n    at UtilityScript.evaluate (<anonymous>:370:30)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+      "timestamp": "2026-11-09T11:10:08.109760+00:00"
+    },
+    {
+      "rank": 5,
+      "company_name": "Lenskart",
+      "url": "https://hiring.lenskart.com/",
+      "status": "SUCCESS",
+      "jobs_found": 2,
+      "jobs_new": 0,
+      "error": null,
+      "timestamp": "2026-11-09T11:10:19.438269+00:00"
+    }
+  ]
+}

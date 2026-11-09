@@ -15,72 +15,55 @@ from app.agents.job_matcher import JobMatcherAgent
 from app.pipeline.role_search import get_unique_user_selected_roles
 from app.core.system_logger import log_system_event
 
+from app.scripts.crawl_delhi_ncr_companies import (
+    load_companies,
+    resolve_target_file,
+    CrawlCheckpoint,
+    DEFAULT_CHECKPOINT_FILE,
+)
+
 logger = structlog.get_logger()
 
-# 10 Curated Top Delhi NCR & Remote India Tech Companies
-TARGET_COMPANIES = [
-    {
-        "name": "Paytm",
-        "url": "https://jobs.lever.co/paytm",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "Delhivery",
-        "url": "https://www.delhivery.com/careers",
-        "default_query": "Engineer",
-    },
-    {
-        "name": "Lenskart",
-        "url": "https://hiring.lenskart.com/",
-        "default_query": "Engineer",
-    },
-    {
-        "name": "Pine Labs",
-        "url": "https://www.pinelabs.com/careers",
-        "default_query": "Engineer",
-    },
-    {
-        "name": "Publicis Sapient",
-        "url": "https://careers.publicissapient.com/job-search",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "Cars24",
-        "url": "https://www.cars24.com/careers/",
-        "default_query": "Engineer",
-    },
-    {
-        "name": "Meesho",
-        "url": "https://jobs.lever.co/meesho",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "BrowserStack",
-        "url": "https://www.browserstack.com/careers",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "MongoDB",
-        "url": "https://www.mongodb.com/careers",
-        "default_query": "Software Engineer",
-    },
-    {
-        "name": "Uber",
-        "url": "https://www.uber.com/in/en/careers/",
-        "default_query": "Software Engineer",
-    },
-]
+
+def get_default_targets(
+    companies: list[str] | None = None,
+    grade: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Dynamically load verified Delhi NCR tech companies from JSON dataset."""
+    try:
+        resolved_file = resolve_target_file()
+        grade_filters = [g.strip().upper() for g in grade.split(",")] if grade else None
+        _, targets = load_companies(
+            file_path=resolved_file,
+            grade_filter=grade_filters,
+            skip_placeholders=True,
+            name_filter=companies,
+        )
+        if limit:
+            targets = targets[:limit]
+        return targets
+    except Exception as e:
+        logger.warning("Could not load Delhi NCR companies dataset, using fallback", error=str(e))
+        return [
+            {"rank": 1, "name": "Zomato", "url": "https://www.zomato.com/careers", "grade": "S"},
+            {"rank": 2, "name": "Blinkit", "url": "https://blinkit.com/careers", "grade": "S"},
+            {"rank": 3, "name": "Paytm", "url": "https://jobs.lever.co/paytm", "grade": "S"},
+            {"rank": 4, "name": "Delhivery", "url": "https://www.delhivery.com/careers", "grade": "S"},
+            {"rank": 5, "name": "Lenskart", "url": "https://hiring.lenskart.com/", "grade": "A"},
+        ]
 
 
 class CrawlerManager:
     """Manages background batch runs of the AI browser crawler with real-time status reporting."""
 
     def __init__(self):
+        initial_targets = get_default_targets(limit=25)
         self.state: dict[str, Any] = {
             "is_running": False,
             "current_company": None,
             "current_index": 0,
-            "total_companies": len(TARGET_COMPANIES),
+            "total_companies": len(initial_targets),
             "percent": 0,
             "status_message": "Ready",
             "jobs_discovered": 0,
@@ -106,13 +89,8 @@ class CrawlerManager:
             if self.state["is_running"]:
                 return {"ok": False, "message": "Crawler is already running"}
 
-            # Filter targets if requested
-            targets = TARGET_COMPANIES
-            if companies:
-                c_set = {c.strip().lower() for c in companies if c.strip()}
-                targets = [t for t in TARGET_COMPANIES if any(cs in t["name"].lower() for cs in c_set)]
-                if not targets:
-                    targets = TARGET_COMPANIES
+            checkpoint = CrawlCheckpoint()
+            targets = get_default_targets(companies=companies)
 
             now_iso = datetime.now(timezone.utc).isoformat()
             self.state = {
@@ -121,7 +99,7 @@ class CrawlerManager:
                 "current_index": 0,
                 "total_companies": len(targets),
                 "percent": 0,
-                "status_message": f"Starting batch crawl across {len(targets)} companies...",
+                "status_message": f"Starting batch crawl across {len(targets)} Delhi NCR companies...",
                 "jobs_discovered": 0,
                 "jobs_saved": 0,
                 "captchas_encountered": 0,
@@ -147,8 +125,14 @@ class CrawlerManager:
             agent = AICareerCrawlerAgent()
 
             for idx, target in enumerate(targets, 1):
+                rank = target.get("rank", idx)
                 comp_name = target["name"]
                 career_url = target["url"]
+
+                if checkpoint.is_completed(rank) and not companies:
+                    logger.info("Skipping already completed company from checkpoint", company=comp_name, rank=rank)
+                    continue
+
                 # Sanitize query: strip parenthetical qualifications like "(Node.js & React)" so ATS search bars don't fail
                 if primary_query:
                     clean_role = re.sub(r'\(.*?\)', '', primary_query).strip()
@@ -274,12 +258,21 @@ class CrawlerManager:
 
                     self.state["jobs_discovered"] += len(jobs)
                     self.state["jobs_saved"] += new_count
+                    status_str = "SUCCESS" if len(jobs) > 0 else "NO_JOBS"
                     self.state["history"].append({
                         "company": comp_name,
-                        "status": "SUCCESS" if len(jobs) > 0 else "NO_JOBS",
+                        "status": status_str,
                         "jobs_found": len(jobs),
                         "new_saved": new_count,
                     })
+                    checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=status_str,
+                        jobs_found=len(jobs),
+                        jobs_new=new_count,
+                    )
 
                 except CaptchaDetectedException as ce:
                     self.state["captchas_encountered"] += 1
@@ -290,6 +283,15 @@ class CrawlerManager:
                         "jobs_found": 0,
                         "new_saved": 0,
                     })
+                    checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=f"CAPTCHA: {ce.captcha_type[:15]}",
+                        jobs_found=0,
+                        jobs_new=0,
+                        error_msg=str(ce),
+                    )
                     logger.warning("Crawler aborted on CAPTCHA", company=comp_name, captcha=ce.captcha_type)
 
                 except Exception as e:
@@ -300,6 +302,15 @@ class CrawlerManager:
                         "jobs_found": 0,
                         "new_saved": 0,
                     })
+                    checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=f"ERROR: {str(e)[:30]}",
+                        jobs_found=0,
+                        jobs_new=0,
+                        error_msg=str(e),
+                    )
                     logger.error("Crawler error on company", company=comp_name, error=str(e))
                     await log_system_event(
                         level="ERROR",

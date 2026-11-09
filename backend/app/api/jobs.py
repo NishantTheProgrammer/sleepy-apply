@@ -39,6 +39,42 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
     return {"ok": True, "message": "Jobs matched and discovery running in background"}
 
 
+@router.post("/crawl-delhi-ncr")
+async def trigger_crawl_delhi_ncr(request: Request, background_tasks: BackgroundTasks):
+    """Trigger resumable Delhi NCR career crawler for current candidate."""
+    user_id = get_current_user_id(request)
+    from app.agents.crawler_manager import crawler_manager
+    status = crawler_manager.get_status()
+    if status.get("is_running"):
+        return {"ok": False, "message": "Delhi NCR crawler is already active and running."}
+
+    async def _runner():
+        await crawler_manager.run_batch(headless=True, limit_per_company=5)
+
+    background_tasks.add_task(_runner)
+    return {
+        "ok": True,
+        "message": "AI Browser Crawler started across top Delhi NCR tech companies. Postings will appear under 'Career Crawled'.",
+        "status": crawler_manager.get_status(),
+    }
+
+
+@router.get("/crawler-status")
+async def get_user_crawler_status(request: Request):
+    """Retrieve live status of the Delhi NCR crawler for candidate UI."""
+    get_current_user_id(request)
+    from app.agents.crawler_manager import crawler_manager
+    from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+    status = crawler_manager.get_status()
+    checkpoint = CrawlCheckpoint()
+    status["checkpoint"] = {
+        "completed_count": len(checkpoint.data.get("completed_ranks", [])),
+        "total_jobs_discovered": checkpoint.data.get("stats", {}).get("total_jobs_discovered", 0),
+        "total_jobs_saved": checkpoint.data.get("stats", {}).get("total_jobs_saved", 0),
+    }
+    return status
+
+
 @router.get("")
 async def list_jobs(
     request: Request,

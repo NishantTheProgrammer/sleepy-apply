@@ -5,7 +5,7 @@ import {
   Users, Briefcase, Zap, Activity, ShieldCheck, ShieldAlert,
   Loader2, Sparkles, RefreshCw, CheckCircle, AlertCircle, ArrowUpRight,
   UserCheck, UserX, Clock, Globe, ChevronRight, Building2, ExternalLink,
-  Plus, Search, Trash2, Check, X, Filter, ScrollText, AlertTriangle, Terminal, ChevronDown
+  Plus, Search, Trash2, Check, X, Filter, ScrollText, AlertTriangle, Terminal, ChevronDown, Bot
 } from "lucide-react";
 import { adminApi, companiesApi, TargetCompany, SystemLogRecord } from "@/lib/api";
 import Link from "next/link";
@@ -384,7 +384,13 @@ export default function AdminPage() {
           <p className="text-slate-500 text-xs mt-0.5">Manage users, monitor scraper pipelines, and inspect real-time platform operations</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href="/admin/jobs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 hover:from-fuchsia-600/40 hover:to-purple-600/40 text-fuchsia-200 border border-fuchsia-500/40 text-xs font-bold transition-all shadow-md shadow-fuchsia-600/20 cursor-pointer"
+          >
+            <Bot className="w-3.5 h-3.5 text-fuchsia-400" /> Delhi NCR Crawler
+          </Link>
           <button
             onClick={loadAll}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer"

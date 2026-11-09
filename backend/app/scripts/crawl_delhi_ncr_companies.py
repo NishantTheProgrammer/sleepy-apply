@@ -39,8 +39,14 @@ from app.pipeline.role_search import get_unique_user_selected_roles
 logger = structlog.get_logger()
 
 DEFAULT_JSON_PATHS = [
+    os.path.abspath(os.path.join(backend_root, "delhi_ncr_tech_companies.json")),
+    os.path.abspath(os.path.join(backend_root, "..", "delhi_ncr_tech_companies.json")),
+    os.path.abspath(os.path.join(os.getcwd(), "delhi_ncr_tech_companies.json")),
+    os.path.abspath("/Users/nishant/Desktop/delhi_ncr_tech_companies.json"),
+    os.path.abspath(os.path.join(backend_root, "top_500_delhi_ncr_tech.json")),
     os.path.abspath(os.path.join(backend_root, "..", "top_500_delhi_ncr_tech.json")),
     os.path.abspath(os.path.join(os.getcwd(), "top_500_delhi_ncr_tech.json")),
+    os.path.abspath(os.path.join(backend_root, "top_500_tech_companies_india.json")),
     os.path.abspath(os.path.join(backend_root, "..", "top_500_tech_companies_india.json")),
 ]
 
@@ -170,25 +176,42 @@ def load_companies(
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    title = data.get("title", "Delhi NCR Tech Companies")
-    raw_list = data.get("companies", [])
+    if isinstance(data, list):
+        title = "Delhi NCR Tech Companies"
+        raw_list = data
+    else:
+        title = data.get("title", "Delhi NCR Tech Companies")
+        raw_list = data.get("companies", [])
 
     filtered: list[dict[str, Any]] = []
-    for item in raw_list:
-        rank = item.get("rank", 0)
+    for idx, item in enumerate(raw_list, 1):
+        if not item.get("is_active", True):
+            continue
+
+        rank = item.get("rank") or idx
         name = (item.get("company_name") or item.get("name") or "").strip()
         url = (item.get("final_url") or item.get("career_page") or item.get("url") or "").strip()
-        grade = item.get("grade", "B").upper()
-        verified = item.get("verified", False)
+        raw_grade = str(item.get("grade", "B")).strip()
+        grade = raw_grade.upper()
+
+        # Map common tier names: Tier-1 -> S, Tier-2 -> A
+        if grade == "TIER-1":
+            grade = "S"
+        elif grade == "TIER-2":
+            grade = "A"
+
+        is_placeholder = bool(
+            "placeholder" in url.lower() or name.startswith("Delhi NCR Tech Company #")
+        )
+        verified = item.get("verified", not is_placeholder)
 
         # Skip invalid or empty URLs
         if not url or not url.startswith("http"):
             continue
 
         # Skip placeholders
-        if skip_placeholders:
-            if not verified and ("placeholder" in url.lower() or name.startswith("Delhi NCR Tech Company #")):
-                continue
+        if skip_placeholders and is_placeholder:
+            continue
 
         # Rank range filtering
         if start_rank is not None and rank < start_rank:
@@ -197,7 +220,7 @@ def load_companies(
             continue
 
         # Grade filter
-        if grade_filter and grade not in grade_filter:
+        if grade_filter and grade not in grade_filter and raw_grade.upper() not in grade_filter:
             continue
 
         # Name filter
@@ -211,6 +234,9 @@ def load_companies(
             "url": url,
             "grade": grade,
             "verified": verified,
+            "location_hq": item.get("location_hq", ""),
+            "industry": item.get("industry", ""),
+            "ats_type": item.get("ats_type", ""),
         })
 
     # Sort deterministically by rank

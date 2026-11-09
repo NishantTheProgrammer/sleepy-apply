@@ -58,7 +58,7 @@ class CrawlerManager:
     """Manages background batch runs of the AI browser crawler with real-time status reporting."""
 
     def __init__(self):
-        initial_targets = get_default_targets(limit=25)
+        initial_targets = get_default_targets()
         self.state: dict[str, Any] = {
             "is_running": False,
             "current_company": None,

@@ -272,7 +272,7 @@ class AICareerCrawlerAgent:
     ) -> list[RawJobData]:
         """Extract job listings currently visible on the page."""
         raw_items = await page.evaluate(
-            """() => {
+            r"""() => {
                 const results = [];
 
                 // 1. Oracle Cloud HCM (.job-tile)
@@ -284,8 +284,8 @@ class AICareerCrawlerAgent:
                         const locEl = tile.querySelector('.job-tile__subheader, [class*="subheader"], [class*="location"]');
                         const title = titleEl ? titleEl.innerText.trim() : '';
                         let loc = locEl ? locEl.innerText.trim() : '';
-                        loc = loc.replace(/Posting Date\\s*\\d{1,2}\\/\\d{1,2}\\/\\d{4}/gi, '')
-                                 .replace(/Job Location\\s*(Signed)?/gi, '')
+                        loc = loc.replace(/Posting Date[^\r\n]+/gi, '')
+                                 .replace(/Job Location/gi, '')
                                  .replace(/(BE THE FIRST TO APPLY|TRENDING|HOT JOB)/gi, '')
                                  .trim();
                         const href = link ? link.href : window.location.href;
@@ -312,7 +312,7 @@ class AICareerCrawlerAgent:
                             let loc = locEl ? locEl.innerText.trim() : '';
                             const cat = c.querySelector('.posting-categories, .categories, .meta');
                             if (cat && (!loc || /^(on-site|hybrid|remote)/i.test(loc) || loc.includes('—'))) {
-                                loc = cat.innerText.replace(/[\n\r\t]+/g, ' ').trim();
+                                loc = cat.innerText.replace(/\s+/g, ' ').trim();
                             }
                             const title = titleEl ? titleEl.innerText.trim().split('\n')[0] : '';
                             const href = link ? link.href : window.location.href;
@@ -328,7 +328,7 @@ class AICareerCrawlerAgent:
                 const anchors = document.querySelectorAll('a[href*="/job/"], a[href*="/jobs/"], a[href*="/career/"], a[href*="/position/"]');
                 anchors.forEach(a => {
                     const txt = a.innerText.trim();
-                    const lines = txt.split('\\n').map(l => l.trim()).filter(Boolean);
+                    const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
                     if (lines.length > 0) {
                         const first = lines[0];
                         if (first.length >= 4 && first.length <= 95 && !/^(view all|careers|search|apply|about)$/i.test(first)) {

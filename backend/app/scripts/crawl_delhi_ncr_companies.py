@@ -50,25 +50,25 @@ DEFAULT_JSON_PATHS = [
     os.path.abspath(os.path.join(backend_root, "..", "top_500_tech_companies_india.json")),
 ]
 
-DEFAULT_CHECKPOINT_FILE = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), ".crawl_checkpoint_delhi_ncr.json")
-)
+DEFAULT_CHECKPOINT_ID = "delhi_ncr_crawler"
 
 
 # ---------------------------------------------------------------------------
-# Checkpoint & State Management
+# Checkpoint & State Management (MongoDB db.crawler_checkpoints)
 # ---------------------------------------------------------------------------
 
 class CrawlCheckpoint:
-    """Thread-safe persistent checkpoint tracking crawled companies, jobs found, and failures."""
+    """MongoDB-backed persistent checkpoint tracking crawled companies, jobs found, and failures."""
 
-    def __init__(self, filepath: str = DEFAULT_CHECKPOINT_FILE):
-        self.filepath = filepath
+    def __init__(self, doc_id: str = DEFAULT_CHECKPOINT_ID):
+        self.doc_id = doc_id
         self.data: dict[str, Any] = {
+            "_id": self.doc_id,
             "source_file": "",
             "started_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "completed_ranks": [],
+            "completed_companies": [],
             "stats": {
                 "total_crawled": 0,
                 "total_jobs_discovered": 0,
@@ -78,39 +78,101 @@ class CrawlCheckpoint:
             },
             "history": [],
         }
-        self.load()
 
-    def load(self) -> None:
-        if os.path.exists(self.filepath):
-            try:
-                with open(self.filepath, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    self.data.update(loaded)
-            except Exception as e:
-                logger.warning("Could not read checkpoint file, starting fresh", error=str(e))
-
-    def save(self) -> None:
-        self.data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        temp_file = f"{self.filepath}.tmp"
+    async def load(self) -> dict[str, Any]:
+        """Load checkpoint state from MongoDB db.crawler_checkpoints."""
         try:
-            with open(temp_file, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
-            os.replace(temp_file, self.filepath)
+            db = get_db()
+            doc = await db.crawler_checkpoints.find_one({"_id": self.doc_id})
+            if doc:
+                self.data.update(doc)
         except Exception as e:
-            logger.error("Failed to write checkpoint file", error=str(e))
+            logger.warning("Could not read checkpoint from async MongoDB, trying sync fallback", error=str(e))
+            self._load_sync()
+        return self.data
 
-    def reset(self) -> None:
-        if os.path.exists(self.filepath):
-            try:
-                os.remove(self.filepath)
-            except Exception:
-                pass
-        self.__init__(self.filepath)
+    def _load_sync(self) -> None:
+        try:
+            from pymongo import MongoClient
+            from app.core.config import get_settings
+            client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
+            doc = client[get_settings().mongodb_db_name]["crawler_checkpoints"].find_one({"_id": self.doc_id})
+            if doc:
+                self.data.update(doc)
+            client.close()
+        except Exception:
+            pass
 
-    def is_completed(self, rank: int) -> bool:
-        return rank in self.data.get("completed_ranks", [])
+    async def save(self) -> None:
+        """Persist checkpoint state to MongoDB db.crawler_checkpoints."""
+        self.data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        try:
+            db = get_db()
+            await db.crawler_checkpoints.replace_one(
+                {"_id": self.doc_id},
+                self.data,
+                upsert=True,
+            )
+        except Exception as e:
+            logger.error("Failed to save checkpoint to async MongoDB, trying sync fallback", error=str(e))
+            self._save_sync()
 
-    def record_company(
+    def _save_sync(self) -> None:
+        try:
+            from pymongo import MongoClient
+            from app.core.config import get_settings
+            client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
+            client[get_settings().mongodb_db_name]["crawler_checkpoints"].replace_one(
+                {"_id": self.doc_id},
+                self.data,
+                upsert=True,
+            )
+            client.close()
+        except Exception as e:
+            logger.error("Failed sync checkpoint save to MongoDB", error=str(e))
+
+    async def reset(self) -> None:
+        """Reset checkpoint in MongoDB."""
+        self.data = {
+            "_id": self.doc_id,
+            "source_file": "",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "completed_ranks": [],
+            "completed_companies": [],
+            "stats": {
+                "total_crawled": 0,
+                "total_jobs_discovered": 0,
+                "total_jobs_saved": 0,
+                "captchas_encountered": 0,
+                "errors_encountered": 0,
+            },
+            "history": [],
+        }
+        try:
+            db = get_db()
+            await db.crawler_checkpoints.delete_one({"_id": self.doc_id})
+        except Exception:
+            self._reset_sync()
+
+    def _reset_sync(self) -> None:
+        try:
+            from pymongo import MongoClient
+            from app.core.config import get_settings
+            client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
+            client[get_settings().mongodb_db_name]["crawler_checkpoints"].delete_one({"_id": self.doc_id})
+            client.close()
+        except Exception:
+            pass
+
+    def is_completed(self, rank: int, company_name: str | None = None) -> bool:
+        if rank in self.data.get("completed_ranks", []):
+            return True
+        if company_name and company_name in self.data.get("completed_companies", []):
+            return True
+        return False
+
+    async def record_company(
         self,
         rank: int,
         company_name: str,
@@ -122,6 +184,10 @@ class CrawlCheckpoint:
     ) -> None:
         if rank not in self.data["completed_ranks"]:
             self.data["completed_ranks"].append(rank)
+
+        comps = self.data.setdefault("completed_companies", [])
+        if company_name not in comps:
+            comps.append(company_name)
 
         stats = self.data.setdefault("stats", {})
         stats["total_crawled"] = stats.get("total_crawled", 0) + 1
@@ -143,7 +209,7 @@ class CrawlCheckpoint:
             "error": error_msg,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
-        self.save()
+        await self.save()
 
 
 # ---------------------------------------------------------------------------
@@ -357,27 +423,33 @@ async def main():
     parser.add_argument("--visible", action="store_false", dest="headless", help="Show browser GUI during crawl")
     parser.add_argument("--slow-mo", type=int, default=50, help="Playwright slow-mo delay in ms (default: 50)")
     parser.add_argument("--model", default="llama3.2:latest", help="Ollama AI model to drive navigation (default: llama3.2:latest)")
+    parser.add_argument("--concurrency", type=int, default=3, help="Number of concurrent browser workers (default: 3)")
     parser.add_argument("--restart", action="store_true", default=False, help="Reset checkpoint and start from rank 1")
-    parser.add_argument("--checkpoint-file", default=DEFAULT_CHECKPOINT_FILE, help="Custom path for crawl checkpoint file")
+    parser.add_argument("--checkpoint-id", default=DEFAULT_CHECKPOINT_ID, help="MongoDB checkpoint document ID (default: delhi_ncr_crawler)")
     parser.add_argument("--status", action="store_true", default=False, help="Print current checkpoint progress and exit")
     parser.add_argument("--include-placeholders", action="store_true", default=False, help="Do not skip unverified placeholder entries")
 
     args = parser.parse_args()
 
-    # Initialize Checkpoint
-    checkpoint = CrawlCheckpoint(args.checkpoint_file)
+    # Connect to MongoDB
+    await connect_db()
+    db = get_db()
+
+    # Initialize Checkpoint from MongoDB
+    checkpoint = CrawlCheckpoint(args.checkpoint_id)
+    await checkpoint.load()
 
     if args.restart:
-        checkpoint.reset()
-        print(f"🔄 Checkpoint reset: {args.checkpoint_file}")
+        await checkpoint.reset()
+        print(f"🔄 MongoDB Checkpoint reset: {args.checkpoint_id}")
 
     if args.status:
         stats = checkpoint.data.get("stats", {})
         completed = checkpoint.data.get("completed_ranks", [])
         print("\n" + "=" * 70)
-        print("📊 CRAWL CHECKPOINT STATUS")
+        print("📊 CRAWL CHECKPOINT STATUS (MongoDB: db.crawler_checkpoints)")
         print("=" * 70)
-        print(f" Checkpoint File : {args.checkpoint_file}")
+        print(f" Checkpoint ID   : {args.checkpoint_id}")
         print(f" Last Updated    : {checkpoint.data.get('updated_at')}")
         print(f" Completed Ranks : {len(completed)} companies")
         print(f" Discovered Jobs : {stats.get('total_jobs_discovered', 0)}")
@@ -411,8 +483,6 @@ async def main():
     if args.max_companies:
         target_companies = target_companies[: args.max_companies]
 
-    await connect_db()
-    db = get_db()
     matcher = JobMatcherAgent()
     users = await db.users.find({"is_active": True}).to_list(100)
 
@@ -424,7 +494,7 @@ async def main():
     stop_event = asyncio.Event()
 
     def handle_interrupt():
-        print("\n\n⚠️ SIGINT received! Finishing current company and saving checkpoint...")
+        print("\n\n⚠️ SIGINT received! Finishing current company and saving checkpoint to MongoDB...")
         stop_event.set()
 
     loop = asyncio.get_running_loop()
@@ -435,7 +505,7 @@ async def main():
             pass
 
     print("\n" + "=" * 78)
-    print(f"🚀 RESUMABLE DELHI NCR TECH CAREER CRAWLER")
+    print(f"🚀 RESUMABLE DELHI NCR TECH CAREER CRAWLER (MongoDB Checkpoint)")
     print("=" * 78)
     print(f" Dataset File       : {resolved_file}")
     print(f" Dataset Title      : {dataset_title}")
@@ -444,93 +514,109 @@ async def main():
     print(f" Default Target Role: {primary_query}")
     print(f" Headless Browser   : {args.headless} (slow-mo: {args.slow_mo}ms)")
     print(f" Active Users       : {len(users)} candidates to match")
-    print(f" Checkpoint Path    : {args.checkpoint_file}")
+    print(f" Checkpoint Doc ID  : {args.checkpoint_id} (in db.crawler_checkpoints)")
     print("=" * 78 + "\n")
 
-    agent = AICareerCrawlerAgent(model=args.model)
     total_new_this_session = 0
     total_found_this_session = 0
+    sem = asyncio.Semaphore(max(1, args.concurrency))
+    checkpoint_lock = asyncio.Lock()
+    active_companies: set[str] = set()
 
-    for idx, target in enumerate(target_companies, 1):
+    pending_targets = [
+        (idx, t) for idx, t in enumerate(target_companies, 1)
+        if not checkpoint.is_completed(t["rank"])
+    ]
+
+    print(f"⚡ Running with concurrency = {args.concurrency} ({len(pending_targets)} pending companies)\n")
+
+    async def crawl_worker(idx: int, target: dict[str, Any]):
+        nonlocal total_new_this_session, total_found_this_session
         if stop_event.is_set():
-            print("⏸️ Crawl paused as requested. Checkpoint saved. Run again to resume.")
-            break
+            return
 
         rank = target["rank"]
         comp_name = target["name"]
         career_url = target["url"]
         grade = target["grade"]
 
-        # Resumability check
-        if checkpoint.is_completed(rank):
-            print(f"[{idx}/{len(target_companies)}] ⏭️  [Rank #{rank}] {comp_name} ({grade}) — Already completed in checkpoint. Skipping.")
-            continue
+        async with sem:
+            if stop_event.is_set():
+                return
 
-        print(f"\n[{idx}/{len(target_companies)}] 🏢 [Rank #{rank} | Grade {grade}] CRAWLING: {comp_name}")
-        print(f"     URL  : {career_url}")
-        print(f"     Query: '{primary_query}'")
+            active_companies.add(comp_name)
+            print(f"[{idx}/{len(target_companies)}] 🏢 [Rank #{rank} | Grade {grade}] CRAWLING: {comp_name} ({len(active_companies)} active parallel)")
 
-        try:
-            jobs = await agent.crawl_career_portal(
-                company=comp_name,
-                start_url=career_url,
-                target_query=primary_query,
-                headless=args.headless,
-                slow_mo=args.slow_mo,
-                limit=args.limit_per_company,
-            )
-
+            jobs = []
             new_count = 0
-            for j in jobs:
-                j.source = "career-crawled"
-                is_new, _ = await save_and_match_job(j, db, users, matcher)
-                if is_new:
-                    new_count += 1
+            worker_agent = AICareerCrawlerAgent(model=args.model)
 
-            total_found_this_session += len(jobs)
-            total_new_this_session += new_count
+            try:
+                jobs = await worker_agent.crawl_career_portal(
+                    company=comp_name,
+                    start_url=career_url,
+                    target_query=primary_query,
+                    headless=args.headless,
+                    slow_mo=args.slow_mo,
+                    limit=args.limit_per_company,
+                )
 
-            status_str = "SUCCESS" if len(jobs) > 0 else "NO_JOBS_FOUND"
-            checkpoint.record_company(
-                rank=rank,
-                company_name=comp_name,
-                url=career_url,
-                status=status_str,
-                jobs_found=len(jobs),
-                jobs_new=new_count,
-            )
-            print(f"     ✅ Completed {comp_name}: {len(jobs)} jobs extracted ({new_count} new entries saved to DB).")
+                for j in jobs:
+                    j.source = "career-crawled"
+                    is_new, _ = await save_and_match_job(j, db, users, matcher)
+                    if is_new:
+                        new_count += 1
 
-        except CaptchaDetectedException as ce:
-            print(f"     🚨 CAPTCHA DETECTED on {comp_name}: {ce.captcha_type}. Logged for manual review.")
-            checkpoint.record_company(
-                rank=rank,
-                company_name=comp_name,
-                url=career_url,
-                status=f"CAPTCHA: {ce.captcha_type[:15]}",
-                jobs_found=0,
-                jobs_new=0,
-                error_msg=str(ce),
-            )
-            await log_system_event(
-                level="WARNING",
-                category="crawler",
-                message=f"CAPTCHA encountered on {comp_name}: {ce.captcha_type}",
-                details={"company": comp_name, "url": ce.url, "rank": rank},
-            )
+                async with checkpoint_lock:
+                    total_found_this_session += len(jobs)
+                    total_new_this_session += new_count
+                    status_str = "SUCCESS" if len(jobs) > 0 else "NO_JOBS_FOUND"
+                    await checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=status_str,
+                        jobs_found=len(jobs),
+                        jobs_new=new_count,
+                    )
+                print(f"     ✅ Completed {comp_name}: {len(jobs)} jobs extracted ({new_count} new entries saved to DB).")
 
-        except Exception as e:
-            logger.error("Error crawling company portal", company=comp_name, rank=rank, error=str(e))
-            checkpoint.record_company(
-                rank=rank,
-                company_name=comp_name,
-                url=career_url,
-                status=f"ERROR: {str(e)[:30]}",
-                jobs_found=0,
-                jobs_new=0,
-                error_msg=str(e),
-            )
-            print(f"     ❌ Failed {comp_name}: {e}")
+            except CaptchaDetectedException as ce:
+                print(f"     🚨 CAPTCHA DETECTED on {comp_name}: {ce.captcha_type}. Logged for manual review.")
+                async with checkpoint_lock:
+                    await checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=f"CAPTCHA: {ce.captcha_type[:15]}",
+                        jobs_found=0,
+                        jobs_new=0,
+                        error_msg=str(ce),
+                    )
+                await log_system_event(
+                    level="WARNING",
+                    category="crawler",
+                    message=f"CAPTCHA encountered on {comp_name}: {ce.captcha_type}",
+                    details={"company": comp_name, "url": ce.url, "rank": rank},
+                )
+
+            except Exception as e:
+                logger.error("Error crawling company portal", company=comp_name, rank=rank, error=str(e))
+                async with checkpoint_lock:
+                    await checkpoint.record_company(
+                        rank=rank,
+                        company_name=comp_name,
+                        url=career_url,
+                        status=f"ERROR: {str(e)[:30]}",
+                        jobs_found=0,
+                        jobs_new=0,
+                        error_msg=str(e),
+                    )
+                print(f"     ❌ Failed {comp_name}: {e}")
+            finally:
+                active_companies.discard(comp_name)
+
+    await asyncio.gather(*(crawl_worker(idx, t) for idx, t in pending_targets), return_exceptions=True)
 
     # Summary
     stats = checkpoint.data.get("stats", {})

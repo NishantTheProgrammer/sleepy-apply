@@ -81,7 +81,7 @@ export default function AdminAllJobsPage() {
   const handleStartCrawler = async (restart = false) => {
     try {
       setShowProgressBanner(true);
-      const res = await adminApi.startCrawler({ headless: false, restart });
+      const res = await adminApi.startCrawler({ headless: false, restart, concurrency: 3 });
       setActionMsg(res.message);
       await pollCrawlerStatus();
       setTimeout(() => setActionMsg(""), 6000);
@@ -459,10 +459,23 @@ export default function AdminAllJobsPage() {
                   <span className="text-sm font-bold text-white">
                     {crawlerStatus.is_running ? "AI Browser Crawler Active" : "AI Browser Crawl Complete"}
                   </span>
-                  {crawlerStatus.is_running && crawlerStatus.current_company && (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-fuchsia-500/25 text-fuchsia-200 border border-fuchsia-500/40 animate-pulse">
-                      🏢 Fetching: {crawlerStatus.current_company} ({crawlerStatus.current_index}/{crawlerStatus.total_companies})
-                    </span>
+                  {crawlerStatus.is_running && crawlerStatus.active_companies && crawlerStatus.active_companies.length > 0 ? (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        ⚡ {crawlerStatus.concurrency || crawlerStatus.active_companies.length}x Parallel
+                      </span>
+                      {crawlerStatus.active_companies.slice(0, 4).map((c: string) => (
+                        <span key={c} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/30 animate-pulse">
+                          🏢 {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    crawlerStatus.is_running && crawlerStatus.current_company && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-fuchsia-500/25 text-fuchsia-200 border border-fuchsia-500/40 animate-pulse">
+                        🏢 Fetching: {crawlerStatus.current_company} ({crawlerStatus.current_index}/{crawlerStatus.total_companies})
+                      </span>
+                    )
                   )}
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">{crawlerStatus.status_message}</p>

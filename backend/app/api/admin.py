@@ -432,6 +432,7 @@ class StartCrawlerRequest(BaseModel):
     headless: bool = False
     limit_per_company: int = 5
     restart: bool = False
+    concurrency: int = 3
 
 
 @router.post("/crawler/start")
@@ -449,13 +450,14 @@ async def start_crawler_batch(
 
     if req.restart:
         from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
-        CrawlCheckpoint().reset()
+        await CrawlCheckpoint().reset()
 
     async def _runner():
         await crawler_manager.run_batch(
             companies=req.companies,
             headless=req.headless,
             limit_per_company=req.limit_per_company,
+            concurrency=req.concurrency,
         )
 
     background_tasks.add_task(_runner)
@@ -471,8 +473,8 @@ async def reset_crawler_checkpoint(admin_id: str = Depends(require_admin)):
     """Reset Delhi NCR crawler checkpoint to restart from rank 1."""
     from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
     checkpoint = CrawlCheckpoint()
-    checkpoint.reset()
-    return {"ok": True, "message": "Delhi NCR crawler checkpoint reset to rank 1."}
+    await checkpoint.reset()
+    return {"ok": True, "message": "Delhi NCR crawler checkpoint reset to rank 1 in MongoDB."}
 
 
 @router.get("/crawler/status")
@@ -481,6 +483,7 @@ async def get_crawler_status(admin_id: str = Depends(require_admin)):
     from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
     status = crawler_manager.get_status()
     checkpoint = CrawlCheckpoint()
+    await checkpoint.load()
     status["checkpoint"] = {
         "completed_count": len(checkpoint.data.get("completed_ranks", [])),
         "total_jobs_discovered": checkpoint.data.get("stats", {}).get("total_jobs_discovered", 0),

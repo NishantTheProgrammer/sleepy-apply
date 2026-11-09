@@ -191,8 +191,11 @@ export const jobsApi = {
     `${API_URL}/api/jobs/${jobId}/resume/download${template ? `?template=${template}` : ""}`,
   deleteResume: (jobId: string) =>
     request<{ ok: boolean; message: string; job_id: string }>(`/api/jobs/${jobId}/resume`, { method: "DELETE" }),
-  crawlDelhiNcr: () =>
-    request<{ ok: boolean; message: string; status?: CrawlerStatusResponse }>("/api/jobs/crawl-delhi-ncr", { method: "POST" }),
+  crawlDelhiNcr: (options?: { concurrency?: number; restart?: boolean }) =>
+    request<{ ok: boolean; message: string; status?: CrawlerStatusResponse }>("/api/jobs/crawl-delhi-ncr", {
+      method: "POST",
+      body: JSON.stringify(options || {}),
+    }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/jobs/crawler-status"),
 };
@@ -267,7 +270,7 @@ export const adminApi = {
   fetchLiveJobs: (source: "all" | "career" | "career-crawled" | "linkedin" | "naukri" = "all") =>
     request<{ ok: boolean; message: string }>(`/api/admin/jobs/fetch-live?source=${source}`, { method: "POST" }),
   // Crawler Sync & Status
-  startCrawler: (options?: { companies?: string[]; headless?: boolean; limit_per_company?: number; restart?: boolean }) =>
+  startCrawler: (options?: { companies?: string[]; headless?: boolean; limit_per_company?: number; restart?: boolean; concurrency?: number }) =>
     request<{ ok: boolean; message: string }>("/api/admin/crawler/start", { method: "POST", body: JSON.stringify(options || {}) }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/admin/crawler/status"),
@@ -298,6 +301,8 @@ export interface CrawlerHistoryItem {
 export interface CrawlerStatusResponse {
   is_running: boolean;
   current_company: string | null;
+  active_companies?: string[];
+  concurrency?: number;
   current_index: number;
   total_companies: number;
   percent: number;

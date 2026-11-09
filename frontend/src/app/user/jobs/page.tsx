@@ -354,7 +354,7 @@ function JobsPageContent() {
   const handleCrawlDelhiNcr = async () => {
     setCrawlingNcr(true);
     try {
-      const res = await jobsApi.crawlDelhiNcr();
+      const res = await jobsApi.crawlDelhiNcr({ concurrency: 3 });
       setDiscoverMsg(res.message);
       setSourceFilter("career-crawled");
       await load(1);

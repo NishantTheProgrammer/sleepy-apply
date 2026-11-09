@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, Query, BackgroundTasks
+from pydantic import BaseModel
 from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
@@ -39,8 +40,18 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
     return {"ok": True, "message": "Jobs matched and discovery running in background"}
 
 
+class CrawlDelhiNCRRequest(BaseModel):
+    companies: list[str] | None = None
+    concurrency: int = 3
+    restart: bool = False
+
+
 @router.post("/crawl-delhi-ncr")
-async def trigger_crawl_delhi_ncr(request: Request, background_tasks: BackgroundTasks):
+async def trigger_crawl_delhi_ncr(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    body: CrawlDelhiNCRRequest | None = None,
+):
     """Trigger resumable Delhi NCR career crawler for current candidate."""
     user_id = get_current_user_id(request)
     from app.agents.crawler_manager import crawler_manager
@@ -48,13 +59,23 @@ async def trigger_crawl_delhi_ncr(request: Request, background_tasks: Background
     if status.get("is_running"):
         return {"ok": False, "message": "Delhi NCR crawler is already active and running."}
 
+    req = body or CrawlDelhiNCRRequest()
+    if req.restart:
+        from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+        await CrawlCheckpoint().reset()
+
     async def _runner():
-        await crawler_manager.run_batch(headless=True, limit_per_company=5)
+        await crawler_manager.run_batch(
+            companies=req.companies,
+            headless=True,
+            limit_per_company=5,
+            concurrency=req.concurrency,
+        )
 
     background_tasks.add_task(_runner)
     return {
         "ok": True,
-        "message": "AI Browser Crawler started across top Delhi NCR tech companies. Postings will appear under 'Career Crawled'.",
+        "message": f"AI Browser Crawler started across top Delhi NCR tech companies ({req.concurrency}x parallel). Postings will appear under 'Career Crawled'.",
         "status": crawler_manager.get_status(),
     }
 
@@ -67,6 +88,7 @@ async def get_user_crawler_status(request: Request):
     from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
     status = crawler_manager.get_status()
     checkpoint = CrawlCheckpoint()
+    await checkpoint.load()
     status["checkpoint"] = {
         "completed_count": len(checkpoint.data.get("completed_ranks", [])),
         "total_jobs_discovered": checkpoint.data.get("stats", {}).get("total_jobs_discovered", 0),

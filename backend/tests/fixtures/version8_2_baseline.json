@@ -1,0 +1,391 @@
+{
+  "user_id": "67167725dc397cff17e92823",
+  "job_id": "6ae471313c8722ed067d8d99",
+  "template": "default",
+  "content": {
+    "candidate_id": "671b5fa8618e9f291071da50",
+    "job_id": "6ae471313c8722ed067d8d99",
+    "job_title": "Senior Backend Engineer",
+    "company": "Pocketpills",
+    "companies": [
+      {
+        "id": "company_dhwani_rural_information_systems",
+        "name": "Dhwani Rural Information Systems"
+      },
+      {
+        "id": "company_max_vision_solutions_pvt_ltd",
+        "name": "Max Vision Solutions Pvt. Ltd."
+      }
+    ],
+    "target_headline": "Senior Backend Engineer | SQL, Node.js, PostgreSQL & Spring Boot Projects",
+    "summary": "SDE-2 Full Stack with **5 years** of overall software development experience. Proven professional track record developing with **SQL**. Core expertise in high-performance APIs, database design & query tuning. Hands-on project experience with **Spring Boot** and **Java** through **StaffSync**.",
+    "tailored_summary": "SDE-2 Full Stack with **5 years** of overall software development experience. Proven professional track record developing with **SQL**. Core expertise in high-performance APIs, database design & query tuning. Hands-on project experience with **Spring Boot** and **Java** through **StaffSync**.",
+    "matching_skills": [
+      "SQL"
+    ],
+    "missing_skills": [
+      "CI/CD",
+      "Jenkins",
+      "Maven",
+      "TDD"
+    ],
+    "skills_breakdown": {
+      "matched_skills": [
+        "SQL"
+      ],
+      "partially_matched_skills": [
+        "Java",
+        "Spring"
+      ],
+      "missing_skills": [
+        "CI/CD",
+        "Jenkins",
+        "Maven",
+        "TDD"
+      ],
+      "unverified_skills": [
+        "Hibernate",
+        "System Design"
+      ],
+      "additional_relevant_skills": [
+        "Angular",
+        "Express",
+        "Flutter",
+        "Ionic",
+        "MySQL",
+        "Node.js",
+        "PostgreSQL",
+        "REST APIs",
+        "Stripe",
+        "Twilio"
+      ]
+    },
+    "evidence_mappings": [
+      {
+        "id": "evidence_001",
+        "requirement": "Java",
+        "status": "PARTIAL",
+        "importance": "mandatory",
+        "evidence_source": "project",
+        "evidence_text": "StaffSync: Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "source_entity": "StaffSync",
+        "confidence": 0.85,
+        "notes": "Candidate has hands-on Java experience in personal/independent project (StaffSync), NOT multi-year professional employment."
+      },
+      {
+        "id": "evidence_002",
+        "requirement": "CI/CD",
+        "status": "MISSING",
+        "importance": "mandatory",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for CI/CD found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "id": "evidence_003",
+        "requirement": "06 to 08 years Core Java and with the spring framework",
+        "status": "PARTIAL",
+        "importance": "mandatory",
+        "evidence_source": "project",
+        "evidence_text": "Candidate has 5 years overall software development tenure, but technology exposure to Spring and Java is project-level in StaffSync. Candidate does not have 6 years of professional enterprise employment in Spring and Java.",
+        "source_entity": "StaffSync",
+        "confidence": 0.85,
+        "notes": "Candidate has hands-on project exposure to Spring and Java in StaffSync, not multi-year professional employment tenure. Do not represent overall experience as Spring and Java tenure."
+      },
+      {
+        "id": "evidence_004",
+        "requirement": "Spring",
+        "status": "PARTIAL",
+        "importance": "desirable",
+        "evidence_source": "project",
+        "evidence_text": "StaffSync: Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "source_entity": "StaffSync",
+        "confidence": 0.85,
+        "notes": "Candidate has hands-on Spring experience in personal/independent project (StaffSync), NOT multi-year professional employment."
+      },
+      {
+        "id": "evidence_005",
+        "requirement": "SQL",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Production database engineering (MySQL, PostgreSQL, SQL): Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs",
+        "source_entity": "Dhwani Rural Information Systems",
+        "confidence": 0.95,
+        "notes": "SQL requirement directly MATCHED via production MySQL, PostgreSQL, SQL and database engineering."
+      },
+      {
+        "id": "evidence_006",
+        "requirement": "Hibernate",
+        "status": "UNVERIFIED",
+        "importance": "desirable",
+        "evidence_source": "self_reported",
+        "evidence_text": "Hibernate is listed under candidate's skills list without detailed employment bullets.",
+        "source_entity": "Skills List",
+        "confidence": 0.5,
+        "notes": "Self-reported keyword. No supporting employment or project metrics."
+      },
+      {
+        "id": "evidence_007",
+        "requirement": "Jenkins",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for Jenkins found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "id": "evidence_008",
+        "requirement": "Maven",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for Maven found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "id": "evidence_009",
+        "requirement": "TDD",
+        "status": "MISSING",
+        "importance": "desirable",
+        "evidence_source": "none",
+        "evidence_text": "",
+        "source_entity": "",
+        "confidence": 0.0,
+        "notes": "No evidence for TDD found anywhere in candidate profile. MUST NOT claim this skill."
+      },
+      {
+        "id": "evidence_010",
+        "requirement": "System Design",
+        "status": "UNVERIFIED",
+        "importance": "desirable",
+        "evidence_source": "self_reported",
+        "evidence_text": "System Design is listed under candidate's skills list without detailed employment bullets.",
+        "source_entity": "Skills List",
+        "confidence": 0.5,
+        "notes": "Self-reported keyword. No supporting employment or project metrics."
+      },
+      {
+        "id": "evidence_011",
+        "requirement": "E-commerce",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Contributed to e-commerce applications Kichi-Mall and In1Mall using WordPress, WooCommerce REST API, Ionic, and Angular",
+        "source_entity": "Max Vision Solutions Pvt. Ltd.",
+        "confidence": 0.95,
+        "notes": "Verified professional employment experience with E-commerce."
+      },
+      {
+        "id": "evidence_012",
+        "requirement": "Mentoring",
+        "status": "MATCHED",
+        "importance": "desirable",
+        "evidence_source": "professional_experience",
+        "evidence_text": "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services",
+        "source_entity": "Dhwani Rural Information Systems",
+        "confidence": 1.0,
+        "notes": "Mentoring explicitly MATCHED from Dhwani Rural Information Systems experience (mentoring junior developers and conducting technical interviews)."
+      },
+      {
+        "id": "evidence_013",
+        "requirement": "B.Tech/BE or related",
+        "status": "PARTIAL",
+        "importance": "desirable",
+        "evidence_source": "education",
+        "evidence_text": "Masters in computer applications (MCA), Bachelors in computer application (BCA)",
+        "source_entity": "IGNOU",
+        "confidence": 0.85,
+        "notes": "Candidate holds Masters in computer applications (MCA), Bachelors in computer application (BCA) (related technical qualification in computer applications/science; not an exact B.Tech/BE or related engineering degree). Original qualification preserved authentically."
+      }
+    ],
+    "required_skills": [
+      "Java",
+      "CI/CD"
+    ],
+    "personal": {
+      "full_name": "Nishant",
+      "email": "knishant113@gmail.com",
+      "phone": "+91 7838716089",
+      "location": {
+        "city": "Delhi",
+        "country": "India",
+        "address": "",
+        "postalCode": ""
+      },
+      "linkedin": "https://www.linkedin.com/in/nishanttheprogrammer",
+      "github": "https://github.com/NishantTheProgrammer",
+      "portfolio": "https://nishanttheprogrammer.com"
+    },
+    "skills": {
+      "backend": [
+        "Node.js",
+        "Express",
+        "Spring Boot",
+        "Hibernate",
+        "Java",
+        "Django"
+      ],
+      "frontend": [
+        "React",
+        "Angular",
+        "Vue",
+        "Next.js",
+        "JavaScript",
+        "TypeScript"
+      ],
+      "databases": [
+        "SQL",
+        "MongoDB",
+        "PostgreSQL",
+        "MySQL",
+        "Redis"
+      ],
+      "tools": [
+        "Docker",
+        "Git",
+        "Linux",
+        "Jest"
+      ],
+      "architecture": [
+        "Microservices",
+        "System Design",
+        "REST APIs"
+      ]
+    },
+    "experience": [
+      {
+        "id": "experience_001",
+        "company_id": "company_dhwani_rural_information_systems",
+        "company": "Dhwani Rural Information Systems",
+        "title": "SDE-2 Full Stack",
+        "start_date": "Jan 2023",
+        "end_date": "Present",
+        "is_current": true,
+        "description": "Technology-driven social impact venture that enables development sector organizations.",
+        "responsibilities": [
+          "Conducting interviews, mentored junior developers, developing REST APIs, integrating third-party services",
+          "Enhanced platform performance through query optimization, materialized views, and session synchronization across multiple tabs",
+          "Implemented bulk upload service handling data for 4000+ urban local bodies and their finance",
+          "Designed and developed a comprehensive full-stack NGO management platform using Node.js/Express and modern Angular frontend"
+        ]
+      },
+      {
+        "id": "experience_002",
+        "company_id": "company_max_vision_solutions_pvt_ltd",
+        "company": "Max Vision Solutions Pvt. Ltd.",
+        "title": "Mobile Application Developer",
+        "start_date": "Mar 2021",
+        "end_date": "Dec 2022",
+        "is_current": false,
+        "description": "Web Development company devoted to delivering services with the Global market.",
+        "responsibilities": [
+          "Built multi-vendor restaurant web application (pay.mesa-qr.com) with Stripe split payment and QR code generation",
+          "Contributed to e-commerce applications Kichi-Mall and In1Mall using WordPress, WooCommerce REST API, Ionic, and Angular",
+          "Developed video call coaching platform using Flutter with integrated Stripe payment gateway and Twilio APIs"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "degree": "Masters in computer applications (MCA)",
+        "institution": "IGNOU",
+        "year": "2023",
+        "id": "education_001",
+        "source_type": "education",
+        "evidence": [
+          {
+            "id": "education_001_ev_001",
+            "text": "Masters in computer applications (MCA) from IGNOU (2023)",
+            "source_type": "education",
+            "degree": "Masters in computer applications (MCA)",
+            "institution": "IGNOU",
+            "year": "2023"
+          }
+        ]
+      },
+      {
+        "degree": "Bachelors in computer application (BCA)",
+        "institution": "IGNOU",
+        "year": "2020",
+        "id": "education_002",
+        "source_type": "education",
+        "evidence": [
+          {
+            "id": "education_002_ev_001",
+            "text": "Bachelors in computer application (BCA) from IGNOU (2020)",
+            "source_type": "education",
+            "degree": "Bachelors in computer application (BCA)",
+            "institution": "IGNOU",
+            "year": "2020"
+          }
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "id": "project_001",
+        "name": "StaffSync",
+        "description": "Role-based workforce management system designed to streamline company operations. Built on Spring Boot.",
+        "technologies": [
+          "Spring Boot",
+          "Java"
+        ]
+      },
+      {
+        "id": "project_004",
+        "name": "DoneMySite",
+        "description": "Building a freelancing platform utilizing React JS and Django REST APIs, integrating Stripe.",
+        "technologies": [
+          "React",
+          "Django",
+          "Stripe"
+        ]
+      },
+      {
+        "id": "project_002",
+        "name": "SkillsAkhada",
+        "description": "A gaming tournament platform using Flutter, React, and Node.js for APIs.",
+        "technologies": [
+          "Flutter",
+          "React",
+          "Node.js"
+        ]
+      }
+    ],
+    "achievements": [
+      {
+        "title": "HackerRank 6th Star Gold Badge (Problem Solving)",
+        "url": null,
+        "source": "original_resume",
+        "id": "achievement_001"
+      },
+      {
+        "title": "Solved 450+ LeetCode questions demonstrating strong algorithmic problem-solving",
+        "url": null,
+        "source": "original_resume",
+        "id": "achievement_002"
+      }
+    ],
+    "template": "default",
+    "generated_at": "2026-11-09T09:20:43.203203+00:00",
+    "validation_report": {
+      "is_valid": true,
+      "sanitized": false,
+      "critical_violations": [],
+      "warnings": [],
+      "summary": "Validation passed with 0 critical violations. 0 warning(s).",
+      "initial_violations": []
+    }
+  },
+  "pdf_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99.pdf",
+  "docx_path": "/Users/nishant/Desktop/learnings/sleepy-apply/storage/resumes/67167725dc397cff17e92823/resume_6ae471313c8722ed067d8d99_default.docx",
+  "generated_at": "2026-11-09T09:20:43.203203+00:00",
+  "_id": "671b5fa8618e9f291071da50"
+}

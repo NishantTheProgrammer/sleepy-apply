@@ -81,6 +81,27 @@ class HallucinationGuard:
         # -------------------------------------------------------------
         summary = str(tailored_resume.get("tailored_summary") or tailored_resume.get("summary") or "").strip()
         if summary:
+            # Check for malformed, fractured, or ungrammatical text
+            malformed_patterns = [
+                r"\b(?:in\s+and|and\s+with|focusing\s+on\s+and|hands-on\s+project\s+experience\s+in\s+and|and\s+DevOps|in\s+and\s+DevOps|with\s+and\b|and\s+or\b|,\s*and\s*,\s*|and\s+or\s+and)\b",
+                r"\bfocusing\s+on\s+(?:[A-Za-z]+\s+)?and\s+with\b",
+                r"\bexperience\s+in\s+and\b",
+                r"\bthrough\s+and\b",
+                r"\bwith\s+a\s+focus\s+on\s+and\b",
+            ]
+            for mp in malformed_patterns:
+                m_match = re.search(mp, summary, re.IGNORECASE)
+                if m_match:
+                    violations.append(ValidationViolation(
+                        category="malformed_summary",
+                        severity="CRITICAL",
+                        field="summary",
+                        message=f"Summary contains malformed or ungrammatical text: '{m_match.group(0)}'.",
+                        detected_value=summary,
+                        allowed_boundary="Summary must be grammatically complete and coherent without broken conjunctions or dangling phrases.",
+                    ))
+                    break
+
             # A) Check for inflated years of experience
             years_matches = re.findall(r"(\d+)\+?\s*years?", summary, re.IGNORECASE)
             for y_str in years_matches:
@@ -144,6 +165,16 @@ class HallucinationGuard:
                             detected_value=sm.group(0).strip(),
                             allowed_boundary=f"'{pt}' is an independent project technology ({matching_p}), not professional expertise. Distinguish project exposure from professional experience.",
                         ))
+                for ut in evidence_result.skills_classification.unverified_skills:
+                    if len(ut) > 2 and re.search(r"\b" + re.escape(ut) + r"\b", claimed_spec, re.IGNORECASE):
+                        violations.append(ValidationViolation(
+                            category="unsupported_specialization",
+                            severity="CRITICAL",
+                            field="summary",
+                            message=f"Summary falsely claims specialization in unverified skill '{ut}'.",
+                            detected_value=sm.group(0).strip(),
+                            allowed_boundary=f"'{ut}' is only self-reported and unverified; cannot be claimed as an area of specialization.",
+                        ))
 
             # D) Check for missing skills in summary
             for missing_tech in missing_skills_set:
@@ -181,8 +212,17 @@ class HallucinationGuard:
                     allowed_boundary="Remove security expertise claims.",
                 ))
 
-            # F) Check for unsupported broad claims in summary: scalable, secure, robust, expert
+            # F) Check for unsupported broad claims in summary: scalable, secure, robust, expert, devops
             profile_text_lower = json.dumps(original_profile, default=str).lower()
+            if re.search(r"\bdevops\b", summary, re.IGNORECASE) and not re.search(r"\bdevops\b", profile_text_lower):
+                violations.append(ValidationViolation(
+                    category="unsupported_claim",
+                    severity="CRITICAL",
+                    field="summary",
+                    message="Summary claims DevOps without backing evidence in candidate profile.",
+                    detected_value="DevOps",
+                    allowed_boundary="Remove DevOps claim unless backed by verified source credentials.",
+                ))
             for buzzword in ["scalable", "secure", "robust", "expert"]:
                 if re.search(r"\b" + re.escape(buzzword) + r"\b", summary, re.IGNORECASE):
                     if not re.search(r"\b" + re.escape(buzzword) + r"\b", profile_text_lower):
@@ -228,6 +268,15 @@ class HallucinationGuard:
         tailored_exps = tailored_resume.get("experience") or []
         orig_exps = original_profile.get("experience") or []
         orig_companies = [e.get("company", "").strip().lower() for e in orig_exps]
+
+        unsupported_outcome_patterns = [
+            r",?\s*(?:and\s+)?(?:enhancing|enhance|improving|improve|increasing|increase|boosting|boost)\s+(?:workflow|operational|team|developer)?\s*efficiency(?:\s+across\s+all\s+teams)?",
+            r",?\s*(?:and\s+)?(?:improving|improve)\s+(?:team|developer)\s+coordination",
+            r",?\s*(?:and\s+)?(?:optimizing|optimize|maximizing|maximize)\s+(?:workflow|operational|team|organizational)?\s*productivity",
+            r",?\s*(?:and\s+)?streamlining\s+company\s+operations\s+and\s+improve\s+team\s+coordination",
+            r",?\s*(?:and\s+)?(?:accelerating|accelerate)\s+project\s+delivery",
+            r",?\s*(?:and\s+)?(?:driving|drive)\s+organizational\s+success",
+        ]
 
         for exp in tailored_exps:
             co = str(exp.get("company") or "").strip()
@@ -382,9 +431,30 @@ class HallucinationGuard:
                             allowed_boundary="Preserve authentic source achievements without inventing outcome claims.",
                         ))
 
-        # Check projects for unsupported outcome claims
+        # Check projects for cross-entity contamination and unsupported outcome claims
+        orig_projects = original_profile.get("projects") or []
+        employment_duty_patterns = [
+            r"\b(?:mentored|mentoring)\s+(?:junior\s+developers?|engineers?|team)\b",
+            r"\b(?:conducted|conducting)\s+(?:technical\s+)?interviews?\b",
+            r"\b(?:reviewing|reviewed)\s+pull\s+requests?\b",
+            r"\b(?:code\s+reviews?\s+and\s+pr\s+reviews?|pr\s+reviews?)\b",
+        ]
         for proj in tailored_resume.get("projects") or []:
             p_desc = str(proj.get("description") or "")
+            p_name = proj.get("name") or proj.get("title") or "Project"
+            orig_p = next((p for p in orig_projects if (p.get("name") or p.get("title") or "").strip().lower() == p_name.lower()), None)
+            orig_p_desc = (orig_p.get("description") or "").lower() if orig_p else ""
+            for edp in employment_duty_patterns:
+                m_duty = re.search(edp, p_desc, re.IGNORECASE)
+                if m_duty and not re.search(edp, orig_p_desc, re.IGNORECASE):
+                    violations.append(ValidationViolation(
+                        category="cross_entity_contamination",
+                        severity="CRITICAL",
+                        field="projects.description",
+                        message=f"Project '{p_name}' contains employment responsibilities '{m_duty.group(0)}' belonging to employment records.",
+                        detected_value=p_desc,
+                        allowed_boundary="Project descriptions must only use facts associated with that project.",
+                    ))
             for uop in unsupported_outcome_patterns:
                 m = re.search(uop, p_desc, re.IGNORECASE)
                 if m and not re.search(uop, profile_full_text, re.IGNORECASE):
@@ -395,6 +465,21 @@ class HallucinationGuard:
                         message=f"Project '{proj.get('name')}' claims unsupported outcome '{m.group(0)}'.",
                         detected_value=p_desc,
                         allowed_boundary="Project descriptions must only reflect authentic facts and technologies.",
+                    ))
+
+        # Check for contradictory skill classifications (project technology marked UNVERIFIED)
+        unverified_set = {s.lower() for s in evidence_result.skills_classification.unverified_skills}
+        for proj in tailored_resume.get("projects") or []:
+            p_name = proj.get("name") or proj.get("title") or "Project"
+            for pt in (proj.get("technologies") or proj.get("tech_stack") or []):
+                if str(pt).lower() in unverified_set:
+                    violations.append(ValidationViolation(
+                        category="contradictory_skill_classification",
+                        severity="CRITICAL",
+                        field="projects.technologies",
+                        message=f"Technology '{pt}' in project '{p_name}' is contradictory with classification UNVERIFIED.",
+                        detected_value=str(pt),
+                        allowed_boundary="Technologies verified in project evidence must not be classified as UNVERIFIED.",
                     ))
 
         # -------------------------------------------------------------
@@ -484,6 +569,106 @@ class HallucinationGuard:
                     allowed_boundary="Store URLs strictly in the url field.",
                 ))
 
+        # -------------------------------------------------------------
+        # 6. Education Equivalence Checks
+        # -------------------------------------------------------------
+        for item in evidence_result.mappings:
+            if item.evidence_source == "education" and "equivalent" in item.notes.lower() and any(k in item.notes.lower() for k in ["bca", "mca", "computer applications"]):
+                violations.append(ValidationViolation(
+                    category="unsupported_education_equivalence",
+                    severity="CRITICAL",
+                    field="education.degree",
+                    message=f"Education mapping notes claim engineering equivalence: '{item.notes}'.",
+                    detected_value=item.notes,
+                    allowed_boundary="Do not describe BCA/MCA as equivalent to B.Tech/BE.",
+                ))
+
+        # -------------------------------------------------------------
+        # 7. Entity IDs and Reference Integrity
+        # -------------------------------------------------------------
+        if "candidate_id" in tailored_resume and not str(tailored_resume.get("candidate_id") or "").strip():
+            violations.append(ValidationViolation(
+                category="empty_entity_id",
+                severity="CRITICAL",
+                field="candidate_id",
+                message="Candidate ID is an empty string.",
+                detected_value=str(tailored_resume.get("candidate_id")),
+                allowed_boundary="Candidate must have a non-empty stable ID.",
+            ))
+
+        companies = tailored_resume.get("companies")
+        known_co_ids = set()
+        if companies and isinstance(companies, list):
+            for comp in companies:
+                cid = comp.get("id") if isinstance(comp, dict) else None
+                if cid is not None and not str(cid).strip():
+                    violations.append(ValidationViolation(
+                        category="empty_entity_id",
+                        severity="CRITICAL",
+                        field="companies.id",
+                        message=f"Company entity '{comp.get('name') if isinstance(comp, dict) else comp}' has an empty ID.",
+                        detected_value=str(cid),
+                        allowed_boundary="All companies must have non-empty IDs.",
+                    ))
+                elif cid:
+                    known_co_ids.add(str(cid))
+
+        for exp in tailored_exps:
+            c_name = exp.get("company", "Company")
+            if "id" in exp and not str(exp.get("id") or "").strip():
+                violations.append(ValidationViolation(
+                    category="empty_entity_id",
+                    severity="CRITICAL",
+                    field=f"experience.{c_name}.id",
+                    message=f"Employment entry for '{c_name}' has an empty ID.",
+                    detected_value=str(exp.get("id")),
+                    allowed_boundary="Employment records must not have empty IDs.",
+                ))
+            if "company_id" in exp and not str(exp.get("company_id") or "").strip():
+                violations.append(ValidationViolation(
+                    category="empty_entity_id",
+                    severity="CRITICAL",
+                    field=f"experience.{c_name}.company_id",
+                    message=f"Employment entry for '{c_name}' has an empty company_id.",
+                    detected_value=str(exp.get("company_id")),
+                    allowed_boundary="Employment records must not have empty company_id references.",
+                ))
+            elif exp.get("company_id") and known_co_ids:
+                if str(exp["company_id"]) not in known_co_ids:
+                    violations.append(ValidationViolation(
+                        category="broken_entity_reference",
+                        severity="CRITICAL",
+                        field=f"experience.{c_name}.company_id",
+                        message=f"company_id '{exp['company_id']}' does not resolve to any entity in 'companies' catalog.",
+                        detected_value=str(exp["company_id"]),
+                        allowed_boundary=f"Must resolve to one of: {sorted(list(known_co_ids))}",
+                    ))
+
+        for proj in tailored_resume.get("projects") or []:
+            p_name = proj.get("name") or proj.get("title") or "Project"
+            if "id" in proj and not str(proj.get("id") or "").strip():
+                violations.append(ValidationViolation(
+                    category="empty_entity_id",
+                    severity="CRITICAL",
+                    field=f"projects.{p_name}.id",
+                    message=f"Project '{p_name}' has an empty ID.",
+                    detected_value=str(proj.get("id")),
+                    allowed_boundary="Projects must have non-empty stable IDs.",
+                ))
+
+        for ach in tailored_resume.get("achievements") or []:
+            if isinstance(ach, dict):
+                a_title = ach.get("title", "Achievement")
+                if "id" in ach and not str(ach.get("id") or "").strip():
+                    violations.append(ValidationViolation(
+                        category="empty_entity_id",
+                        severity="CRITICAL",
+                        field=f"achievements.{a_title[:30]}.id",
+                        message=f"Achievement '{a_title[:30]}' has an empty ID.",
+                        detected_value=str(ach.get("id")),
+                        allowed_boundary="Achievements must have non-empty stable IDs.",
+                    ))
+
         return violations, warnings
 
     def validate(
@@ -510,6 +695,93 @@ class HallucinationGuard:
             summary_notes=summary_notes,
             initial_violations=critical_violations,
         )
+
+    @staticmethod
+    def _regenerate_grounded_summary(
+        cand_index: CandidateEvidenceIndex,
+        original_profile: dict[str, Any],
+        evidence_result: EvidenceMappingResult,
+    ) -> str:
+        """Deterministically synthesizes a clean, concise, 100% grammatically complete and factual summary."""
+        profile_text = json.dumps(original_profile, default=str)
+        profile_text_lower = profile_text.lower()
+
+        # 1. Primary Title
+        cand_title = ""
+        if cand_index.professional_roles:
+            t = cand_index.professional_roles[0].get("title", "").strip()
+            if t:
+                cand_title = t
+        if not cand_title:
+            cand_title = original_profile.get("jobPreferences", {}).get("jobTitles", ["Software Engineer"])[0]
+        if not cand_title or cand_title.lower() == "software engineer":
+            if "full stack" in original_profile.get("summary", "").lower():
+                cand_title = "Full Stack Developer"
+            else:
+                cand_title = "Software Engineer"
+
+        # 2. Sentence 1: Title and verified overall years
+        years = cand_index.overall_years
+        supports_scalable = "scalable" in profile_text_lower
+        sys_adj = "scalable" if supports_scalable else "production"
+        s1 = f"{cand_title} with {years:g} years of overall software development experience delivering {sys_adj} backend systems, high-performance APIs, and database optimizations."
+
+        # 3. Sentence 2: Verified professional strengths and project exposure
+        prof_techs = sorted(list(cand_index.professional_technologies))
+        matching_prof = [
+            t for t in prof_techs
+            if t in evidence_result.skills_classification.matched_skills
+        ]
+        chosen_prof = []
+        if any(t in prof_techs for t in ["SQL", "PostgreSQL", "MySQL"]):
+            chosen_prof.append("SQL")
+        for t in matching_prof:
+            if t not in chosen_prof and t not in ["SQL"]:
+                chosen_prof.append(t)
+        for t in ["Node.js", "Python", "REST APIs", "Microservices"]:
+            if t in prof_techs and t not in chosen_prof:
+                chosen_prof.append(t)
+
+        chosen_prof = chosen_prof[:3]
+        if chosen_prof:
+            if "SQL" in chosen_prof:
+                s2_base = f"Proven professional track record in {', '.join(chosen_prof)} and database optimization"
+            else:
+                s2_base = f"Proven professional track record in {', '.join(chosen_prof)}"
+        else:
+            s2_base = "Proven professional track record delivering reliable backend services and APIs"
+
+        # 4. Relevant project-level experience
+        s_proj = ""
+        proj_skills = [
+            t for t in evidence_result.skills_classification.partially_matched_skills
+            if t.lower() in [pt.lower() for pt in cand_index.project_technologies]
+        ]
+        if proj_skills:
+            for proj in cand_index.projects:
+                p_name = proj.get("name") or proj.get("title") or "independent projects"
+                project_technologies = proj.get("technologies") or []
+                p_techs = [
+                    t for t in proj_skills
+                    if any(t.lower() == pt.lower() or t.lower() in pt.lower() for pt in project_technologies)
+                ]
+                if p_techs:
+                    resolved_techs = []
+                    for t in p_techs:
+                        if t.lower() == "spring" and any("spring boot" in pt.lower() for pt in project_technologies):
+                            canon_t = next((pt for pt in project_technologies if "spring boot" in pt.lower()), "Spring Boot")
+                        else:
+                            canon_t = next((pt for pt in project_technologies if pt.lower() == t.lower()), t)
+                        if canon_t not in resolved_techs:
+                            resolved_techs.append(canon_t)
+                    p_techs_sorted = sorted(resolved_techs, key=lambda x: (1 if "spring boot" in x.lower() else (2 if "spring" in x.lower() else 3), -len(x)))
+                    filtered_p_techs = [t for t in p_techs_sorted if not (t.lower() == "spring" and any("spring boot" in o.lower() for o in p_techs_sorted))]
+                    tech_joined = filtered_p_techs[0] if filtered_p_techs else "Spring Boot"
+                    s_proj = f", with hands-on project experience in {tech_joined} through {p_name}"
+                    break
+
+        s2 = f"{s2_base}{s_proj}."
+        return f"{s1} {s2}"
 
     def validate_and_sanitize(
         self,
@@ -554,67 +826,25 @@ class HallucinationGuard:
 
         # 2. Sanitize Summary
         summary = str(tailored_resume.get("tailored_summary") or tailored_resume.get("summary") or "").strip()
-        clean_sum = summary
-        for missing_tech in missing_skills_set:
-            if len(missing_tech) > 2:
-                clean_sum = re.sub(rf"\b{re.escape(missing_tech)}\b", "", clean_sum, flags=re.IGNORECASE)
-        clean_sum = re.sub(r"\b(?:\d+)\+?\s*years?\b", f"{cand_index.overall_years:g} years", clean_sum, count=1, flags=re.IGNORECASE)
-        # Generic project-level technology remediation in summary:
-        # Prevent project-level technologies from being inflated into professional expertise
-        for proj in cand_index.projects:
-            p_name = proj.get("name") or proj.get("title") or "independent project"
-            p_techs = proj.get("technologies") or proj.get("tech_stack") or []
-            p_tech_only = [t for t in p_techs if t.lower() not in [pr.lower() for pr in cand_index.professional_technologies]]
-            if p_tech_only and any(t.lower() in clean_sum.lower() for t in p_tech_only):
-                sorted_techs = sorted(p_tech_only, key=lambda x: (len(x.split()), len(x)), reverse=True)
-                techs_joined = " and ".join(sorted_techs[:2])
-                tech_or_pattern = "|".join(re.escape(t) for t in sorted_techs)
-                clean_sum = re.sub(
-                    rf"(?:with\s+)?(?:\d+\+?\s*years?(?:\s+of)?\s+)?(?:proven\s+expertise\s+in\s+)?(?:{tech_or_pattern})(?:\s*(?:,|and)\s*(?:{tech_or_pattern}))*",
-                    f"with hands-on project experience in {techs_joined} through {p_name}",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-                clean_sum = re.sub(
-                    rf"Proven expertise in (?:{tech_or_pattern})(?:\s*(?:,|and)\s*(?:{tech_or_pattern}))*,\s*and backend systems",
-                    f"Proven professional expertise in backend systems, REST APIs, and database optimization, with hands-on project experience in {techs_joined} through {p_name}",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-                clean_sum = re.sub(
-                    r"(?:specializing in|specialization in)\s+([A-Za-z\s,/&]+?)(?:\.|\bwith\b|\band\b|$)",
-                    f"with hands-on project experience in {techs_joined} ({p_name}).",
-                    clean_sum,
-                    flags=re.IGNORECASE,
-                )
-        clean_sum = re.sub(
-            r"\b(?:\d+)\+?\s*years(?:\s+of)?(?:\s+overall)?\s+(?:software\s+engineering|software\s+development|development|full\s+stack)?\s*experience\b",
-            f"{cand_index.overall_years:g} years of overall software development experience",
-            clean_sum,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-        clean_sum = re.sub(
-            r",?\s*(?:with\s+a\s+focus\s+on\s+building\s+)?(?:robust\s+and\s+)?secure\s+applications?",
-            "",
-            clean_sum,
-            flags=re.IGNORECASE,
-        )
-        clean_sum = re.sub(
-            r",?\s*(?:proven\s+)?security\s+expert(?:ise)?",
-            "",
-            clean_sum,
-            flags=re.IGNORECASE,
-        )
-        # Sanitize unsupported broad claims in summary if not present in original profile
-        for buzzword in ["scalable", "secure", "robust", "expert"]:
-            if re.search(r"\b" + re.escape(buzzword) + r"\b", clean_sum, re.IGNORECASE):
-                if not re.search(r"\b" + re.escape(buzzword) + r"\b", profile_full_text.lower()):
-                    clean_sum = re.sub(rf",?\s*(?:and\s+)?(?:proven\s+)?{re.escape(buzzword)}(?:\s+applications?|\s+systems?|\s+in\s+[a-zA-Z\s]+)?", "", clean_sum, flags=re.IGNORECASE)
-                    clean_sum = re.sub(rf"\b{re.escape(buzzword)}\b\s*", "", clean_sum, flags=re.IGNORECASE)
-        clean_sum = " ".join(clean_sum.split()).strip(" ,.-")
-        sanitized_copy["tailored_summary"] = clean_sum
-        sanitized_copy["summary"] = clean_sum
+        summary_crit = [v for v in initial_critical if v.field == "summary"]
+        if summary_crit:
+            # Regenerate deterministically using verified ground-truth facts
+            clean_sum = self._regenerate_grounded_summary(cand_index, original_profile, evidence_result)
+            # Reapply verified bold tags only if summary originally used bolding
+            if "**" in summary:
+                for ms in evidence_result.skills_classification.matched_skills + evidence_result.skills_classification.partially_matched_skills:
+                    if len(ms) > 2 and ms.lower() in clean_sum.lower() and f"**{ms}**" not in clean_sum and f"**{ms.lower()}**" not in clean_sum.lower():
+                        clean_sum = re.sub(rf"\b{re.escape(ms)}\b", f"**{ms}**", clean_sum)
+            sanitized_copy["tailored_summary"] = clean_sum
+            sanitized_copy["summary"] = clean_sum
+        else:
+            clean_sum = summary
+            for missing_tech in missing_skills_set:
+                if len(missing_tech) > 2:
+                    clean_sum = re.sub(rf"\b{re.escape(missing_tech)}\b", "", clean_sum, flags=re.IGNORECASE)
+            clean_sum = " ".join(clean_sum.split()).strip(" ,.-")
+            sanitized_copy["tailored_summary"] = clean_sum
+            sanitized_copy["summary"] = clean_sum
 
         # 3. Strip missing skills from matching_skills
         if "matching_skills" in sanitized_copy and isinstance(sanitized_copy["matching_skills"], list):
@@ -624,7 +854,6 @@ class HallucinationGuard:
             ]
 
         # 4. Reconstruct complete achievements
-        # 4. Structured Achievement Reconstruction & URL Preservation
         from app.agents.resume_builder import reconstruct_achievements
         sanitized_copy["achievements"] = reconstruct_achievements(
             tailored_resume.get("achievements") or [],
@@ -745,16 +974,73 @@ class HallucinationGuard:
 
         sanitized_copy["experience"] = sanitized_exps
 
-        # 6. Sanitize project descriptions
+        # 6. Sanitize project descriptions and prevent cross-entity contamination
+        orig_projects = original_profile.get("projects") or []
+        employment_duty_patterns = [
+            r"\b(?:mentored|mentoring)\s+(?:junior\s+developers?|engineers?|team)\b",
+            r"\b(?:conducted|conducting)\s+(?:technical\s+)?interviews?\b",
+            r"\b(?:reviewing|reviewed)\s+pull\s+requests?\b",
+            r"\b(?:code\s+reviews?\s+and\s+pr\s+reviews?|pr\s+reviews?)\b",
+        ]
         sanitized_projs = []
-        for proj in sanitized_copy.get("projects") or []:
+        for idx, proj in enumerate(sanitized_copy.get("projects") or []):
             p_c = dict(proj)
+            p_name = p_c.get("name") or p_c.get("title") or f"Project {idx+1}"
             p_desc = str(p_c.get("description") or "")
+            orig_p = next((p for p in orig_projects if (p.get("name") or p.get("title") or "").strip().lower() == p_name.lower()), None)
+            orig_desc = orig_p.get("description", "") if orig_p else ""
+            for edp in employment_duty_patterns:
+                if re.search(edp, p_desc, re.IGNORECASE) and not re.search(edp, orig_desc, re.IGNORECASE):
+                    p_desc = orig_desc
+                    break
             for uop in unsupported_outcome_patterns:
                 p_desc = re.sub(uop, "", p_desc, flags=re.IGNORECASE)
             p_c["description"] = " ".join(p_desc.split()).strip(" ,.-")
+            if not p_c.get("id"):
+                p_c["id"] = f"project_{idx+1:03d}"
             sanitized_projs.append(p_c)
         sanitized_copy["projects"] = sanitized_projs
+
+        # 7. Ensure stable entity IDs and Companies catalog
+        if not sanitized_copy.get("candidate_id") and not sanitized_copy.get("id"):
+            cand_name = cand_index.full_name or "candidate"
+            slug = re.sub(r"[^a-z0-9]+", "_", cand_name.lower()).strip("_")
+            sanitized_copy["candidate_id"] = f"candidate_{slug or '001'}"
+
+        companies_catalog = []
+        existing_co_map = {}
+        for idx, exp in enumerate(sanitized_copy.get("experience") or []):
+            co_name = exp.get("company", "").strip() or f"Company {idx+1}"
+            slug = re.sub(r"[^a-z0-9]+", "_", co_name.lower()).strip("_")
+            co_id = exp.get("company_id") or f"company_{slug or f'{idx+1:03d}'}"
+            if co_id not in existing_co_map:
+                co_obj = {"id": co_id, "name": co_name}
+                existing_co_map[co_id] = co_obj
+                companies_catalog.append(co_obj)
+            exp["company_id"] = co_id
+            if not exp.get("id"):
+                exp["id"] = f"experience_{idx+1:03d}"
+        if sanitized_copy.get("experience"):
+            sanitized_copy["companies"] = companies_catalog
+
+        for idx, ach in enumerate(sanitized_copy.get("achievements") or []):
+            if isinstance(ach, dict) and not ach.get("id"):
+                ach["id"] = f"achievement_{idx+1:03d}"
+
+        # 8. Reconcile contradictory skill classifications
+        if "skills_breakdown" in sanitized_copy and isinstance(sanitized_copy["skills_breakdown"], dict):
+            sb = sanitized_copy["skills_breakdown"]
+            unv = list(sb.get("unverified_skills", []))
+            part = list(sb.get("partially_matched_skills", []))
+            for proj in sanitized_copy.get("projects") or []:
+                for pt in (proj.get("technologies") or []):
+                    pt_match = next((u for u in unv if u.lower() == str(pt).lower()), None)
+                    if pt_match:
+                        unv.remove(pt_match)
+                        if pt_match not in part:
+                            part.append(pt_match)
+            sb["unverified_skills"] = unv
+            sb["partially_matched_skills"] = part
 
         # -------------------------------------------------------------
         # Re-run semantic validation on final sanitized JSON

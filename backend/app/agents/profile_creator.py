@@ -559,6 +559,19 @@ class ProfileCreatorAgent:
                 }
             ]
 
+        # Companies catalog with entity provenance
+        companies_catalog = []
+        comp_seen = set()
+        for exp in data.get("experience", []):
+            cid = exp.get("company_id")
+            cname = exp.get("company", "")
+            if cid and cid not in comp_seen:
+                comp_seen.add(cid)
+                companies_catalog.append({"id": cid, "name": cname})
+        data["companies"] = companies_catalog
+        data["candidate_id"] = user_id_str
+        data["id"] = user_id_str
+
         # Achievements with IDs and provenance
         for a_idx, ach in enumerate(data.get("achievements", [])):
             ach["id"] = f"achievement_{a_idx+1:03d}"

@@ -1557,6 +1557,216 @@ def test_version_8_1_targeted_corrections(candidate_profile, pocketpills_jd):
         assert bz not in clean_text
 
 
+# ==============================================================================
+# Version 8.2 Comprehensive Test Suite
+# ==============================================================================
+@pytest.mark.anyio
+async def test_version_8_2_evidence_isolation_and_final_output_validation(candidate_profile, pocketpills_jd):
+    """Version 8.2 Target Corrections Verification:
+    1. Cross-entity evidence contamination prevention: StaffSync cannot absorb Dhwani mentoring/interviews/PR reviews.
+    2. Summary grammar validation & deterministic synthesis without malformed phrases.
+    3. Education classification: related qualification without claiming BCA is equivalent to B.Tech/BE.
+    4. Java evidence consistency: project-level evidence (PARTIAL) through StaffSync, not UNVERIFIED.
+    5. Entity IDs: stable unique non-empty IDs for candidate, companies, experiences, projects, achievements.
+    6. Broken entity reference detection.
+    7. Contradictory skill classification detection.
+    8. Strict validation sequence: is_valid is determined by the final serialized output.
+    """
+    from app.agents.profile_creator import ProfileCreatorAgent
+    from app.agents.resume_builder import ResumeBuilderAgent, select_and_tailor_projects
+    from unittest.mock import AsyncMock, patch, MagicMock
+    import json
+    import os
+
+    creator = ProfileCreatorAgent()
+    norm_profile = creator._normalize_extracted_data(candidate_profile)
+    mapper = EvidenceMapper()
+    ev_res = mapper.map_evidence(norm_profile, pocketpills_jd)
+    guard = HallucinationGuard()
+
+    # -------------------------------------------------------------
+    # 1. Cross-entity evidence contamination prevention
+    # -------------------------------------------------------------
+    # AI attempts to inject Dhwani employment duties into StaffSync
+    contaminated_ai_projects = [
+        {
+            "name": "StaffSync",
+            "description": "Role-based workforce management system. Mentored junior developers and conducted technical interviews and PR reviews.",
+            "technologies": ["Spring Boot", "Java"],
+        }
+    ]
+    tailored_p = select_and_tailor_projects(
+        raw_projects=norm_profile["projects"],
+        required_skills=["Spring Boot", "Java"],
+        matching_skills=["Spring Boot", "Java"],
+        job_title="Senior Backend Engineer",
+        ai_projects=contaminated_ai_projects,
+        candidate_experience=norm_profile["experience"],
+    )
+    # Must reject the contaminated description and preserve authentic project facts
+    assert "mentored junior developers" not in tailored_p[0]["description"].lower()
+    assert "technical interviews" not in tailored_p[0]["description"].lower()
+    assert "pr reviews" not in tailored_p[0]["description"].lower()
+    assert "workforce management system" in tailored_p[0]["description"].lower()
+
+    # Guard must flag project containing employment duties as cross_entity_contamination
+    contaminated_resume = {
+        "candidate_id": "candidate_001",
+        "companies": norm_profile.get("companies", [{"id": "company_001", "name": "Dhwani"}]),
+        "target_headline": "Senior Backend Engineer | SQL, Python",
+        "tailored_summary": "Full Stack Developer with 5 years overall software development experience.",
+        "experience": norm_profile["experience"],
+        "projects": [
+            {
+                "id": "project_001",
+                "name": "StaffSync",
+                "description": "Built StaffSync. Mentored junior developers and conducted technical interviews.",
+                "technologies": ["Spring Boot", "Java"],
+            }
+        ],
+        "education": norm_profile["education"],
+    }
+    val_contam = guard.validate(contaminated_resume, norm_profile, ev_res)
+    assert not val_contam.is_valid
+    assert any(v.category == "cross_entity_contamination" for v in val_contam.critical_violations)
+
+    # -------------------------------------------------------------
+    # 2. Summary generation: malformed phrases & unverified skills
+    # -------------------------------------------------------------
+    malformed_resume = {
+        "candidate_id": "candidate_001",
+        "companies": norm_profile.get("companies", []),
+        "target_headline": "Senior Backend Engineer | SQL",
+        "tailored_summary": "Full Stack Developer with 5 years experience focusing on Java and with hands-on project experience in and DevOps.",
+        "experience": norm_profile["experience"],
+        "education": norm_profile["education"],
+    }
+    val_malformed = guard.validate(malformed_resume, norm_profile, ev_res)
+    assert not val_malformed.is_valid
+    assert any(v.category in ["malformed_summary", "unsupported_claim"] for v in val_malformed.critical_violations)
+
+    # Sanitization regenerates a clean, grammatically complete summary
+    sanitized_val = guard.validate_and_sanitize(malformed_resume, norm_profile, ev_res)
+    assert sanitized_val.sanitized
+    clean_sum = sanitized_val.sanitized_content["summary"]
+    # No broken grammar fragments
+    for bad in ["in and", "and with", "and DevOps", "in and DevOps", "focusing on and"]:
+        assert bad not in clean_sum
+    assert "5 years of overall software development experience" in clean_sum
+    assert "StaffSync" in clean_sum
+
+    # -------------------------------------------------------------
+    # 3. Education classification: no claiming equivalence
+    # -------------------------------------------------------------
+    edu_m = next((m for m in ev_res.mappings if m.evidence_source == "education"), None)
+    assert edu_m is not None
+    assert edu_m.status == "PARTIAL"
+    assert "equivalent to" not in edu_m.notes.lower()
+    assert "not an exact" in edu_m.notes.lower() or "related technical qualification" in edu_m.notes.lower()
+
+    # Guard must reject claims of degree equivalence
+    fake_ev_res = copy.deepcopy(ev_res)
+    edu_target = next(m for m in fake_ev_res.mappings if m.evidence_source == "education")
+    edu_target.notes = "Candidate holds BCA (equivalent to target: B.Tech)."
+    val_edu = guard.validate(sanitized_val.sanitized_content, norm_profile, fake_ev_res)
+    assert not val_edu.is_valid
+    assert any(v.category == "unsupported_education_equivalence" for v in val_edu.critical_violations)
+
+    # -------------------------------------------------------------
+    # 4. Java evidence consistency
+    # -------------------------------------------------------------
+    java_m = next((m for m in ev_res.mappings if m.requirement.lower() == "java"), None)
+    assert java_m is not None
+    assert java_m.status == "PARTIAL"
+    assert java_m.evidence_source in ["project", "academic_project"]
+    assert "StaffSync" in java_m.source_entity
+    assert "Java" in ev_res.skills_classification.partially_matched_skills
+    assert "Java" not in ev_res.skills_classification.unverified_skills
+
+    # Contradictory check: If a project uses tech, it must not be UNVERIFIED
+    contradictory_ev_res = copy.deepcopy(ev_res)
+    contradictory_ev_res.skills_classification.unverified_skills.append("Spring Boot")
+    resume_with_spring = {
+        "projects": [{"name": "StaffSync", "technologies": ["Spring Boot"]}],
+        "experience": [],
+    }
+    val_contradict = guard.validate(resume_with_spring, norm_profile, contradictory_ev_res)
+    assert any(v.category == "contradictory_skill_classification" for v in val_contradict.critical_violations)
+
+    # -------------------------------------------------------------
+    # 5. Entity IDs & Reference Integrity
+    # -------------------------------------------------------------
+    # A) Empty entity IDs must fail validation
+    empty_id_resume = {
+        "candidate_id": "",
+        "companies": [{"id": "", "name": "Dhwani"}],
+        "experience": [{"id": "", "company_id": "", "company": "Dhwani"}],
+        "projects": [{"id": "", "name": "StaffSync"}],
+        "achievements": [{"id": "", "title": "HackerRank 6th Star"}],
+    }
+    val_empty = guard.validate(empty_id_resume, norm_profile, ev_res)
+    assert not val_empty.is_valid
+    empty_violations = [v for v in val_empty.critical_violations if v.category == "empty_entity_id"]
+    assert len(empty_violations) >= 3
+
+    # B) Broken entity references must fail validation
+    broken_ref_resume = {
+        "candidate_id": "candidate_001",
+        "companies": [{"id": "company_001", "name": "Dhwani"}],
+        "experience": [{"id": "exp_001", "company_id": "company_phantom", "company": "Dhwani"}],
+    }
+    val_broken = guard.validate(broken_ref_resume, norm_profile, ev_res)
+    assert not val_broken.is_valid
+    assert any(v.category == "broken_entity_reference" for v in val_broken.critical_violations)
+
+    # -------------------------------------------------------------
+    # 6. End-to-End Pipeline Validation Sequence
+    # -------------------------------------------------------------
+    mock_db = MagicMock()
+    mock_db.profiles.find_one = AsyncMock(return_value=norm_profile)
+    mock_db.jobs.find_one = AsyncMock(return_value=pocketpills_jd)
+    mock_db.user_settings.find_one = AsyncMock(return_value=None)
+    mock_db.resumes.update_one = AsyncMock(return_value=MagicMock(upserted_id=candidate_profile["_id"]))
+    mock_db.job_matches.update_one = AsyncMock()
+
+    with patch("app.agents.resume_builder.get_db", return_value=mock_db):
+        builder = ResumeBuilderAgent()
+        tailored = await builder.build_tailored_resume(
+            user_id=str(candidate_profile["user_id"]),
+            job_id=str(pocketpills_jd["_id"]),
+        )
+
+    assert tailored is not None
+    content = tailored["content"]
+    val_rep = content["validation_report"]
+    assert val_rep["is_valid"] is True
+    assert len(val_rep["critical_violations"]) == 0
+
+    # Entity IDs in final output must be non-empty and references intact
+    assert content["candidate_id"]
+    assert len(content["companies"]) > 0
+    comp_ids = {c["id"] for c in content["companies"]}
+    for exp in content["experience"]:
+        assert exp["id"]
+        assert exp["company_id"] in comp_ids
+    for proj in content["projects"]:
+        assert proj["id"]
+    for ach in content["achievements"]:
+        assert ach["id"]
+
+    # Final summary must be clean, grounded, and non-empty
+    summary_final = content["summary"]
+    for bad in ["in and", "and with", "and DevOps", "in and DevOps"]:
+        assert bad not in summary_final
+    assert "StaffSync" in summary_final
+
+    # Save Version 8.2 Baseline Fixture for regression verification
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "version8_2_baseline.json")
+    with open(fixture_path, "w") as f:
+        json.dump(tailored, f, indent=2, default=str)
+    assert os.path.exists(fixture_path)
+
+
 
 
 

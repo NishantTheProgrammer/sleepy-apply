@@ -45,9 +45,9 @@ EVIDENCE MAPPING & FACTUAL BOUNDARIES (COMPLY STRICTLY):
 - NEVER inflate experience (do not claim >{overall_years:g} years or copy JD years like 6-8 years).
 - NEVER convert overall Full Stack experience into tech-specific experience (e.g. never say "{overall_years:g}+ years of Java developer").
 
-5. LEADERSHIP & TEAM SIZES:
-- Candidate's verified record states: "Conducting interviews, mentored junior developers, developing REST APIs, reviewing pull requests."
-- DO NOT invent team sizes (e.g. do NOT write "mentored team of 4-6 engineers"). State "mentored junior developers and conducted technical interviews".
+5. LEADERSHIP, MENTORING & TEAM SIZES:
+- Leadership, mentoring, technical interviews, and PR reviews belong strictly to the employer where they were performed. NEVER attach employment responsibilities to personal/independent projects.
+- DO NOT invent team sizes (e.g. do NOT write "mentored team of 4-6 engineers" unless specifically stated in source notes). State authentic mentoring actions without headcounts.
 
 6. EDUCATION FIDELITY:
 - Candidate holds: {education_summary}.
@@ -96,16 +96,24 @@ def select_and_tailor_projects(
     filter_irrelevant: bool = True,
     ai_projects: list[dict] | None = None,
     bold_enabled: bool = True,
+    candidate_experience: list[dict] | None = None,
 ) -> list[dict]:
     """Filter candidate personal projects to prioritize high-relevance projects while preserving authenticity."""
     if not raw_projects:
         return []
 
     authentic_map = {}
-    for p in raw_projects:
+    for idx, p in enumerate(raw_projects):
         name = (p.get("name") or p.get("title") or "").strip()
         if name:
-            authentic_map[name.lower()] = p
+            authentic_map[name.lower()] = (idx, p)
+
+    employment_duty_patterns = [
+        r"\b(?:mentored|mentoring)\s+(?:junior\s+developers?|engineers?|team)\b",
+        r"\b(?:conducted|conducting)\s+(?:technical\s+)?interviews?\b",
+        r"\b(?:reviewing|reviewed)\s+pull\s+requests?\b",
+        r"\b(?:code\s+reviews?\s+and\s+pr\s+reviews?|pr\s+reviews?)\b",
+    ]
 
     # 1. Match AI-selected projects against authentic candidate projects
     if ai_projects and isinstance(ai_projects, list):
@@ -119,18 +127,27 @@ def select_and_tailor_projects(
                 continue
 
             matched_auth = None
-            for auth_name, auth_p in authentic_map.items():
+            orig_idx = 0
+            for auth_name, (idx, auth_p) in authentic_map.items():
                 if auth_name in used_auth_names:
                     continue
                 if auth_name in aip_name.lower() or aip_name.lower() in auth_name:
                     matched_auth = auth_p
+                    orig_idx = idx
                     used_auth_names.add(auth_name)
                     break
 
             if matched_auth:
                 proj_copy = dict(matched_auth)
+                orig_desc = proj_copy.get("description", "")
                 ai_desc = (aip.get("description") or "").strip()
-                desc_to_use = ai_desc if ai_desc else proj_copy.get("description", "")
+
+                # Verify explicit source provenance: prevent employment duties from leaking into project descriptions
+                has_duty_leak = any(
+                    re.search(edp, ai_desc, re.IGNORECASE) and not re.search(edp, orig_desc, re.IGNORECASE)
+                    for edp in employment_duty_patterns
+                )
+                desc_to_use = orig_desc if has_duty_leak or not ai_desc else ai_desc
 
                 # Strip unsupported outcome claims
                 unsupported_outcome_patterns = [
@@ -144,7 +161,7 @@ def select_and_tailor_projects(
                     desc_to_use = re.sub(uop, "", desc_to_use, flags=re.IGNORECASE)
                 desc_to_use = " ".join(desc_to_use.split()).strip(" ,.-")
                 if not desc_to_use:
-                    desc_to_use = proj_copy.get("description", "")
+                    desc_to_use = orig_desc
 
                 if bold_enabled and desc_to_use:
                     for ms in matching_skills:
@@ -170,6 +187,7 @@ def select_and_tailor_projects(
                     proj_copy["technologies"] = clean_ai_tech
 
                 clean_ai_p = CanonicalDict({
+                    "id": proj_copy.get("id") or f"project_{len(matched_ai_projects)+1:03d}",
                     "name": aip_name,
                     "description": desc_to_use,
                     "technologies": proj_copy.get("technologies") or [],
@@ -271,6 +289,7 @@ def select_and_tailor_projects(
         p_name = p_copy.get("name") or p_copy.get("title") or "Project"
         p_techs = p_copy.get("technologies") or p_copy.get("tech_stack") or []
         clean_p = CanonicalDict({
+            "id": p_copy.get("id") or f"project_{len(final_projects)+1:03d}",
             "name": p_name,
             "description": desc,
             "technologies": p_techs,
@@ -613,6 +632,10 @@ def reconstruct_achievements(
                 "source": "original_resume",
             })
 
+    for idx, ach in enumerate(clean_achs):
+        if not ach.get("id"):
+            ach["id"] = f"achievement_{idx+1:03d}"
+
     return clean_achs
 
 
@@ -912,12 +935,25 @@ class ResumeBuilderAgent:
                     co_name = te["company"].strip().lower()
                     tailored_exp_map[co_name] = te.get("highlights", [])
 
-        for exp in raw_experience:
+        companies_catalog = []
+        company_slug_map = {}
+        for idx, exp in enumerate(raw_experience):
+            co_name = exp.get("company", "").strip() or f"Company {idx+1}"
+            slug = re.sub(r"[^a-z0-9]+", "_", co_name.lower()).strip("_")
+            co_id = exp.get("company_id") or f"company_{slug or f'{idx+1:03d}'}"
+            if co_id not in company_slug_map:
+                company_slug_map[co_id] = co_name
+                companies_catalog.append({"id": co_id, "name": co_name})
+
+        for idx, exp in enumerate(raw_experience):
             exp_copy = dict(exp)
-            co_name = exp_copy.get("company", "").strip()
+            co_name = exp_copy.get("company", "").strip() or f"Company {idx+1}"
             co_key = co_name.lower()
             orig_bullets = exp_copy.get("responsibilities") or exp_copy.get("highlights") or []
             ai_exp_bullets = tailored_exp_map.get(co_key, [])
+
+            slug = re.sub(r"[^a-z0-9]+", "_", co_name.lower()).strip("_")
+            co_id = exp_copy.get("company_id") or f"company_{slug or f'{idx+1:03d}'}"
 
             other_cos = [c for c in all_companies_list if c.lower() != co_name.lower()]
             other_bs = []
@@ -938,9 +974,10 @@ class ResumeBuilderAgent:
                 all_other_bullets=other_bs,
             )
 
+            exp_id = exp_copy.get("id") or f"experience_{idx+1:03d}"
             clean_exp_entry = CanonicalDict({
-                "id": exp_copy.get("id", ""),
-                "company_id": exp_copy.get("company_id", ""),
+                "id": exp_id,
+                "company_id": co_id,
                 "company": co_name,
                 "title": exp_copy.get("title") or exp_copy.get("jobTitle") or "Software Engineer",
                 "start_date": exp_copy.get("start_date") or exp_copy.get("startDate") or "",
@@ -966,6 +1003,7 @@ class ResumeBuilderAgent:
             filter_irrelevant=filter_projects,
             ai_projects=tailored_projects,
             bold_enabled=bold_enabled,
+            candidate_experience=raw_experience,
         )
 
         # ------------------------------------------------------------------
@@ -987,11 +1025,17 @@ class ResumeBuilderAgent:
 
         personal_data = profile.get("personal", {})
         cand_name = personal_data.get("fullName") or personal_data.get("full_name") or "Candidate"
+        cand_id = profile.get("candidate_id") or profile.get("id")
+        if not cand_id:
+            cand_slug = re.sub(r"[^a-z0-9]+", "_", cand_name.lower()).strip("_")
+            cand_id = f"candidate_{cand_slug or '001'}"
 
         resume_content = {
+            "candidate_id": cand_id,
             "job_id": str(job_id),
             "job_title": job_title,
             "company": company,
+            "companies": companies_catalog,
             "target_headline": target_headline,
             "summary": tailored_summary,
             "tailored_summary": tailored_summary,
@@ -1021,27 +1065,50 @@ class ResumeBuilderAgent:
 
         # ------------------------------------------------------------------
         # Post-Generation Hallucination Guard Validation & Sanitization
+        # Sequence:
+        # 1. Generate output.
+        # 2. Run deterministic validation.
+        # 3. Sanitize or regenerate affected sections.
+        # 4. Validate the final serialized JSON again.
+        # 5. Set is_valid based on the final output, not the remediation attempt.
         # ------------------------------------------------------------------
-        val_result: ValidationResult = self.hallucination_guard.validate_and_sanitize(
+        initial_val: ValidationResult = self.hallucination_guard.validate(
             tailored_resume=resume_content,
             original_profile=profile,
             evidence_result=evidence_result,
         )
 
-        if val_result.sanitized:
-            logger.warning(
-                "HallucinationGuard sanitized tailored resume content",
-                job_id=job_id,
-                critical_count=len(val_result.critical_violations),
+        was_sanitized = False
+        initial_critical = initial_val.critical_violations
+
+        if not initial_val.is_valid or initial_val.warnings:
+            val_result: ValidationResult = self.hallucination_guard.validate_and_sanitize(
+                tailored_resume=resume_content,
+                original_profile=profile,
+                evidence_result=evidence_result,
             )
+            was_sanitized = val_result.sanitized
             resume_content = val_result.sanitized_content
 
+        final_serialized = json.loads(json.dumps(resume_content, default=str))
+        final_val: ValidationResult = self.hallucination_guard.validate(
+            tailored_resume=final_serialized,
+            original_profile=profile,
+            evidence_result=evidence_result,
+        )
+
+        final_is_valid = len(final_val.critical_violations) == 0
         resume_content["validation_report"] = {
-            "is_valid": val_result.is_valid,
-            "sanitized": val_result.sanitized,
-            "critical_violations": [v.model_dump() for v in val_result.critical_violations],
-            "warnings": [w.model_dump() for w in val_result.warnings],
-            "summary": val_result.summary_notes,
+            "is_valid": final_is_valid,
+            "sanitized": was_sanitized,
+            "critical_violations": [v.model_dump() for v in final_val.critical_violations],
+            "warnings": [w.model_dump() for w in final_val.warnings],
+            "summary": (
+                f"Validation passed with 0 critical violations. {len(final_val.warnings)} warning(s)."
+                if final_is_valid
+                else f"Validation failed with {len(final_val.critical_violations)} critical violation(s)."
+            ),
+            "initial_violations": [v.model_dump() for v in initial_critical],
         }
 
         def _sanitize_for_mongo(obj):
@@ -1130,6 +1197,6 @@ class ResumeBuilderAgent:
             company=company,
             title=job_title,
             matched_skills_count=len(matching_skills),
-            is_valid=val_result.is_valid,
+            is_valid=final_is_valid,
         )
         return resume_doc

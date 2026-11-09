@@ -17,10 +17,11 @@ from pydantic import BaseModel, Field
 
 
 class EvidenceItem(BaseModel):
+    id: str = Field(default="")
     requirement: str
     status: str  # MATCHED | PARTIAL | MISSING | UNVERIFIED
     importance: str = "mandatory"  # mandatory | desirable
-    evidence_source: str = "none"  # professional_experience | project | education | achievement | self_reported | none
+    evidence_source: str = "none"  # professional_experience | project | academic_project | education | achievement | self_reported | none
     evidence_text: str = ""
     source_entity: str = ""  # e.g. "Dhwani Rural Information Systems", "StaffSync", "IGNOU"
     confidence: float = 0.0
@@ -280,6 +281,13 @@ class EvidenceMapper:
                         p_techs.append(canon)
                     proj_known.add(canon)
                     all_known.add(canon)
+
+            # If project uses Spring Boot or Spring framework, Java is established at the project level
+            if any("spring" in t.lower() for t in p_techs) or re.search(r"\bspring\b", full_text, re.IGNORECASE):
+                if "Java" not in p_techs:
+                    p_techs.append("Java")
+                proj_known.add("Java")
+                all_known.add("Java")
 
             is_academic = any(k in full_text.lower() for k in ["college project", "academic", "university project", "bca", "mca"])
             projects_indexed.append({
@@ -552,6 +560,11 @@ class EvidenceMapper:
             unverified_skills=unverified_skills,
             additional_relevant_skills=additional_relevant[:10],
         )
+
+        # Assign stable unique non-empty IDs to all evidence items
+        for idx, item in enumerate(mappings):
+            if not item.id:
+                item.id = f"evidence_{idx+1:03d}"
 
         # Enforce strict company-level isolation across all evidence mappings
         known_companies = [r["company"] for r in index.professional_roles if r.get("company")]
@@ -832,7 +845,7 @@ class EvidenceMapper:
                     evidence_text=deg_str,
                     source_entity=primary_inst,
                     confidence=0.85,
-                    notes=f"Candidate holds {deg_str} (related technical qualification equivalent to target: {name}). Original qualification preserved authentically.",
+                    notes=f"Candidate holds {deg_str} (related technical qualification in computer applications/science; not an exact {name} engineering degree). Original qualification preserved authentically.",
                 )
 
             return EvidenceItem(
@@ -903,8 +916,8 @@ class EvidenceMapper:
                 name_lower in proj_techs
                 or any(name_lower in t or t in name_lower for t in proj_techs)
                 or re.search(r"\b" + re.escape(name) + r"\b", proj.get("raw_text", ""), re.IGNORECASE)
-                or (name_lower in ["spring", "spring framework"] and any("spring" in t for t in proj_techs))
-                or (any(j in name_lower for j in ["java", "core java"]) and any("java" in t for t in proj_techs))
+                or (name_lower in ["spring", "spring framework", "spring boot"] and any("spring" in t for t in proj_techs))
+                or (any(j in name_lower for j in ["java", "core java"]) and (any("java" in t for t in proj_techs) or any("spring" in t for t in proj_techs)))
             )
             if matches_tech:
                 source_type = "academic_project" if proj.get("is_academic") else "project"

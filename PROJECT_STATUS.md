@@ -1,6 +1,6 @@
 # Sleepy Apply — Project Status & Architecture Report
 
-*Last Updated: November 5, 2026*  
+*Last Updated: November 9, 2026*  
 *Environment: Development (Local Docker / FastAPI / Next.js / MongoDB)*
 
 ---
@@ -31,9 +31,9 @@ This document details the current implementation status of all subsystems, ident
 | **Multi-Provider AI Factory** | `✅ COMPLETED` | Unified adapter factory for Ollama (local llama3.2), OpenAI, Anthropic, Gemini, Groq, and DeepSeek. ([`providers/`](backend/app/providers/)) |
 | **Candidate & Admin Dashboards** | `✅ COMPLETED` | Full Next.js UI for profile, job discovery, application filtering, and admin company controls. ([`frontend/src/app/`](frontend/src/app/)) |
 | **Test Persona Switcher** | `✅ COMPLETED` | Modal switching between preloaded test candidates (Nishant, Suraj Singh, Abhishek Soni, Priya Sharma, etc.). ([`TestLoginModal.tsx`](frontend/src/components/TestLoginModal.tsx)) |
+| **Evidence-Grounded Resume Tailoring (v8.2)** | `✅ COMPLETED` | Generic, multi-employer resume tailoring pipeline with evidence isolation, strict tenure grounding, deterministic summary synthesis, and automated hallucination sanitization. ([`resume_builder.py`](backend/app/agents/resume_builder.py), [`evidence_mapper.py`](backend/app/agents/evidence_mapper.py), [`hallucination_guard.py`](backend/app/agents/hallucination_guard.py)) |
 | **Discord Notifications** | `🟡 PARTIALLY DONE` | Outbound Discord webhook notifications for new job matches and submitted applications; 2-way bot commands not yet built. ([`discord_bot.py`](backend/app/agents/discord_bot.py)) |
 | **Playwright SPA Scraper** | `🟡 PARTIALLY DONE` | Headless browser crawler written with route interception, but Playwright browser binaries are not installed in Docker container. ([`playwright_crawler.py`](backend/app/sources/playwright_crawler.py)) |
-| **Per-Job Resume Tailoring** | `🟡 PARTIALLY DONE` | LLM tailoring prompt and schema ready, but end-to-end automated attachment to individual applications needs final wiring. ([`resume_builder.py`](backend/app/agents/resume_builder.py)) |
 | **Autonomous Browser Form Submission** | `❌ MISSING` | Currently simulated in `form_applier.py`. Real Playwright form-filling for Greenhouse, Lever, and Ashby is not yet implemented. ([`form_applier.py`](backend/app/appliers/form_applier.py)) |
 | **Background Recurring Scheduler (Cron)** | `❌ MISSING` | Currently triggers on-demand (upload, role change, fetch button). Standing automated cron (e.g. APScheduler / Celery Beat) is not yet active. |
 | **CAPTCHA / Human-in-the-Loop Action Center**| `❌ MISSING` | Backend flags `REQUIRES_USER_ACTION`, but frontend lacks an interactive solver queue/modal for challenges. |
@@ -92,6 +92,21 @@ This document details the current implementation status of all subsystems, ident
   - Google Gemini (`gemini-1.5-pro`, `gemini-1.5-flash`)
   - Groq (`llama-3.3-70b-versatile`)
   - DeepSeek (`deepseek-chat`)
+
+### 3.6 Evidence-Grounded Resume Tailoring Subsystem (Version 8.2 — `✅ COMPLETED`)
+- **Factual Evidence Mapping & Grounding**:
+  - Automatically parses and normalizes arbitrary candidate profiles with zero candidate- or company-specific hardcodes (`profile_creator.py`).
+  - Indexes candidate evidence into distinct provenance layers: professional employment, personal/independent projects, academic projects, education, achievements, and self-reported skills (`evidence_mapper.py`).
+  - Categorizes JD requirements rigorously into `MATCHED`, `PARTIAL`, `MISSING`, and `UNVERIFIED` with source entity attribution.
+  - Strict technology tenure separation: never conflates overall developer tenure (e.g. 5 years) with technology-specific exposure (e.g. project-level Spring Boot).
+  - Education fidelity: classifies technical degrees (e.g. BCA/MCA) as related qualifications without overclaiming engineering equivalence.
+- **Evidence Isolation & Provenance Integrity**:
+  - Enforces strict cross-entity isolation: prevents employment responsibilities (mentoring junior engineers, technical interviews, PR reviews) from contaminating personal or independent projects.
+  - Generates stable, non-empty entity IDs for candidates, companies, employment records, projects, and achievements, with a verified `companies` reference catalog.
+- **Deterministic Summary Synthesis & Hallucination Guard**:
+  - Deterministically synthesizes grammatically complete, concise summaries grounded purely in verified facts, avoiding broken conjunctions or ad-hoc regex string replacements.
+  - 5-stage validation & sanitization lifecycle: Generate $\to$ Validate $\to$ Remediate $\to$ Re-serialize to JSON $\to$ Final Validate $\to$ Output `is_valid` state (`hallucination_guard.py`).
+  - 49/49 regression unit and integration tests passing in ~1.0s.
 
 ---
 

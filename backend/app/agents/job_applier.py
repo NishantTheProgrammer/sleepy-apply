@@ -95,14 +95,23 @@ class JobApplierAgent:
         user_webhook_url = notif_prefs.get("discord_webhook_url")
         target_discord_id = cand_discord_id
 
-        if result.status == "APPLIED":
-            await self._update_status(app_doc["_id"], "APPLIED", reason=result.message)
+        if result.status in ["APPLIED", "FORM_FILLED_READY"]:
+            app_status = result.status
+            await self._update_status(app_doc["_id"], app_status, reason=result.message)
             await db.applications.update_one(
                 {"_id": app_doc["_id"]},
-                {"$set": {"applied_at": now, "application_method": self.applier.applier_name}},
+                {
+                    "$set": {
+                        "applied_at": now,
+                        "application_method": self.applier.applier_name,
+                        "form_fill_details": result.details,
+                        "screenshot_path": result.details.get("screenshot_path"),
+                    }
+                },
             )
+            title_prefix = "[Form Autofilled - Review Ready]" if app_status == "FORM_FILLED_READY" else ""
             await self.discord.notify_application_submitted(
-                job_title=job.get("title", ""),
+                job_title=f"{title_prefix} {job.get('title', '')}".strip(),
                 company=job.get("company", ""),
                 score=score,
                 discord_user_id=target_discord_id,

@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 class ApplicationResult(BaseModel):
     success: bool
-    status: Literal["APPLIED", "REQUIRES_USER_ACTION", "FAILED"]
-    action_type: Literal["captcha", "mfa", "manual_form", "missing_info"] | None = None
+    status: Literal["APPLIED", "REQUIRES_USER_ACTION", "FAILED", "FORM_FILLED_READY"]
+    action_type: Literal["captcha", "mfa", "manual_form", "missing_info", "review_ready"] | None = None
     message: str = ""
     details: dict = Field(default_factory=dict)
 

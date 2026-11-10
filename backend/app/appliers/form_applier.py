@@ -41,49 +41,38 @@ class FormJobApplier(BaseJobApplier):
             )
 
         try:
-            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                res = await client.get(app_url)
-                body = res.text.lower()
+            # Execute browser-driven form autofill (Dry-run mode: fills all fields and stops before submit)
+            from app.agents.browser_form_filler import form_filler
 
-                # Check for CAPTCHA indicators
-                if "hcaptcha" in body or "recaptcha" in body or "cf-turnstile" in body or "challenges.cloudflare" in body:
-                    logger.info("CAPTCHA detected on application page", url=app_url)
-                    return ApplicationResult(
-                        success=False,
-                        status="REQUIRES_USER_ACTION",
-                        action_type="captcha",
-                        message="CAPTCHA challenge detected on application page. Please verify in browser.",
-                        details={"url": app_url},
-                    )
+            fill_res = await form_filler.fill_application_form(
+                job=job,
+                user=user,
+                profile=profile,
+                resume=resume,
+                dry_run=True,
+            )
 
-                # Simulated/Autonomous submission success
-                personal = profile.get("personal", {})
-                candidate_name = personal.get("full_name") or user.get("discord_username")
-
-                logger.info(
-                    "Autonomous application submitted successfully",
-                    job_id=str(job.get("_id")),
-                    company=job.get("company"),
-                    title=job.get("title"),
-                    candidate=candidate_name,
-                )
-
+            if fill_res.success:
                 return ApplicationResult(
                     success=True,
-                    status="APPLIED",
-                    message="Application submitted successfully via Form Applier",
-                    details={
-                        "target_url": app_url,
-                        "candidate_name": candidate_name,
-                        "pdf_resume": resume.get("pdf_path"),
-                    },
+                    status="FORM_FILLED_READY",
+                    action_type="review_ready",
+                    message=fill_res.message,
+                    details=fill_res.to_dict(),
+                )
+            else:
+                return ApplicationResult(
+                    success=False,
+                    status="FAILED",
+                    message=fill_res.message,
+                    details=fill_res.to_dict(),
                 )
 
         except Exception as e:
-            logger.error("Application failed with error", error=str(e), url=app_url)
+            logger.error("Application form autofill failed with error", error=str(e), url=app_url)
             return ApplicationResult(
                 success=False,
                 status="FAILED",
-                message=f"Network or submission error: {str(e)}",
+                message=f"Autofill error: {str(e)}",
                 details={"error": str(e)},
             )

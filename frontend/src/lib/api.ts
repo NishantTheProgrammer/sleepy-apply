@@ -213,6 +213,18 @@ export const jobsApi = {
   },
   get: (id: string) => request(`/api/jobs/${id}`),
   apply: (id: string) => request(`/api/jobs/${id}/apply`, { method: "POST" }),
+  autoApplyForm: (id: string) =>
+    request<{
+      ok: boolean;
+      status: string;
+      message: string;
+      target_url: string;
+      fields_filled: Array<{ field: string; value: string; type: string }>;
+      submit_button_found: boolean;
+      screenshot_path?: string;
+      screenshot_base64?: string;
+      questions_answered?: Array<{ field: string; answer: string }>;
+    }>(`/api/jobs/${id}/auto-apply-form`, { method: "POST" }),
   fetchNow: () => request<{ ok: boolean; message: string }>("/api/jobs/fetch-now", { method: "POST" }),
   generateResume: (jobId: string, template?: string) =>
     request<{

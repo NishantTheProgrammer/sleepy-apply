@@ -234,6 +234,91 @@ async def trigger_apply(request: Request, job_id: str):
     return {"ok": True, "message": "Application pipeline triggered", "job_id": job_id}
 
 
+@router.post("/{job_id}/auto-apply-form")
+async def auto_apply_form_preview(request: Request, job_id: str):
+    """
+    Autofills the job application form using the autonomous browser agent,
+    uploads tailored resume and fills profile details, but strictly STOPS
+    before pressing Apply/Submit. Returns screenshot preview and filled fields.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
+    resume = await db.resumes.find_one({"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)})
+
+    from app.agents.browser_form_filler import form_filler
+
+    res = await form_filler.fill_application_form(
+        job=job,
+        user=user or {},
+        profile=profile,
+        resume=resume,
+        dry_run=True,
+    )
+
+    # Save to application record
+    now = datetime.now(timezone.utc)
+    app_doc = await db.applications.find_one({"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)})
+    if not app_doc:
+        app_doc = {
+            "user_id": ObjectId(user_id),
+            "job_id": ObjectId(job_id),
+            "status": "FORM_FILLED_READY",
+            "status_history": [{"status": "FORM_FILLED_READY", "timestamp": now, "reason": res.message}],
+            "form_fill_details": res.to_dict(),
+            "screenshot_path": res.screenshot_path,
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.applications.insert_one(app_doc)
+    else:
+        await db.applications.update_one(
+            {"_id": app_doc["_id"]},
+            {
+                "$set": {
+                    "status": "FORM_FILLED_READY",
+                    "form_fill_details": res.to_dict(),
+                    "screenshot_path": res.screenshot_path,
+                    "updated_at": now,
+                },
+                "$push": {
+                    "status_history": {"status": "FORM_FILLED_READY", "timestamp": now, "reason": res.message}
+                },
+            },
+        )
+
+    # Broadcast to Discord #auto-applied
+    try:
+        from app.agents.discord_bot import DiscordAgent
+        discord = DiscordAgent()
+        await discord.notify_application_submitted(
+            job_title=f"[Form Autofilled - Review Ready] {job.get('title', '')}",
+            company=job.get("company", ""),
+            score=95,
+            discord_user_id=user.get("discord_id") if user else None,
+        )
+    except Exception as e:
+        logger.debug("Discord broadcast error", error=str(e))
+
+    return {
+        "ok": res.success,
+        "status": res.status,
+        "message": res.message,
+        "target_url": res.target_url,
+        "fields_filled": res.fields_filled,
+        "submit_button_found": res.submit_button_found,
+        "screenshot_path": res.screenshot_path,
+        "screenshot_base64": res.screenshot_base64,
+        "questions_answered": res.questions_answered,
+    }
+
+
 @router.post("/{job_id}/generate-resume")
 async def generate_tailored_resume(request: Request, job_id: str, template: str | None = None):
     """Generate tailored resume JSON against user profile and JD, and store against job-user match."""

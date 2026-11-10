@@ -305,6 +305,19 @@ function JobsPageContent() {
   const [previewTemplate, setPreviewTemplate] = useState<string>("default");
   const [copiedJson, setCopiedJson] = useState(false);
 
+  // Auto-Apply Form Filler Review Modal (Dry-Run Preview)
+  const [formFillResult, setFormFillResult] = useState<{
+    job_id: string;
+    job_title: string;
+    company: string;
+    target_url: string;
+    fields_filled: Array<{ field: string; value: string; type: string }>;
+    submit_button_found: boolean;
+    screenshot_base64?: string;
+    screenshot_path?: string;
+    message: string;
+  } | null>(null);
+
   const load = async (p = 1) => {
     setLoading(true);
     try {
@@ -375,10 +388,25 @@ function JobsPageContent() {
   const handleApply = async (jobId: string) => {
     setApplying(jobId);
     try {
-      await jobsApi.apply(jobId);
+      const targetItem = jobs.find((j) => j.job._id === jobId || j._id === jobId || j.job_id === jobId);
+      const res = await jobsApi.autoApplyForm(jobId);
+      if (res.ok) {
+        setFormFillResult({
+          job_id: jobId,
+          job_title: targetItem?.job.title || "Position",
+          company: targetItem?.job.company || "Company",
+          target_url: res.target_url,
+          fields_filled: res.fields_filled || [],
+          submit_button_found: res.submit_button_found,
+          screenshot_base64: res.screenshot_base64,
+          screenshot_path: res.screenshot_path,
+          message: res.message,
+        });
+      }
       await load(page);
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Auto-apply form filler failed";
+      alert(msg);
     } finally {
       setApplying(null);
     }
@@ -910,18 +938,22 @@ function JobsPageContent() {
                   <div className="flex items-center gap-2 pt-2 border-t border-white/10">
                     <button
                       onClick={() => handleApply(selectedItem.job._id)}
-                      disabled={applying === selectedItem.job._id || ["APPLIED", "VERIFIED_SUCCESS"].includes(selectedItem.application?.status || "")}
+                      disabled={applying === selectedItem.job._id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-60"
                     >
                       {applying === selectedItem.job._id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : selectedItem.application?.status === "FORM_FILLED_READY" ? (
+                        <CheckCircle className="w-3.5 h-3.5 text-amber-300" />
                       ) : selectedItem.application?.status === "APPLIED" || selectedItem.application?.status === "VERIFIED_SUCCESS" ? (
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
                       ) : (
                         <Zap className="w-3.5 h-3.5" />
                       )}
                       {applying === selectedItem.job._id
-                        ? "Executing LangGraph Apply Pipeline…"
+                        ? "Autofilling Form (No-Submit Review Mode)…"
+                        : selectedItem.application?.status === "FORM_FILLED_READY"
+                        ? "Form Autofilled (Ready to Review)"
                         : selectedItem.application?.status === "APPLIED"
                         ? "Applied with AI"
                         : "One-Click Auto-Apply with AI"}
@@ -1828,12 +1860,135 @@ function JobsPageContent() {
                       handleApply(previewItem.job._id);
                       setPreviewModalOpen(false);
                     }}
-                    disabled={applying === previewItem.job._id || ["APPLIED", "VERIFIED_SUCCESS"].includes(previewItem.application?.status || "")}
+                    disabled={applying === previewItem.job._id}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Zap className="w-3.5 h-3.5" />
                     <span>Auto-Apply with this Resume</span>
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Auto-Apply Form Filler Review Modal (Dry-Run Preview) ── */}
+      <AnimatePresence>
+        {formFillResult && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="glass rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-emerald-500/30 shadow-2xl overflow-hidden bg-slate-950/95"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-emerald-950/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-black text-white">Application Form Autofilled</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        🛑 Submission Withheld for Review
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {formFillResult.company} • {formFillResult.job_title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setFormFillResult(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+                {/* Review Mode Banner */}
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-amber-500/15 border border-amber-500/30 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-200">
+                        Form Successfully Pre-Filled by AI Browser Agent
+                      </p>
+                      <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+                        We navigated to the career portal, filled your candidate details, social URLs, and attached your tailored resume.
+                        <strong> The final apply/submit button was intentionally NOT pressed</strong> so you can review and verify before submitting.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filled Form Screenshot Preview */}
+                {formFillResult.screenshot_base64 && (
+                  <div className="rounded-2xl border border-white/10 overflow-hidden bg-black/40">
+                    <div className="px-3.5 py-2 bg-white/5 border-b border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-semibold flex items-center gap-1.5 text-slate-300">
+                        <Eye className="w-3.5 h-3.5 text-purple-400" />
+                        Captured Form Screenshot (Live State)
+                      </span>
+                      <span className="text-emerald-400 font-bold">Autofill Completed</span>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      <img
+                        src={formFillResult.screenshot_base64}
+                        alt="Autofilled Form Preview"
+                        className="w-full object-cover object-top"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Filled Fields Breakdown */}
+                <div>
+                  <h4 className="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                    Filled Information ({formFillResult.fields_filled.length} fields)
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {formFillResult.fields_filled.map((f, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-2"
+                      >
+                        <span className="text-slate-400 text-[11px] font-medium shrink-0">{f.field}</span>
+                        <span className="text-white font-semibold text-right truncate text-[11px]" title={f.value}>
+                          {f.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-white/10 bg-slate-900/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-[11px] text-slate-400">
+                  Ready to submit? Open the portal and click the final submit button.
+                </span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => setFormFillResult(null)}
+                    className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-colors cursor-pointer"
+                  >
+                    Done Reviewing
+                  </button>
+                  <a
+                    href={formFillResult.target_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all"
+                  >
+                    <span>Open Career Portal to Submit</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
               </div>
             </motion.div>

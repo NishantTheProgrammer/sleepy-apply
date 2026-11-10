@@ -97,6 +97,13 @@ def create_app() -> FastAPI:
     app.include_router(pipeline.router, prefix="/api")
     app.include_router(templates.router, prefix="/api")
 
+    # Serve static assets (form previews & screenshots)
+    import os
+    from fastapi.staticfiles import StaticFiles
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    os.makedirs(os.path.join(static_dir, "form_previews"), exist_ok=True)
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
     @app.get("/health")
     async def health():
         return {"status": "ok"}

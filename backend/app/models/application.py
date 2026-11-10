@@ -9,6 +9,7 @@ ApplicationStatus = Literal[
     "MATCHED",
     "RESUME_GENERATED",
     "READY_TO_APPLY",
+    "FORM_FILLED_READY",
     "APPLYING",
     "APPLIED",
     "VERIFIED_SUCCESS",

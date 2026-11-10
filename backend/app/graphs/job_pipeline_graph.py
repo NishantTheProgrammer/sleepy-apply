@@ -89,6 +89,7 @@ async def match_jobs_node(state: JobPipelineState) -> JobPipelineState:
 
     for uid in target_user_ids:
         settings_doc = await db.user_settings.find_one({"user_id": ObjectId(uid)})
+        profile_doc = await db.profiles.find_one({"user_id": ObjectId(uid)})
         user_settings = UserSettings(**settings_doc) if settings_doc else None
 
         app_prefs = user_settings.application_preferences if user_settings else None
@@ -97,7 +98,14 @@ async def match_jobs_node(state: JobPipelineState) -> JobPipelineState:
         # Find active jobs to match
         job_cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
         async for j in job_cursor:
-            m = await matcher.match_user_and_job(uid, str(j["_id"]), user_settings=user_settings, use_ai_reasoning=False)
+            m = await matcher.match_user_and_job(
+                uid,
+                str(j["_id"]),
+                user_settings=user_settings,
+                use_ai_reasoning=False,
+                profile=profile_doc,
+                job=j,
+            )
             if m and m.get("compatibility_score", 0) >= threshold:
                 matches.append(m)
 

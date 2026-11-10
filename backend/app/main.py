@@ -77,11 +77,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow frontend origins
-    origins = list(dict.fromkeys([cfg.frontend_url, "http://localhost:3000", "http://localhost:3002"]))
+    # CORS — allow frontend origins & tunnels
+    origins = list(dict.fromkeys([cfg.frontend_url, "http://localhost:3000", "http://localhost:3002", "http://127.0.0.1:3000", "http://127.0.0.1:3002"]))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
+        allow_origin_regex=r"^https?://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

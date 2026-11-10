@@ -192,10 +192,14 @@ class JobMatcherAgent:
         job_id: str,
         user_settings: UserSettings | None = None,
         use_ai_reasoning: bool = False,
+        profile: dict | None = None,
+        job: dict | None = None,
     ) -> dict | None:
         db = get_db()
-        profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
-        job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+        if profile is None:
+            profile = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+        if job is None:
+            job = await db.jobs.find_one({"_id": ObjectId(job_id)})
 
         if not profile or not job:
             return None

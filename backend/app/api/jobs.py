@@ -22,10 +22,18 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
         db = get_db()
         matcher = JobMatcherAgent()
         settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+        profile_doc = await db.profiles.find_one({"user_id": ObjectId(user_id)})
         user_settings = UserSettings(**settings_doc) if settings_doc else None
         cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
         async for j in cursor:
-            await matcher.match_user_and_job(user_id, str(j["_id"]), user_settings=user_settings, use_ai_reasoning=False)
+            await matcher.match_user_and_job(
+                user_id,
+                str(j["_id"]),
+                user_settings=user_settings,
+                use_ai_reasoning=False,
+                profile=profile_doc,
+                job=j,
+            )
     except Exception as e:
         logger.warning("Fast job matching failed", error=str(e), user_id=user_id)
 

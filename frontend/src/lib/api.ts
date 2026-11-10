@@ -6,15 +6,29 @@ const API_URL =
 let isRefreshingToken = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(new Error("Request timed out")), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: options?.signal ?? controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function doTokenRefresh(): Promise<boolean> {
   if (isRefreshingToken && refreshPromise) return refreshPromise;
   isRefreshingToken = true;
   refreshPromise = (async () => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+      const res = await fetchWithTimeout(`${API_URL}/api/auth/refresh`, {
         method: "POST",
         credentials: "include",
-      });
+      }, 8000);
       return res.ok;
     } catch {
       return false;
@@ -27,7 +41,7 @@ async function doTokenRefresh(): Promise<boolean> {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  let res = await fetch(`${API_URL}${path}`, {
+  let res = await fetchWithTimeout(`${API_URL}${path}`, {
     credentials: "include", // send httpOnly cookies
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
@@ -44,7 +58,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   ) {
     const refreshed = await doTokenRefresh();
     if (refreshed) {
-      res = await fetch(`${API_URL}${path}`, {
+      res = await fetchWithTimeout(`${API_URL}${path}`, {
         credentials: "include",
         headers: { "Content-Type": "application/json", ...options?.headers },
         ...options,

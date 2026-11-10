@@ -9,7 +9,16 @@ _client: AsyncIOMotorClient | None = None
 async def connect_db() -> None:
     global _client
     settings = get_settings()
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
+    _client = AsyncIOMotorClient(
+        settings.mongodb_uri,
+        maxPoolSize=50,
+        minPoolSize=5,
+        maxIdleTimeMS=45000,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=15000,
+        retryWrites=True,
+    )
     # Verify connection
     await _client.admin.command("ping")
     logger.info("MongoDB connected", db=settings.mongodb_db_name)

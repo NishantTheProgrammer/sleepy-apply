@@ -179,6 +179,85 @@ class DiscordAgent:
             logger.error("Error sending Discord DM via REST API", error=str(e))
             return False
 
+    async def send_channel(
+        self,
+        channel_id: str | None,
+        title: str,
+        description: str,
+        fields: list[dict[str, Any]] | None = None,
+        color: int = 0x6366F1,
+        url: str | None = None,
+    ) -> bool:
+        """Send an embed message directly to a Discord server text channel."""
+        cid = channel_id or self.settings.discord_channel_id
+        if not cid:
+            return False
+
+        token = self.settings.discord_bot_token
+        if not is_valid_token(token):
+            return False
+
+        # Try live gateway client first
+        global _bot_instance
+        if _bot_instance and _bot_instance.is_ready():
+            try:
+                ch = _bot_instance.get_channel(int(cid)) or await _bot_instance.fetch_channel(int(cid))
+                if ch:
+                    discord_embed = discord.Embed(
+                        title=title,
+                        description=description,
+                        color=color,
+                        timestamp=datetime.now(timezone.utc),
+                    )
+                    if url:
+                        discord_embed.url = url
+                    discord_embed.set_footer(text="Sleepy Apply • Autonomous Job Search")
+                    if fields:
+                        for f in fields:
+                            discord_embed.add_field(
+                                name=f["name"],
+                                value=str(f["value"]),
+                                inline=f.get("inline", True),
+                            )
+                    await ch.send(embed=discord_embed)
+                    logger.info("Discord channel message sent via Gateway", channel_id=cid, title=title)
+                    return True
+            except Exception as e:
+                logger.warning("Gateway channel message failed, falling back to REST", error=str(e), channel_id=cid)
+
+        # Fallback to REST API
+        try:
+            embed_payload: dict[str, Any] = {
+                "title": title,
+                "description": description,
+                "color": color,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "footer": {"text": "Sleepy Apply • Autonomous Job Search"},
+            }
+            if url:
+                embed_payload["url"] = url
+            if fields:
+                embed_payload["fields"] = [
+                    {"name": f["name"], "value": str(f["value"]), "inline": f.get("inline", True)}
+                    for f in fields
+                ]
+            headers = {"Authorization": f"Bot {token}"}
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(
+                    f"https://discord.com/api/v10/channels/{cid}/messages",
+                    headers=headers,
+                    json={"embeds": [embed_payload]},
+                )
+                if res.status_code in [200, 201]:
+                    logger.info("Discord channel message sent via REST API", channel_id=cid, title=title)
+                    return True
+                else:
+                    logger.warning("Failed to post message to channel", status=res.status_code, body=res.text)
+                    return False
+        except Exception as e:
+            logger.error("Error sending Discord channel message via REST API", error=str(e))
+            return False
+
     async def send_notification(
         self,
         title: str,
@@ -189,10 +268,10 @@ class DiscordAgent:
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        """Deliver notification to user DM if ID provided, and/or to webhook."""
+        """Deliver notification to user DM if ID provided, and/or to webhook, and/or to default server channel."""
         sent_any = False
 
-        if discord_user_id:
+        if discord_user_id and self.settings.discord_enable_dm:
             dm_success = await self.send_dm(
                 discord_user_id=discord_user_id,
                 title=title,
@@ -214,6 +293,18 @@ class DiscordAgent:
         )
         if webhook_success:
             sent_any = True
+
+        if self.settings.discord_channel_id:
+            ch_success = await self.send_channel(
+                channel_id=self.settings.discord_channel_id,
+                title=title,
+                description=description,
+                fields=fields,
+                color=color,
+                url=url,
+            )
+            if ch_success:
+                sent_any = True
 
         return sent_any
 
@@ -311,8 +402,8 @@ class DiscordAgent:
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> dict[str, bool]:
-        """Test sending to webhook and/or DM."""
-        results = {"webhook": False, "dm": False}
+        """Test sending to webhook and/or DM and/or server channel."""
+        results = {"webhook": False, "dm": False, "channel": False}
         title = "🧪 Sleepy Apply Discord Connection Verified"
         desc = "Your Sleepy Apply Discord notification integration is functioning properly!"
         fields = [
@@ -329,9 +420,18 @@ class DiscordAgent:
                 color=0x10B981,
             )
 
-        if discord_user_id:
+        if discord_user_id and self.settings.discord_enable_dm:
             results["dm"] = await self.send_dm(
                 discord_user_id=discord_user_id,
+                title=title,
+                description=desc,
+                fields=fields,
+                color=0x10B981,
+            )
+
+        if self.settings.discord_channel_id:
+            results["channel"] = await self.send_channel(
+                channel_id=self.settings.discord_channel_id,
                 title=title,
                 description=desc,
                 fields=fields,

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     discord_redirect_uri: str = "http://localhost:3000/auth/callback"
     discord_bot_token: str = "dev_discord_bot_token"
     discord_webhook_url: str | None = None
+    discord_channel_id: str | None = None
+    discord_enable_dm: bool = False
     admin_emails: list[str] = ["knishant113@gmail.com"]
     admin_discord_ids: list[str] = []
 

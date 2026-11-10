@@ -256,6 +256,16 @@ class NaukriJobSource(BaseJobSource):
         collected_jobs: list[RawJobData] = []
         seen_ids: set[str] = set()
 
+        # Pre-fetch existing external IDs so we skip already indexed jobs and discover fresh postings
+        existing_ids: set[str] = set()
+        try:
+            db = get_db()
+            async for j in db.jobs.find({"source": "naukri"}, {"external_id": 1}):
+                if j.get("external_id"):
+                    existing_ids.add(j["external_id"])
+        except Exception:
+            pass
+
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, headers=headers) as client:
             for city in cities_to_scan:
                 if len(collected_jobs) >= max_jobs:
@@ -300,7 +310,7 @@ class NaukriJobSource(BaseJobSource):
                             continue
 
                         parsed = parse_naukri_url(u, posted_at=posted_at, posted_raw=lastmod_str)
-                        if not parsed or parsed.external_id in seen_ids:
+                        if not parsed or parsed.external_id in seen_ids or parsed.external_id in existing_ids:
                             continue
 
                         seen_ids.add(parsed.external_id)

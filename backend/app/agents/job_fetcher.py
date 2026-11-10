@@ -24,7 +24,7 @@ class JobFetcherAgent:
         self.linkedin_source = LinkedInJobSource()
         self.naukri_source = NaukriJobSource()
         self.indeed_source = IndeedJobSource()
-        self.playwright_crawler = PlaywrightJobCrawler()
+        self.playwright_crawler = PlaywrightJobCrawler(headless=True)
 
     async def fetch_and_store_jobs(
         self,
@@ -63,21 +63,23 @@ class JobFetcherAgent:
                     custom_companies = []
                     cursor = db.companies.find({"is_active": True})
                     async for doc in cursor:
+                        raw_type = doc.get("ats_type")
+                        ats_clean = (raw_type if raw_type else "custom").lower().strip()
                         comp_info = {
                             "name": doc["name"],
-                            "ats_type": doc.get("ats_type", "custom"),
+                            "ats_type": ats_clean,
                             "board_token": doc.get("board_token"),
                             "career_page": doc.get("career_page", ""),
                         }
-                        if comp_info["ats_type"] == "custom" and comp_info["career_page"]:
-                            custom_companies.append(comp_info)
-                        else:
+                        if comp_info["ats_type"] in ["greenhouse", "lever", "ashby", "smartrecruiters", "workday", "darwinbox", "keka"]:
                             active_companies.append(comp_info)
+                        elif comp_info["career_page"]:
+                            custom_companies.append(comp_info)
 
                     if active_companies:
                         ats_jobs = await self.ats_source.fetch_jobs({
                             "companies": active_companies,
-                            "limit_per_company": 15,
+                            "limit_per_company": 25,
                             "delhi_ncr_only": delhi_ncr_only,
                         })
                         for j in ats_jobs:
@@ -91,6 +93,7 @@ class JobFetcherAgent:
                                 "companies": custom_companies[:5],  # polite batch limit for headless browsing
                                 "delhi_ncr_only": delhi_ncr_only,
                                 "limit_per_company": 10,
+                                "headless": True,
                             })
                             for j in pw_jobs:
                                 j.source = "career"
@@ -107,7 +110,7 @@ class JobFetcherAgent:
                         "keywords": resolved_keywords,
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
-                        "limit": 25,
+                        "limit": 50,
                     })
                     for j in linkedin_jobs:
                         j.source = "linkedin"
@@ -122,7 +125,7 @@ class JobFetcherAgent:
                         "keywords": resolved_keywords,
                         "delhi_ncr_only": delhi_ncr_only,
                         "max_age_days": 14,
-                        "limit": 25,
+                        "limit": 50,
                     })
                     for j in naukri_jobs:
                         j.source = "naukri"

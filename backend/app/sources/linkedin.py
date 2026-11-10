@@ -120,44 +120,59 @@ class LinkedInJobSource(BaseJobSource):
         seen_ids: set[str] = set()
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
-        search_keywords = keywords_list[:5]
-        rate_limited = False
+        # Pre-fetch existing external IDs so we skip already indexed jobs and discover fresh postings
+        existing_ids: set[str] = set()
+        try:
+            db = get_db()
+            async for j in db.jobs.find({"source": "linkedin"}, {"external_id": 1}):
+                if j.get("external_id"):
+                    existing_ids.add(j["external_id"])
+        except Exception:
+            pass
+
+        search_keywords = keywords_list[:8]
 
         async with httpx.AsyncClient(timeout=12.0, follow_redirects=True, headers=headers) as client:
             for loc in locations:
-                if len(collected_jobs) >= max_jobs or rate_limited:
+                if len(collected_jobs) >= max_jobs:
                     break
                 for kw in search_keywords:
                     if len(collected_jobs) >= max_jobs:
                         break
-                    try:
-                        q_kw = urllib.parse.quote_plus(kw)
-                        q_loc = urllib.parse.quote_plus(loc)
-                        search_url = (
-                            f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-                            f"?keywords={q_kw}&location={q_loc}&f_TPR={tpr_param}&start=0"
-                        )
-
-                        r = await client.get(search_url, headers=headers)
-                        if r.status_code == 429:
-                            logger.warning("LinkedIn guest search rate limited (429)", kw=kw, loc=loc)
-                            rate_limited = True
+                    for start_offset in [0, 25]:
+                        if len(collected_jobs) >= max_jobs:
                             break
-                        if r.status_code != 200:
-                            logger.warning("LinkedIn guest search returned non-200", status=r.status_code, kw=kw, loc=loc)
-                            continue
+                        try:
+                            q_kw = urllib.parse.quote_plus(kw)
+                            q_loc = urllib.parse.quote_plus(loc)
+                            search_url = (
+                                f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+                                f"?keywords={q_kw}&location={q_loc}&f_TPR={tpr_param}&start={start_offset}"
+                            )
 
-                        # Parse job cards
-                        card_pattern = re.compile(
-                            r'<div class="[^"]*base-card[^"]*"[^>]*data-entity-urn="urn:li:jobPosting:(\d+)"[^>]*>([\s\S]*?)<\/li>',
-                            re.IGNORECASE,
-                        )
-                        matches = card_pattern.findall(r.text)
-
-                        for jid, card_html in matches:
-                            if jid in seen_ids or len(collected_jobs) >= max_jobs:
+                            r = await client.get(search_url, headers=headers)
+                            if r.status_code == 429:
+                                logger.warning("LinkedIn guest search rate limited (429)", kw=kw, loc=loc)
+                                await asyncio.sleep(0.5)
+                                break
+                            if r.status_code != 200:
+                                logger.warning("LinkedIn guest search returned non-200", status=r.status_code, kw=kw, loc=loc)
                                 continue
-                            seen_ids.add(jid)
+
+                            # Parse job cards
+                            card_pattern = re.compile(
+                                r'<div class="[^"]*base-card[^"]*"[^>]*data-entity-urn="urn:li:jobPosting:(\d+)"[^>]*>([\s\S]*?)<\/li>',
+                                re.IGNORECASE,
+                            )
+                            matches = card_pattern.findall(r.text)
+                            if not matches:
+                                break
+
+                            for jid, card_html in matches:
+                                ext_id = f"linkedin_{jid}"
+                                if jid in seen_ids or ext_id in existing_ids or len(collected_jobs) >= max_jobs:
+                                    continue
+                                seen_ids.add(jid)
 
                             # 1. Parse Card Time and Date
                             time_m = re.search(r'<time[^>]*datetime="([^"]+)"[^>]*>([\s\S]*?)<\/time>', card_html)
@@ -279,10 +294,9 @@ class LinkedInJobSource(BaseJobSource):
                                 )
                             )
 
-                        await asyncio.sleep(0.5)
-
-                    except Exception as e:
-                        logger.warning("LinkedIn search iteration failed", error=str(e), kw=kw, loc=loc)
+                            await asyncio.sleep(0.5)
+                        except Exception as e:
+                            logger.warning("LinkedIn search iteration failed", error=str(e), kw=kw, loc=loc)
 
         logger.info("LinkedIn fresh live job fetch complete", total=len(collected_jobs), delhi_ncr_only=delhi_ncr_only)
         return collected_jobs

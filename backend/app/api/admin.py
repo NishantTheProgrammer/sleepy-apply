@@ -406,7 +406,28 @@ async def admin_fetch_live_jobs(
         try:
             if source == "career-crawled":
                 logger.info("Admin triggered AI browser crawler batch for 10 companies")
-                await crawler_manager.run_batch(headless=False)
+                await crawler_manager.run_batch(headless=True)
+            elif source == "all":
+                logger.info("Admin triggered live job fetcher for all sources", delhi_ncr_only=delhi_ncr_only)
+                res = await fetcher.fetch_and_store_jobs(source="all", delhi_ncr_only=delhi_ncr_only)
+                logger.info("Live job fetcher completed", source="all", count=len(res))
+                try:
+                    from app.agents.discord_bot import DiscordAgent
+                    discord_agent = DiscordAgent()
+                    await discord_agent.notify_admin_crawl(
+                        crawled_count=len(res),
+                        source_breakdown={"All Ingested Sources": len(res)},
+                        checkpoint_summary=f"Admin live sync: {len(res)} fresh jobs indexed into MongoDB.",
+                    )
+                except Exception as d_err:
+                    logger.warning("Discord crawl notification failed", error=str(d_err))
+
+                # Also trigger background AI Browser crawler batch for target company career portals
+                if not crawler_manager.get_status().get("is_running"):
+                    try:
+                        await crawler_manager.run_batch(headless=True, limit_per_company=5)
+                    except Exception as c_err:
+                        logger.warning("Crawler batch in fetch-all encountered error", error=str(c_err))
             else:
                 logger.info("Admin triggered live job fetcher", source=source, delhi_ncr_only=delhi_ncr_only)
                 res = await fetcher.fetch_and_store_jobs(source=source, delhi_ncr_only=delhi_ncr_only)

@@ -125,6 +125,12 @@ function formatLocation(loc: unknown): string {
 
 function renderFormattedText(text: unknown, customBoldClass?: string) {
   if (!text) return null;
+  let str = String(text);
+  const projMatch = str.match(/^([A-Za-z0-9.\-,\s/]{2,55}):\s*(.*)$/);
+  if (projMatch && !str.startsWith("**") && !str.startsWith("<strong>")) {
+    const cleanPrefix = projMatch[1].replace(/\*\*/g, "").trim();
+    str = `**${cleanPrefix}:** ${projMatch[2].trim()}`;
+  }
   return (
     <ReactMarkdown
       components={{
@@ -141,7 +147,7 @@ function renderFormattedText(text: unknown, customBoldClass?: string) {
         p: ({ children }) => <span className="inline">{children}</span>,
       }}
     >
-      {String(text)}
+      {str}
     </ReactMarkdown>
   );
 }
@@ -1624,8 +1630,8 @@ function JobsPageContent() {
                                             const spAchs = Array.isArray(sp.achievements) ? sp.achievements : [];
                                             return (
                                               <div key={spi} className="text-[11px]">
-                                                <span className="font-semibold text-slate-900">
-                                                  {String(sp.name || sp.title || "Project")}
+                                                <span className="font-bold text-slate-950 font-black">
+                                                  {String(sp.name || sp.title || "Project")}:
                                                 </span>{" "}
                                                 {spTech.length > 0 && (
                                                   <span className="text-slate-500">

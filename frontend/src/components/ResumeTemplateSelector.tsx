@@ -7,6 +7,36 @@ import {
   ExternalLink, Layers, Loader2
 } from "lucide-react";
 import { templatesApi, ResumeTemplateItem } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
+
+function renderFormattedText(text: unknown, customBoldClass?: string) {
+  if (!text) return null;
+  let str = String(text);
+  const projMatch = str.match(/^([A-Za-z0-9.\-,\s/]{2,55}):\s*(.*)$/);
+  if (projMatch && !str.startsWith("**") && !str.startsWith("<strong>")) {
+    const cleanPrefix = projMatch[1].replace(/\*\*/g, "").trim();
+    str = `**${cleanPrefix}:** ${projMatch[2].trim()}`;
+  }
+  return (
+    <ReactMarkdown
+      components={{
+        strong: ({ children }) => (
+          <strong className={customBoldClass || "font-bold text-slate-900 font-black"}>
+            {children}
+          </strong>
+        ),
+        b: ({ children }) => (
+          <strong className={customBoldClass || "font-bold text-slate-900 font-black"}>
+            {children}
+          </strong>
+        ),
+        p: ({ children }) => <span className="inline">{children}</span>,
+      }}
+    >
+      {str}
+    </ReactMarkdown>
+  );
+}
 
 const isClean = (val: unknown): val is string => {
   if (typeof val !== "string") return false;
@@ -610,7 +640,7 @@ export default function ResumeTemplateSelector({
                         {exp.responsibilities && exp.responsibilities.filter(isClean).length > 0 && (
                           <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
                             {exp.responsibilities.filter(isClean).map((r, ri) => (
-                              <li key={ri}>{r}</li>
+                              <li key={ri}>{renderFormattedText(r)}</li>
                             ))}
                           </ul>
                         )}
@@ -622,8 +652,8 @@ export default function ResumeTemplateSelector({
                               .filter((sp) => isClean(sp.name))
                               .map((sp, spi) => (
                                 <div key={spi} className="text-[11px]">
-                                  <span className="font-semibold text-slate-800">
-                                    {sp.name}
+                                  <span className="font-bold text-slate-900 font-black">
+                                    {sp.name}:
                                   </span>{" "}
                                   {sp.technologies && sp.technologies.filter(isClean).length > 0 && (
                                     <span className="text-slate-500">
@@ -633,7 +663,7 @@ export default function ResumeTemplateSelector({
                                   {sp.achievements && sp.achievements.filter(isClean).length > 0 && (
                                     <ul className="list-disc pl-3 text-slate-600">
                                       {sp.achievements.filter(isClean).map((ach, achi) => (
-                                        <li key={achi}>{ach}</li>
+                                        <li key={achi}>{renderFormattedText(ach)}</li>
                                       ))}
                                     </ul>
                                   )}
@@ -658,7 +688,7 @@ export default function ResumeTemplateSelector({
                     .map((proj, idx) => (
                       <div key={idx} className="text-xs sm:text-[13px]">
                         <div className="flex items-baseline gap-2">
-                          <span className="font-bold text-slate-900">{proj.name}</span>
+                          <span className="font-bold text-slate-900 font-black">{proj.name}</span>
                           {proj.technologies && proj.technologies.filter(isClean).length > 0 && (
                             <span className="text-slate-500 text-[11px]">
                               ({proj.technologies.filter(isClean).join(", ")})
@@ -666,9 +696,9 @@ export default function ResumeTemplateSelector({
                           )}
                         </div>
                         {isClean(proj.description) && (
-                          <p className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
-                            {proj.description}
-                          </p>
+                          <div className="text-slate-700 text-xs mt-0.5 pl-3 border-l border-slate-200">
+                            {renderFormattedText(proj.description)}
+                          </div>
                         )}
                       </div>
                     ))}

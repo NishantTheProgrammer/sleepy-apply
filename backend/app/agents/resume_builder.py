@@ -426,8 +426,19 @@ def preserve_and_prioritize_experience_bullets(
         m_corp = corp_suffix_pattern.search(b_clean)
         if m_corp:
             matched_co = m_corp.group(1).strip()
-            if company_name and matched_co.lower() not in company_name.lower():
+            # Do NOT strip if it is a project prefix at the start of a bullet (e.g. "TabCorp:")
+            is_proj_prefix = bool(re.match(rf"^\s*{re.escape(matched_co)}\s*:", b_clean, re.IGNORECASE))
+            if not is_proj_prefix and company_name and matched_co.lower() not in company_name.lower():
                 b_clean = corp_suffix_pattern.sub("", b_clean).strip(" .-\t")
+
+        # Self-healing if a previous AI generation or filter left an orphan colon at start
+        if b_clean.startswith(": ") or b_clean.startswith(":"):
+            for ob in clean_orig_bullets:
+                m_ob = re.match(r"^([A-Za-z0-9\.\-,\s/]{2,55}):\s*", ob)
+                if m_ob and ob.endswith(b_clean.lstrip(": ")):
+                    b_clean = f"{m_ob.group(1).strip()}: {b_clean.lstrip(': ')}"
+                    break
+
         for ms in missing_skills:
             if len(ms) > 2:
                 b_clean = re.sub(rf"\b{re.escape(ms)}\b", "", b_clean, flags=re.IGNORECASE)
@@ -442,6 +453,15 @@ def preserve_and_prioritize_experience_bullets(
                 ):
                     pattern = re.compile(rf"\b{re.escape(ms)}\b", re.IGNORECASE)
                     b_clean = pattern.sub(f"**{ms}**", b_clean)
+
+        # Ensure project / platform prefix preceding a colon is always bolded (e.g. "**Indian Partner Network:**")
+        proj_prefix_m = re.match(r"^([A-Za-z0-9\.\-,\s/]{2,55}):\s*(.*)$", b_clean)
+        if proj_prefix_m:
+            raw_prefix = proj_prefix_m.group(1).strip()
+            rest_text = proj_prefix_m.group(2).strip()
+            clean_prefix = raw_prefix.replace("**", "").strip()
+            if clean_prefix and not raw_prefix.startswith("**"):
+                b_clean = f"**{clean_prefix}:** {rest_text}"
 
         b_clean = " ".join(b_clean.split()).strip()
         if b_clean and b_clean not in processed_bullets:

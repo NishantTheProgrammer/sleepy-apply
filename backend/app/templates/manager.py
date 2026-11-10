@@ -251,7 +251,15 @@ def format_profile_for_rendering(profile: dict) -> dict:
         dates = f"{start} – {end}".strip(" –")
 
         resps = exp.get("responsibilities") or exp.get("highlights") or []
-        resps_rich = [markdown_to_richtext(r) for r in resps]
+        resps_rich = []
+        for r in resps:
+            r_str = str(r).strip()
+            # Ensure project prefix preceding colon is bolded in Word export (e.g. "**Indian Partner Network:**")
+            proj_m = re.match(r"^([A-Za-z0-9\.\-,\s/]{2,55}):\s*(.*)$", r_str)
+            if proj_m and not r_str.startswith("**"):
+                clean_p = proj_m.group(1).replace("**", "").strip()
+                r_str = f"**{clean_p}:** {proj_m.group(2).strip()}"
+            resps_rich.append(markdown_to_richtext(r_str))
         achs = exp.get("achievements", [])
 
         # Sub-projects achievements and formatted project items
@@ -262,8 +270,9 @@ def format_profile_for_rendering(profile: dict) -> dict:
             p_desc = sub.get("description", "")
             if not p_desc and sub.get("achievements"):
                 p_desc = " ".join(sub.get("achievements"))
+            sub_title = sub.get("name") or sub.get("title") or "Project"
             projects_formatted.append({
-                "title": sub.get("name", "Project"),
+                "title": markdown_to_richtext(f"**{sub_title}**"),
                 "description": markdown_to_richtext(p_desc),
             })
 
@@ -282,8 +291,9 @@ def format_profile_for_rendering(profile: dict) -> dict:
     projects = []
     for p in raw_proj:
         tech = p.get("technologies") or p.get("tech_stack") or []
+        p_name = p.get("name") or p.get("title", "")
         projects.append({
-            "name": p.get("name") or p.get("title", ""),
+            "name": markdown_to_richtext(f"**{p_name}**"),
             "description": markdown_to_richtext(p.get("description", "")),
             "tech": tech,
             "tech_str": ", ".join(tech),

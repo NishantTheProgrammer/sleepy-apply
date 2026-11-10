@@ -1,4 +1,5 @@
 import os
+import re
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -177,7 +178,13 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
 
                 # Responsibilities
                 for resp in exp.get("responsibilities", []):
-                    story.append(Paragraph(f"• {resp}", bullet_style))
+                    resp_str = str(resp).strip()
+                    proj_m = re.match(r"^([A-Za-z0-9\.\-,\s/]{2,55}):\s*(.*)$", resp_str)
+                    if proj_m and not resp_str.startswith("**") and not resp_str.startswith("<b>"):
+                        clean_p = proj_m.group(1).replace("**", "").strip()
+                        resp_str = f"<b>{clean_p}:</b> {proj_m.group(2).strip()}"
+                    resp_formatted = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", resp_str)
+                    story.append(Paragraph(f"• {resp_formatted}", bullet_style))
 
                 # Sub-projects
                 for sub in exp.get("projects", []):

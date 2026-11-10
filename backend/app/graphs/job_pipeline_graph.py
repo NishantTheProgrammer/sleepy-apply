@@ -127,6 +127,17 @@ async def notify_matches_node(state: JobPipelineState) -> JobPipelineState:
 
     discord = DiscordAgent()
     db = get_db()
+    user_id = state.get("user_id")
+
+    user_doc = None
+    if user_id:
+        try:
+            from bson import ObjectId
+            user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+        except Exception:
+            user_doc = await db.users.find_one({"_id": user_id})
+
+    discord_id = (user_doc or {}).get("discord_id")
 
     # Get top match
     top_match = max(matches, key=lambda m: m.get("compatibility_score", 0))
@@ -137,7 +148,18 @@ async def notify_matches_node(state: JobPipelineState) -> JobPipelineState:
             top_job_title=job.get("title", "Software Engineer"),
             top_company=job.get("company", "Company"),
             top_score=top_match.get("compatibility_score", 0),
+            location=job.get("location", "Delhi NCR / Remote"),
+            matching_skills=top_match.get("matched_skills", []),
+            discord_user_id=discord_id,
         )
+
+    # Broadcast matching completed summary to #admin
+    high_scores = len([m for m in matches if m.get("compatibility_score", 0) >= 75])
+    await discord.notify_admin_matching(
+        jobs_evaluated=len(state.get("enriched_jobs", [])),
+        matches_found=len(matches),
+        high_score_count=high_scores,
+    )
 
     return state
 

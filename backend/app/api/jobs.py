@@ -253,6 +253,31 @@ async def generate_tailored_resume(request: Request, job_id: str, template: str 
     if not result:
         raise HTTPException(status_code=400, detail="Could not generate tailored resume. Check if profile and job exist.")
 
+    # Broadcast notification to Discord #tailored channel
+    try:
+        from app.agents.discord_bot import DiscordAgent
+        import asyncio
+        db = get_db()
+        user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+        discord_id = (user_doc or {}).get("discord_id")
+        content = result.get("content", {})
+        headline = content.get("target_headline") or content.get("job_title", "")
+        matched_skills = content.get("matching_skills", [])
+        score = content.get("compatibility_score", 0)
+        discord_agent = DiscordAgent()
+        asyncio.create_task(
+            discord_agent.notify_tailored_resume_ready(
+                job_title=content.get("job_title", "Role"),
+                company=content.get("company", "Company"),
+                headline=headline,
+                matched_skills_count=len(matched_skills),
+                score=score,
+                discord_user_id=discord_id,
+            )
+        )
+    except Exception as e:
+        logger.warning("Discord tailored notification dispatch failed", error=str(e))
+
     return {
         "ok": True,
         "job_id": job_id,

@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     discord_webhook_url: str | None = None
     discord_channel_id: str | None = None
     discord_enable_dm: bool = False
+
+    # Targeted multi-channel IDs
+    discord_channel_admin: str | None = "1569582529101561928"
+    discord_channel_match: str | None = "1569582530712182895"
+    discord_channel_tailored: str | None = "1569582532444422154"
+    discord_channel_auto_applied: str | None = "1569582534227001345"
+    discord_channel_question: str | None = "1569582536827478167"
     admin_emails: list[str] = ["knishant113@gmail.com"]
     admin_discord_ids: list[str] = []
 

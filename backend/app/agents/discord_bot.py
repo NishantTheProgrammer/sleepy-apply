@@ -187,8 +187,9 @@ class DiscordAgent:
         fields: list[dict[str, Any]] | None = None,
         color: int = 0x6366F1,
         url: str | None = None,
+        content: str | None = None,
     ) -> bool:
-        """Send an embed message directly to a Discord server text channel."""
+        """Send an embed message directly to a Discord server text channel with optional user tagging."""
         cid = channel_id or self.settings.discord_channel_id
         if not cid:
             return False
@@ -211,7 +212,7 @@ class DiscordAgent:
                     )
                     if url:
                         discord_embed.url = url
-                    discord_embed.set_footer(text="Sleepy Apply • Autonomous Job Search")
+                    discord_embed.set_footer(text="Sleepy Apply • Autonomous Job Pipeline")
                     if fields:
                         for f in fields:
                             discord_embed.add_field(
@@ -219,7 +220,7 @@ class DiscordAgent:
                                 value=str(f["value"]),
                                 inline=f.get("inline", True),
                             )
-                    await ch.send(embed=discord_embed)
+                    await ch.send(content=content, embed=discord_embed)
                     logger.info("Discord channel message sent via Gateway", channel_id=cid, title=title)
                     return True
             except Exception as e:
@@ -232,7 +233,7 @@ class DiscordAgent:
                 "description": description,
                 "color": color,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "footer": {"text": "Sleepy Apply • Autonomous Job Search"},
+                "footer": {"text": "Sleepy Apply • Autonomous Job Pipeline"},
             }
             if url:
                 embed_payload["url"] = url
@@ -242,11 +243,15 @@ class DiscordAgent:
                     for f in fields
                 ]
             headers = {"Authorization": f"Bot {token}"}
+            msg_payload: dict[str, Any] = {"embeds": [embed_payload]}
+            if content:
+                msg_payload["content"] = content
+
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
                     f"https://discord.com/api/v10/channels/{cid}/messages",
                     headers=headers,
-                    json={"embeds": [embed_payload]},
+                    json=msg_payload,
                 )
                 if res.status_code in [200, 201]:
                     logger.info("Discord channel message sent via REST API", channel_id=cid, title=title)
@@ -267,8 +272,10 @@ class DiscordAgent:
         url: str | None = None,
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
+        channel_id: str | None = None,
+        content: str | None = None,
     ) -> bool:
-        """Deliver notification to user DM if ID provided, and/or to webhook, and/or to default server channel."""
+        """Deliver notification to target server channel, webhook, or user DM if enabled."""
         sent_any = False
 
         if discord_user_id and self.settings.discord_enable_dm:
@@ -294,19 +301,66 @@ class DiscordAgent:
         if webhook_success:
             sent_any = True
 
-        if self.settings.discord_channel_id:
+        target_channel = channel_id or self.settings.discord_channel_id
+        if target_channel:
             ch_success = await self.send_channel(
-                channel_id=self.settings.discord_channel_id,
+                channel_id=target_channel,
                 title=title,
                 description=description,
                 fields=fields,
                 color=color,
                 url=url,
+                content=content,
             )
             if ch_success:
                 sent_any = True
 
         return sent_any
+
+    async def notify_admin_crawl(
+        self,
+        crawled_count: int,
+        source_breakdown: dict[str, int] | None = None,
+        checkpoint_summary: str = "",
+    ) -> bool:
+        """Post crawling & source ingestion updates to #admin channel."""
+        cid = self.settings.discord_channel_admin or self.settings.discord_channel_id
+        sources_str = ", ".join(f"{k}: {v}" for k, v in (source_breakdown or {}).items()) or "Delhi NCR ATS, Naukri, LinkedIn"
+        fields = [
+            {"name": "Openings Crawled", "value": f"**{crawled_count}** jobs", "inline": True},
+            {"name": "Sources", "value": sources_str, "inline": True},
+        ]
+        if checkpoint_summary:
+            fields.append({"name": "Checkpoint", "value": checkpoint_summary, "inline": False})
+
+        return await self.send_channel(
+            channel_id=cid,
+            title="📊 Openings Crawled & Sources Synced",
+            description=f"Automated crawler cycle completed. Discovered and indexed **{crawled_count}** openings across feeds.",
+            fields=fields,
+            color=0x64748B,
+        )
+
+    async def notify_admin_matching(
+        self,
+        jobs_evaluated: int,
+        matches_found: int,
+        high_score_count: int = 0,
+    ) -> bool:
+        """Post matching engine run updates to #admin channel."""
+        cid = self.settings.discord_channel_admin or self.settings.discord_channel_id
+        fields = [
+            {"name": "Jobs Evaluated", "value": f"**{jobs_evaluated}**", "inline": True},
+            {"name": "Matches Stored", "value": f"**{matches_found}**", "inline": True},
+            {"name": "High Match (≥75%)", "value": f"**{high_score_count}**", "inline": True},
+        ]
+        return await self.send_channel(
+            channel_id=cid,
+            title="⚙️ Matching Engine Cycle Completed",
+            description="Background matching evaluated indexed openings against candidate profile tech stacks.",
+            fields=fields,
+            color=0x475569,
+        )
 
     async def notify_application_submitted(
         self,
@@ -317,20 +371,24 @@ class DiscordAgent:
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
+        """Post submission report to #auto-applied channel and tag candidate."""
+        cid = self.settings.discord_channel_auto_applied or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
         fields = [
-            {"name": "Match Score", "value": f"**{score}%**"},
-            {"name": "Status", "value": "APPLIED"},
+            {"name": "Opening", "value": f"**{job_title}** at **{company}**", "inline": False},
+            {"name": "Match Score", "value": f"⭐ **{score}%**", "inline": True},
+            {"name": "Status", "value": "✅ **APPLIED**", "inline": True},
         ]
         if resume_path:
             fields.append({"name": "Tailored Resume", "value": "DOCX Generated", "inline": True})
 
-        return await self.send_notification(
-            title="🚀 Application Submitted!",
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title=f"🚀 Application Submitted: {company}",
             description=f"Sleepy Apply successfully submitted your application for **{job_title}** at **{company}** while you slept.",
             fields=fields,
-            color=0x10B981,  # Emerald
-            discord_user_id=discord_user_id,
-            webhook_url=webhook_url,
+            color=0x10B981,
         )
 
     async def notify_action_required(
@@ -342,17 +400,19 @@ class DiscordAgent:
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        return await self.send_notification(
-            title="⚠️ Action Required!",
+        cid = self.settings.discord_channel_auto_applied or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title=f"⚠️ Action Required: {company}",
             description=f"Action needed to complete application for **{job_title}** at **{company}**.",
             fields=[
-                {"name": "Action Type", "value": action_type.upper()},
-                {"name": "Link", "value": f"[Open Application]({action_url})"},
+                {"name": "Action Type", "value": action_type.upper(), "inline": True},
+                {"name": "Form Link", "value": f"[Open Application]({action_url})", "inline": True},
             ],
-            color=0xF59E0B,  # Amber
+            color=0xF59E0B,
             url=action_url,
-            discord_user_id=discord_user_id,
-            webhook_url=webhook_url,
         )
 
     async def notify_new_matches(
@@ -361,19 +421,29 @@ class DiscordAgent:
         top_job_title: str,
         top_company: str,
         top_score: int,
+        location: str = "Delhi NCR / Remote",
+        matching_skills: list[str] | None = None,
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        return await self.send_notification(
-            title="🎯 New Jobs Discovered & Matched!",
-            description=f"Discovered **{count}** new matching jobs today.",
-            fields=[
-                {"name": "Top Match", "value": f"{top_job_title} at {top_company}"},
-                {"name": "Compatibility", "value": f"**{top_score}%**"},
-            ],
-            color=0x8B5CF6,  # Purple
-            discord_user_id=discord_user_id,
-            webhook_url=webhook_url,
+        """Post match notifications to #match channel and tag candidate."""
+        cid = self.settings.discord_channel_match or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
+        fields = [
+            {"name": "Top Match", "value": f"**{top_job_title}** at **{top_company}**", "inline": False},
+            {"name": "Compatibility Score", "value": f"⭐ **{top_score}% Match**", "inline": True},
+            {"name": "Location", "value": location, "inline": True},
+        ]
+        if matching_skills:
+            fields.append({"name": "Verified Skills", "value": ", ".join(matching_skills[:6]), "inline": False})
+
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title=f"🎯 New Job Match: {top_job_title} ({top_score}%)",
+            description=f"New opening matching candidate profile with **{top_score}%** compatibility.",
+            fields=fields,
+            color=0x8B5CF6,
         )
 
     async def notify_tailored_resume_ready(
@@ -382,19 +452,51 @@ class DiscordAgent:
         company: str,
         headline: str,
         matched_skills_count: int = 0,
+        score: int = 0,
         discord_user_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        return await self.send_notification(
-            title="📄 ATS-Tailored Resume Ready!",
-            description=f"Tailored resume built for **{job_title}** at **{company}**.",
-            fields=[
-                {"name": "Target Headline", "value": headline[:100]},
-                {"name": "Matched Skills", "value": f"{matched_skills_count} skills verified"},
-            ],
-            color=0x3B82F6,  # Blue
-            discord_user_id=discord_user_id,
-            webhook_url=webhook_url,
+        """Post resume tailoring report to #tailored channel and tag candidate."""
+        cid = self.settings.discord_channel_tailored or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
+        fields = [
+            {"name": "Position", "value": f"**{job_title}** at **{company}**", "inline": False},
+            {"name": "Target Headline", "value": headline[:120], "inline": False},
+            {"name": "Tailored Score", "value": f"⭐ **{score}%**" if score else "Verified", "inline": True},
+            {"name": "Verified Skills", "value": f"**{matched_skills_count}** skills bolded", "inline": True},
+        ]
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title=f"📄 ATS Resume Tailored: {company}",
+            description=f"Tailored resume built for **{job_title}** at **{company}** with zero hallucination.",
+            fields=fields,
+            color=0x3B82F6,
+        )
+
+    async def ask_screening_question(
+        self,
+        question_id: str,
+        question_text: str,
+        company: str = "",
+        job_title: str = "",
+        discord_user_id: str | None = None,
+    ) -> bool:
+        """Post screening form question to #question channel and tag candidate."""
+        cid = self.settings.discord_channel_question or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
+        fields = [
+            {"name": "Question", "value": f"**{question_text}**", "inline": False},
+            {"name": "How to Answer", "value": "Reply directly in this channel:\n`!answer <your response>`", "inline": False},
+        ]
+        comp_str = f" to **{company}**" if company else ""
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title="❓ Application Form Question Needed",
+            description=f"To submit your application{comp_str}, please answer the following screening question:",
+            fields=fields,
+            color=0xF59E0B,
         )
 
     async def notify_test(
@@ -766,6 +868,72 @@ def create_bot() -> commands.Bot:
         if target_roles:
             embed.add_field(name="Target Roles", value=", ".join(target_roles[:4]), inline=False)
 
+        await ctx.send(embed=embed)
+
+    @bot.command(name="answer")
+    async def answer_command(ctx: commands.Context, *, response_text: str):
+        """Answer a screening form question and store it permanently against the candidate profile."""
+        user, profile = await get_candidate(ctx)
+        if not user:
+            await ctx.send("⚠️ Discord account not linked. Please log in at Sleepy Apply.")
+            return
+
+        db = get_db()
+        now = datetime.now(timezone.utc)
+        clean_ans = response_text.strip()
+        if not clean_ans:
+            await ctx.send("⚠️ Please provide an answer: `!answer <your response>`")
+            return
+
+        screening_qs = profile.get("screening_questions", []) if profile else []
+        pending_q = None
+        for q in screening_qs:
+            if not q.get("answer"):
+                pending_q = q
+                break
+
+        if not pending_q and screening_qs:
+            pending_q = screening_qs[-1]
+
+        q_id = pending_q.get("id") if pending_q else f"q_{int(now.timestamp())}"
+        q_text = pending_q.get("question") if pending_q else "Screening Question"
+
+        qa_history = profile.get("qa_history", []) if profile else []
+        existing_map = {item.get("id"): item for item in qa_history}
+        existing_map[q_id] = {
+            "id": q_id,
+            "question": q_text,
+            "answer": clean_ans,
+            "category": "screening",
+            "answered_at": now.isoformat(),
+            "source": "discord_channel",
+        }
+        updated_qa = list(existing_map.values())
+
+        for sq in screening_qs:
+            if sq.get("id") == q_id:
+                sq["answer"] = clean_ans
+                sq["answered_at"] = now.isoformat()
+
+        if profile:
+            await db.profiles.update_one(
+                {"_id": profile["_id"]},
+                {"$set": {
+                    "qa_history": updated_qa,
+                    "screening_questions": screening_qs,
+                    "updated_at": now,
+                }}
+            )
+
+        embed = discord.Embed(
+            title="✅ Answer Saved Permanently!",
+            description=f"<@{ctx.author.id}>, your answer has been saved to your profile.",
+            color=0x10B981,
+            timestamp=now,
+        )
+        embed.add_field(name="Question", value=q_text, inline=False)
+        embed.add_field(name="Saved Answer", value=clean_ans, inline=False)
+        embed.set_footer(text="Sleepy Apply will reuse this answer automatically for all future applications!")
         await ctx.send(embed=embed)
 
     return bot

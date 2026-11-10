@@ -5,7 +5,8 @@ import {
   Briefcase, Building2, Search, Filter, Globe, ArrowUpRight,
   RefreshCw, Sparkles, Loader2, CheckCircle, ShieldCheck,
   ChevronLeft, ChevronRight, X, ExternalLink, MapPin, DollarSign,
-  Calendar, Layers, Check, Trash2, Zap, Bot, AlertTriangle, ScrollText
+  Calendar, Layers, Check, Trash2, Zap, Bot, AlertTriangle, ScrollText,
+  Pause, Play, RotateCcw
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -50,7 +51,7 @@ export default function AdminAllJobsPage() {
     try {
       const s = await adminApi.getCrawlerStatus();
       setCrawlerStatus(s);
-      if (s.is_running) {
+      if (s.is_running || s.is_paused) {
         setShowProgressBanner(true);
       }
       return s;
@@ -69,7 +70,7 @@ export default function AdminAllJobsPage() {
     const interval = setInterval(async () => {
       const s = await pollCrawlerStatus();
       if (s && !s.is_running) {
-        // Refresh jobs when crawler finishes
+        // Refresh jobs when crawler finishes or pauses
         loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
       }
     }, 2000);
@@ -77,11 +78,12 @@ export default function AdminAllJobsPage() {
   }, [crawlerStatus?.is_running, page, search, selectedCompany, selectedSource, remoteFilter, pollCrawlerStatus]);
 
   const [resettingCheckpoint, setResettingCheckpoint] = useState(false);
+  const [pausingCrawler, setPausingCrawler] = useState(false);
 
   const handleStartCrawler = async (restart = false) => {
     try {
       setShowProgressBanner(true);
-      const res = await adminApi.startCrawler({ headless: false, restart, concurrency: 3 });
+      const res = await adminApi.startCrawler({ headless: true, restart, concurrency: 3 });
       setActionMsg(res.message);
       await pollCrawlerStatus();
       setTimeout(() => setActionMsg(""), 6000);
@@ -89,6 +91,26 @@ export default function AdminAllJobsPage() {
       const msg = err instanceof Error ? err.message : "Failed to start AI crawler";
       alert(msg);
     }
+  };
+
+  const handlePauseCrawler = async () => {
+    setPausingCrawler(true);
+    try {
+      const res = await adminApi.pauseCrawler();
+      setActionMsg(res.message);
+      await pollCrawlerStatus();
+      loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
+      setTimeout(() => setActionMsg(""), 9000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to pause AI crawler";
+      alert(msg);
+    } finally {
+      setPausingCrawler(false);
+    }
+  };
+
+  const handleResumeCrawler = async () => {
+    await handleStartCrawler(false);
   };
 
   const handleResetCheckpoint = async () => {
@@ -338,6 +360,31 @@ export default function AdminAllJobsPage() {
             {crawlerStatus?.is_running ? "Crawling Portals…" : "Crawl Delhi NCR (Resumable)"}
           </button>
 
+          {/* Pause Button if crawler is active */}
+          {crawlerStatus?.is_running && (
+            <button
+              onClick={handlePauseCrawler}
+              disabled={pausingCrawler}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-xs border border-amber-500/40 shadow-lg shadow-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+              title="Pause crawler and save checkpoint breakpoint"
+            >
+              {pausingCrawler ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
+              <span>Pause</span>
+            </button>
+          )}
+
+          {/* Resume Button if crawler is paused */}
+          {crawlerStatus?.is_paused && !crawlerStatus?.is_running && (
+            <button
+              onClick={handleResumeCrawler}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 font-bold text-xs border border-emerald-500/40 shadow-lg shadow-emerald-500/10 transition-all cursor-pointer"
+              title="Resume crawling from saved breakpoint"
+            >
+              <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
+              <span>Resume Crawl</span>
+            </button>
+          )}
+
           {/* Reset Checkpoint Button */}
           <button
             onClick={handleResetCheckpoint}
@@ -447,17 +494,35 @@ export default function AdminAllJobsPage() {
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-900/90 to-fuchsia-950/70 border border-fuchsia-500/30 backdrop-blur-md shadow-xl"
+          className={`mb-6 p-4 rounded-2xl backdrop-blur-md shadow-xl transition-all ${
+            crawlerStatus.is_paused
+              ? "bg-gradient-to-r from-amber-950/70 via-slate-900/90 to-amber-950/70 border border-amber-500/40"
+              : "bg-gradient-to-r from-purple-950/70 via-slate-900/90 to-fuchsia-950/70 border border-fuchsia-500/30"
+          }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center text-fuchsia-300 shrink-0">
-                {crawlerStatus.is_running ? <Loader2 className="w-5 h-5 animate-spin text-fuchsia-400" /> : <CheckCircle className="w-5 h-5 text-emerald-400" />}
+              <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                crawlerStatus.is_paused
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                  : "bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300"
+              }`}>
+                {crawlerStatus.is_running ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-fuchsia-400" />
+                ) : crawlerStatus.is_paused ? (
+                  <Pause className="w-5 h-5 text-amber-400 fill-current" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-white">
-                    {crawlerStatus.is_running ? "AI Browser Crawler Active" : "AI Browser Crawl Complete"}
+                    {crawlerStatus.is_running
+                      ? "AI Browser Crawler Active"
+                      : crawlerStatus.is_paused
+                      ? "AI Browser Crawler Paused at Breakpoint"
+                      : "AI Browser Crawl Complete"}
                   </span>
                   {crawlerStatus.is_running && crawlerStatus.active_companies && crawlerStatus.active_companies.length > 0 ? (
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -476,6 +541,11 @@ export default function AdminAllJobsPage() {
                         🏢 Fetching: {crawlerStatus.current_company} ({crawlerStatus.current_index}/{crawlerStatus.total_companies})
                       </span>
                     )
+                  )}
+                  {crawlerStatus.is_paused && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/25 text-amber-200 border border-amber-500/40">
+                      ⏸️ Breakpoint Rank {crawlerStatus.breakpoint?.rank || crawlerStatus.current_index}
+                    </span>
                   )}
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">{crawlerStatus.status_message}</p>
@@ -501,6 +571,42 @@ export default function AdminAllJobsPage() {
                   </>
                 )}
               </div>
+
+              {/* Pause Button when active */}
+              {crawlerStatus.is_running && (
+                <button
+                  onClick={handlePauseCrawler}
+                  disabled={pausingCrawler}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs shadow-md shadow-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+                  title="Pause crawler and save breakpoint"
+                >
+                  {pausingCrawler ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
+                  <span>Pause</span>
+                </button>
+              )}
+
+              {/* Resume / Reset Controls when paused */}
+              {crawlerStatus.is_paused && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleResumeCrawler}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-500/40 font-bold text-xs shadow-md shadow-emerald-500/10 transition-all cursor-pointer"
+                    title="Resume crawling from breakpoint"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
+                    <span>Resume Crawl</span>
+                  </button>
+                  <button
+                    onClick={handleResetCheckpoint}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-white/10 text-xs font-semibold cursor-pointer"
+                    title="Reset checkpoint to Rank 1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Reset</span>
+                  </button>
+                </div>
+              )}
+
               {!crawlerStatus.is_running && (
                 <button
                   onClick={() => setShowProgressBanner(false)}
@@ -516,7 +622,11 @@ export default function AdminAllJobsPage() {
           {/* Progress Bar */}
           <div className="w-full bg-slate-800/90 rounded-full h-2.5 overflow-hidden border border-white/10">
             <div
-              className="bg-gradient-to-r from-purple-500 via-indigo-500 to-fuchsia-500 h-full rounded-full transition-all duration-500 shadow-sm shadow-fuchsia-500/50"
+              className={`h-full rounded-full transition-all duration-500 shadow-sm ${
+                crawlerStatus.is_paused
+                  ? "bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 shadow-amber-500/50"
+                  : "bg-gradient-to-r from-purple-500 via-indigo-500 to-fuchsia-500 shadow-fuchsia-500/50"
+              }`}
               style={{ width: `${Math.max(crawlerStatus.percent, 3)}%` }}
             />
           </div>
@@ -525,11 +635,28 @@ export default function AdminAllJobsPage() {
           {crawlerStatus.checkpoint && (
             <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                <span className={`inline-block w-2 h-2 rounded-full ${crawlerStatus.is_paused ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
                 Daily Checkpoint ({crawlerStatus.checkpoint.crawl_date || "Today"}): <strong className="text-white">{crawlerStatus.checkpoint.completed_count}</strong>/500 companies completed (resets daily)
               </span>
               <span>
                 Total Jobs Saved: <strong className="text-emerald-300 font-bold">{crawlerStatus.checkpoint.total_jobs_saved}</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Paused Breakpoint Callout Notice */}
+          {crawlerStatus.is_paused && (
+            <div className="mt-3 pt-2.5 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-200">
+              <span className="flex items-center gap-2">
+                <span className="text-amber-400 font-bold">⏸️ Breakpoint Saved:</span>
+                <span>
+                  Explored till now: <strong>{crawlerStatus.checkpoint?.completed_count || crawlerStatus.current_index}/{crawlerStatus.total_companies} companies</strong>
+                  {crawlerStatus.breakpoint ? ` (Breakpoint: Rank ${crawlerStatus.breakpoint.rank} - ${crawlerStatus.breakpoint.company})` : ""}.
+                  {crawlerStatus.breakpoint?.next_company ? ` Next in queue: ${crawlerStatus.breakpoint.next_company}.` : ""}
+                </span>
+              </span>
+              <span className="text-amber-300 font-semibold text-[11px]">
+                Ready to Resume Anytime
               </span>
             </div>
           )}

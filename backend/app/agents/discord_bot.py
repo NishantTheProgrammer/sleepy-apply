@@ -440,6 +440,39 @@ class DiscordAgent:
             color=0x475569,
         )
 
+    async def notify_admin_crawler_paused(
+        self,
+        breakpoint_rank: int,
+        breakpoint_company: str,
+        completed_count: int,
+        total_companies: int,
+        jobs_discovered: int,
+        jobs_saved: int,
+        captchas_encountered: int = 0,
+        next_company: str = "",
+    ) -> bool:
+        """Post crawler pause & breakpoint summary to #admin channel."""
+        cid = self.settings.discord_channel_admin or self.settings.discord_channel_id
+        pct = int((completed_count / max(1, total_companies)) * 100)
+        fields = [
+            {"name": "⏸️ Breakpoint Reached", "value": f"Rank **{breakpoint_rank}** • **{breakpoint_company}**", "inline": False},
+            {"name": "Explored Till Now", "value": f"**{completed_count}** / {total_companies} companies ({pct}%)", "inline": True},
+            {"name": "Jobs Discovered", "value": f"**{jobs_discovered}**", "inline": True},
+            {"name": "Jobs Saved in DB", "value": f"**{jobs_saved}**", "inline": True},
+        ]
+        if captchas_encountered > 0:
+            fields.append({"name": "CAPTCHAs Aborted", "value": f"**{captchas_encountered}**", "inline": True})
+        if next_company:
+            fields.append({"name": "Ready to Resume At", "value": f"**{next_company}** (Rank {breakpoint_rank + 1})", "inline": False})
+
+        return await self.send_channel(
+            channel_id=cid,
+            title="⏸️ AI Browser Crawler Paused at Breakpoint",
+            description=f"Crawler paused by admin request. Explored **{completed_count}/{total_companies}** companies till now. Breakpoint saved to MongoDB.",
+            fields=fields,
+            color=0xF59E0B,
+        )
+
     async def notify_application_submitted(
         self,
         job_title: str,

@@ -61,6 +61,7 @@ class CrawlerManager:
         initial_targets = get_default_targets()
         self.state: dict[str, Any] = {
             "is_running": False,
+            "is_paused": False,
             "current_company": None,
             "active_companies": [],
             "concurrency": 3,
@@ -73,12 +74,91 @@ class CrawlerManager:
             "captchas_encountered": 0,
             "started_at": None,
             "finished_at": None,
+            "paused_at": None,
+            "breakpoint": None,
             "history": [],
         }
         self._lock = asyncio.Lock()
+        self._pause_requested = False
 
     def get_status(self) -> dict[str, Any]:
         return dict(self.state)
+
+    async def pause(self) -> dict[str, Any]:
+        """Request active crawler to pause and record breakpoint with exploration summary."""
+        if not self.state.get("is_running"):
+            return {
+                "ok": False,
+                "message": "Crawler is not currently running.",
+                "status": self.get_status(),
+            }
+
+        self._pause_requested = True
+        self.state["is_paused"] = True
+        self.state["paused_at"] = datetime.now(timezone.utc).isoformat()
+        self.state["status_message"] = "Pausing crawler at current breakpoint..."
+
+        checkpoint = CrawlCheckpoint()
+        await checkpoint.load()
+        completed_ranks = checkpoint.data.get("completed_ranks", [])
+        last_rank = max(completed_ranks) if completed_ranks else self.state.get("current_index", 0)
+
+        targets = get_default_targets()
+        last_company = self.state.get("current_company") or "Unknown"
+        next_company = ""
+        for t in targets:
+            if t.get("rank") == last_rank:
+                last_company = t.get("name", last_company)
+            elif t.get("rank") == last_rank + 1:
+                next_company = t.get("name", "")
+
+        completed_count = len(completed_ranks) or self.state.get("current_index", 0)
+        breakpoint_info = {
+            "rank": last_rank,
+            "company": last_company,
+            "completed_count": completed_count,
+            "total_companies": len(targets),
+            "jobs_discovered": self.state.get("jobs_discovered", 0),
+            "jobs_saved": self.state.get("jobs_saved", 0),
+            "captchas_encountered": self.state.get("captchas_encountered", 0),
+            "next_company": next_company,
+        }
+        self.state["breakpoint"] = breakpoint_info
+
+        # Trigger message to Discord #admin channel
+        try:
+            from app.agents.discord_bot import DiscordAgent
+            discord = DiscordAgent()
+            await discord.notify_admin_crawler_paused(
+                breakpoint_rank=last_rank,
+                breakpoint_company=last_company,
+                completed_count=completed_count,
+                total_companies=len(targets),
+                jobs_discovered=self.state.get("jobs_discovered", 0),
+                jobs_saved=self.state.get("jobs_saved", 0),
+                captchas_encountered=self.state.get("captchas_encountered", 0),
+                next_company=next_company,
+            )
+        except Exception as e:
+            logger.warning("Failed to dispatch crawler pause notification to Discord", error=str(e))
+
+        await log_system_event(
+            level="WARNING",
+            category="crawler",
+            message=f"AI Browser Crawler paused by admin at breakpoint Rank {last_rank} ({last_company}). Explored {completed_count}/{len(targets)} companies.",
+            details=breakpoint_info,
+        )
+
+        return {
+            "ok": True,
+            "message": (
+                f"⏸️ Crawler paused. Explored {completed_count}/{len(targets)} "
+                f"companies till now (Breakpoint: Rank {last_rank} - {last_company}). "
+                f"{breakpoint_info['jobs_saved']} new jobs saved."
+            ),
+            "breakpoint": breakpoint_info,
+            "status": self.get_status(),
+        }
 
     async def run_batch(
         self,
@@ -92,6 +172,7 @@ class CrawlerManager:
             if self.state["is_running"]:
                 return {"ok": False, "message": "Crawler is already running"}
 
+            self._pause_requested = False
             checkpoint = CrawlCheckpoint()
             await checkpoint.load()
             targets = get_default_targets(companies=companies)
@@ -109,6 +190,7 @@ class CrawlerManager:
 
             self.state = {
                 "is_running": True,
+                "is_paused": False,
                 "current_company": None,
                 "active_companies": [],
                 "concurrency": concurrency,
@@ -121,6 +203,8 @@ class CrawlerManager:
                 "captchas_encountered": 0,
                 "started_at": now_iso,
                 "finished_at": None,
+                "paused_at": None,
+                "breakpoint": None,
                 "history": [],
             }
 
@@ -159,11 +243,16 @@ class CrawlerManager:
 
             async def crawl_worker(idx: int, target: dict[str, Any]):
                 nonlocal completed_count
+                if self._pause_requested:
+                    return
+
                 rank = target.get("rank", idx)
                 comp_name = target["name"]
                 career_url = target["url"]
 
                 async with sem:
+                    if self._pause_requested:
+                        return
                     async with state_lock:
                         active_companies.add(comp_name)
                         self.state["active_companies"] = sorted(list(active_companies))
@@ -338,6 +427,11 @@ class CrawlerManager:
             self.state["is_running"] = False
             self.state["current_company"] = None
             self.state["active_companies"] = []
+
+            if self._pause_requested:
+                self.state["is_paused"] = True
+                return self.get_status()
+
             self.state["percent"] = 100
             self.state["finished_at"] = datetime.now(timezone.utc).isoformat()
             self.state["status_message"] = (

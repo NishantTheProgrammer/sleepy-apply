@@ -499,6 +499,13 @@ async def start_crawler_batch(
     }
 
 
+@router.post("/crawler/pause")
+async def pause_crawler_batch(admin_id: str = Depends(require_admin)):
+    """Pause the active AI browser crawler and record breakpoint with exploration summary."""
+    result = await crawler_manager.pause()
+    return result
+
+
 @router.post("/crawler/reset")
 async def reset_crawler_checkpoint(admin_id: str = Depends(require_admin)):
     """Reset Delhi NCR crawler checkpoint to restart from rank 1."""

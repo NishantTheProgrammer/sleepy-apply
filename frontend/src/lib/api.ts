@@ -274,6 +274,22 @@ export const adminApi = {
     request<{ ok: boolean; message: string }>("/api/admin/crawler/start", { method: "POST", body: JSON.stringify(options || {}) }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/admin/crawler/status"),
+  pauseCrawler: () =>
+    request<{
+      ok: boolean;
+      message: string;
+      breakpoint?: {
+        rank: number;
+        company: string;
+        completed_count: number;
+        total_companies: number;
+        jobs_discovered: number;
+        jobs_saved: number;
+        captchas_encountered?: number;
+        next_company?: string;
+      };
+      status: CrawlerStatusResponse;
+    }>("/api/admin/crawler/pause", { method: "POST" }),
   resetCrawlerCheckpoint: () =>
     request<{ ok: boolean; message: string }>("/api/admin/crawler/reset", { method: "POST" }),
   // System Logs
@@ -300,6 +316,7 @@ export interface CrawlerHistoryItem {
 
 export interface CrawlerStatusResponse {
   is_running: boolean;
+  is_paused?: boolean;
   current_company: string | null;
   active_companies?: string[];
   concurrency?: number;
@@ -312,6 +329,17 @@ export interface CrawlerStatusResponse {
   captchas_encountered: number;
   started_at: string | null;
   finished_at: string | null;
+  paused_at?: string | null;
+  breakpoint?: {
+    rank: number;
+    company: string;
+    completed_count: number;
+    total_companies: number;
+    jobs_discovered: number;
+    jobs_saved: number;
+    captchas_encountered?: number;
+    next_company?: string;
+  };
   history: CrawlerHistoryItem[];
   checkpoint?: {
     crawl_date?: string;
@@ -319,6 +347,7 @@ export interface CrawlerStatusResponse {
     total_jobs_discovered: number;
     total_jobs_saved: number;
     last_updated?: string | null;
+    last_rank?: number;
   };
 }
 

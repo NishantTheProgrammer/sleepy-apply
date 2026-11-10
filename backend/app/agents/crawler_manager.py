@@ -235,7 +235,6 @@ class CrawlerManager:
                 self.state["percent"] = 100
                 return self.get_status()
 
-            sem = asyncio.Semaphore(concurrency)
             state_lock = asyncio.Lock()
             checkpoint_lock = asyncio.Lock()
             active_companies: set[str] = set()
@@ -250,178 +249,193 @@ class CrawlerManager:
                 comp_name = target["name"]
                 career_url = target["url"]
 
-                async with sem:
-                    if self._pause_requested:
-                        return
-                    async with state_lock:
-                        active_companies.add(comp_name)
-                        self.state["active_companies"] = sorted(list(active_companies))
-                        self.state["current_company"] = comp_name
-                        self.state["status_message"] = (
-                            f"Crawling {len(active_companies)} companies in parallel "
-                            f"({completed_count}/{len(targets)} done)... [{', '.join(sorted(list(active_companies))[:3])}]"
+                if self._pause_requested:
+                    return
+                async with state_lock:
+                    active_companies.add(comp_name)
+                    self.state["active_companies"] = sorted(list(active_companies))
+                    self.state["current_company"] = comp_name
+                    self.state["status_message"] = (
+                        f"Crawling {len(active_companies)} companies in parallel "
+                        f"({completed_count}/{len(targets)} done)... [{', '.join(sorted(list(active_companies))[:3])}]"
+                    )
+
+                logger.info("Crawler starting company", company=comp_name, url=career_url, rank=rank)
+                jobs = []
+                new_count = 0
+                status_str = "SUCCESS"
+                err_msg = None
+
+                try:
+                    # Sanitize query
+                    if primary_query:
+                        clean_role = re.sub(r'\(.*?\)', '', primary_query).strip()
+                        query_role = clean_role if clean_role else "Software Engineer"
+                    else:
+                        query_role = target.get("default_query", "Software Engineer")
+
+                    is_in_docker = os.path.exists('/.dockerenv') or not os.environ.get('DISPLAY')
+                    run_headless = True if is_in_docker else headless
+
+                    worker_agent = AICareerCrawlerAgent()
+                    jobs = await worker_agent.crawl_career_portal(
+                        company=comp_name,
+                        start_url=career_url,
+                        target_query=query_role,
+                        headless=run_headless,
+                        slow_mo=0 if run_headless else slow_mo,
+                        delhi_ncr_only=True,
+                        limit=limit_per_company,
+                    )
+
+                    for raw_job in jobs:
+                        if not is_relevant_tech_job(raw_job.title, query_role):
+                            logger.debug("Skipping non-relevant non-tech job", company=comp_name, title=raw_job.title)
+                            continue
+
+                        if not is_delhi_ncr_or_remote_job(raw_job.location, raw_job.title, raw_job.description or ""):
+                            logger.debug("Skipping non-Delhi-NCR job", company=comp_name, title=raw_job.title, loc=raw_job.location)
+                            continue
+
+                        raw_job.source = "career-crawled"
+                        content_hash = JobDeduplicator.compute_raw_hash(raw_job)
+                        exists_query = (
+                            {"$or": [{"content_hash": content_hash}, {"external_id": raw_job.external_id}]}
+                            if raw_job.external_id
+                            else {"content_hash": content_hash}
                         )
+                        existing = await db.jobs.find_one(exists_query)
 
-                    logger.info("Crawler starting company", company=comp_name, url=career_url, rank=rank)
-                    jobs = []
-                    new_count = 0
-                    status_str = "SUCCESS"
-                    err_msg = None
+                        now = datetime.now(timezone.utc)
+                        norm = DelhiNCRJobNormalizer.normalize(raw_job)
+                        job_doc = {
+                            "source": "career-crawled",
+                            "source_url": norm["source_url"],
+                            "external_id": norm["external_id"],
+                            "title": norm["title"],
+                            "company": norm["company"],
+                            "company_info": {"website": raw_job.company_website or raw_job.source_url},
+                            "description": norm["description"],
+                            "requirements": getattr(raw_job, "requirements", []),
+                            "responsibilities": getattr(raw_job, "responsibilities", []),
+                            "location": norm["location"],
+                            "delhi_ncr_hub": norm["delhi_ncr_hub"],
+                            "is_delhi_ncr": norm["is_delhi_ncr"],
+                            "is_remote": norm["is_remote"],
+                            "work_model": norm["work_model"],
+                            "seniority": norm["seniority"],
+                            "employment_type": norm["employment_type"],
+                            "salary_range": norm["salary_range"],
+                            "application_url": norm["application_url"],
+                            "hr_contact": {},
+                            "required_skills": norm["required_skills"],
+                            "posted_at": raw_job.posted_at or now,
+                            "is_active": True,
+                            "enriched": bool(norm.get("required_skills")),
+                            "content_hash": content_hash,
+                            "discovered_at": now,
+                        }
 
-                    try:
-                        # Sanitize query
-                        if primary_query:
-                            clean_role = re.sub(r'\(.*?\)', '', primary_query).strip()
-                            query_role = clean_role if clean_role else "Software Engineer"
+                        if existing:
+                            job_id = existing["_id"]
+                            await db.jobs.update_one(
+                                {"_id": job_id},
+                                {
+                                    "$set": {
+                                        "source": "career-crawled",
+                                        "is_active": True,
+                                        "location": norm["location"],
+                                        "description": norm["description"],
+                                        "requirements": getattr(raw_job, "requirements", []),
+                                        "responsibilities": getattr(raw_job, "responsibilities", []),
+                                        "required_skills": norm["required_skills"],
+                                        "enriched": bool(norm.get("required_skills")),
+                                    }
+                                },
+                            )
                         else:
-                            query_role = target.get("default_query", "Software Engineer")
+                            insert_res = await db.jobs.insert_one(job_doc)
+                            job_id = insert_res.inserted_id
+                            new_count += 1
 
-                        is_in_docker = os.path.exists('/.dockerenv') or not os.environ.get('DISPLAY')
-                        run_headless = True if is_in_docker else headless
+                        for u in users:
+                            try:
+                                await matcher.match_user_and_job(
+                                    user_id=str(u["_id"]),
+                                    job_id=str(job_id),
+                                    use_ai_reasoning=False,
+                                )
+                            except Exception:
+                                pass
 
-                        worker_agent = AICareerCrawlerAgent()
-                        jobs = await worker_agent.crawl_career_portal(
-                            company=comp_name,
-                            start_url=career_url,
-                            target_query=query_role,
-                            headless=run_headless,
-                            slow_mo=0 if run_headless else slow_mo,
-                            delhi_ncr_only=True,
-                            limit=limit_per_company,
+                    status_str = "SUCCESS" if len(jobs) > 0 else "NO_JOBS"
+
+                except CaptchaDetectedException as ce:
+                    status_str = f"CAPTCHA: {ce.captcha_type[:15]}"
+                    err_msg = str(ce)
+                    async with state_lock:
+                        self.state["captchas_encountered"] += 1
+                    logger.warning("Crawler hit CAPTCHA", company=comp_name, captcha=ce.captcha_type)
+
+                except Exception as e:
+                    status_str = f"ERROR: {str(e)[:30]}"
+                    err_msg = str(e)
+                    logger.error("Crawler error on company", company=comp_name, error=str(e))
+                finally:
+                    async with checkpoint_lock:
+                        await checkpoint.record_company(
+                            rank=rank,
+                            company_name=comp_name,
+                            url=career_url,
+                            status=status_str,
+                            jobs_found=len(jobs),
+                            jobs_new=new_count,
+                            error_msg=err_msg,
                         )
 
-                        for raw_job in jobs:
-                            if not is_relevant_tech_job(raw_job.title, query_role):
-                                logger.debug("Skipping non-relevant non-tech job", company=comp_name, title=raw_job.title)
-                                continue
-
-                            if not is_delhi_ncr_or_remote_job(raw_job.location, raw_job.title, raw_job.description or ""):
-                                logger.debug("Skipping non-Delhi-NCR job", company=comp_name, title=raw_job.title, loc=raw_job.location)
-                                continue
-
-                            raw_job.source = "career-crawled"
-                            content_hash = JobDeduplicator.compute_raw_hash(raw_job)
-                            exists_query = (
-                                {"$or": [{"content_hash": content_hash}, {"external_id": raw_job.external_id}]}
-                                if raw_job.external_id
-                                else {"content_hash": content_hash}
+                    async with state_lock:
+                        active_companies.discard(comp_name)
+                        completed_count += 1
+                        self.state["active_companies"] = sorted(list(active_companies))
+                        self.state["jobs_discovered"] += len(jobs)
+                        self.state["jobs_saved"] += new_count
+                        self.state["current_index"] = completed_count
+                        pct = int((completed_count / max(1, len(targets))) * 100)
+                        self.state["percent"] = min(100, pct)
+                        if active_companies:
+                            self.state["status_message"] = (
+                                f"Crawling {len(active_companies)} in parallel ({completed_count}/{len(targets)} completed)... "
+                                f"[{', '.join(sorted(list(active_companies))[:3])}]"
                             )
-                            existing = await db.jobs.find_one(exists_query)
+                        else:
+                            self.state["status_message"] = f"Processed {completed_count}/{len(targets)} companies."
+                        self.state["history"].append({
+                            "rank": rank,
+                            "company": comp_name,
+                            "jobs": len(jobs),
+                            "new_saved": new_count,
+                            "status": status_str,
+                        })
 
-                            now = datetime.now(timezone.utc)
-                            norm = DelhiNCRJobNormalizer.normalize(raw_job)
-                            job_doc = {
-                                "source": "career-crawled",
-                                "source_url": norm["source_url"],
-                                "external_id": norm["external_id"],
-                                "title": norm["title"],
-                                "company": norm["company"],
-                                "company_info": {"website": raw_job.company_website or raw_job.source_url},
-                                "description": norm["description"],
-                                "requirements": getattr(raw_job, "requirements", []),
-                                "responsibilities": getattr(raw_job, "responsibilities", []),
-                                "location": norm["location"],
-                                "delhi_ncr_hub": norm["delhi_ncr_hub"],
-                                "is_delhi_ncr": norm["is_delhi_ncr"],
-                                "is_remote": norm["is_remote"],
-                                "work_model": norm["work_model"],
-                                "seniority": norm["seniority"],
-                                "employment_type": norm["employment_type"],
-                                "salary_range": norm["salary_range"],
-                                "application_url": norm["application_url"],
-                                "hr_contact": {},
-                                "required_skills": norm["required_skills"],
-                                "posted_at": raw_job.posted_at or now,
-                                "is_active": True,
-                                "enriched": bool(norm.get("required_skills")),
-                                "content_hash": content_hash,
-                                "discovered_at": now,
-                            }
+            # Launch bounded worker pool (size = concurrency) to prevent event loop starvation
+            queue: asyncio.Queue = asyncio.Queue()
+            for idx, t in pending_targets:
+                await queue.put((idx, t))
 
-                            if existing:
-                                job_id = existing["_id"]
-                                await db.jobs.update_one(
-                                    {"_id": job_id},
-                                    {
-                                        "$set": {
-                                            "source": "career-crawled",
-                                            "is_active": True,
-                                            "location": norm["location"],
-                                            "description": norm["description"],
-                                            "requirements": getattr(raw_job, "requirements", []),
-                                            "responsibilities": getattr(raw_job, "responsibilities", []),
-                                            "required_skills": norm["required_skills"],
-                                            "enriched": bool(norm.get("required_skills")),
-                                        }
-                                    },
-                                )
-                            else:
-                                insert_res = await db.jobs.insert_one(job_doc)
-                                job_id = insert_res.inserted_id
-                                new_count += 1
+            async def pool_worker():
+                while not queue.empty() and not self._pause_requested:
+                    try:
+                        idx, t = queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    await crawl_worker(idx, t)
+                    queue.task_done()
+                    # Yield control to event loop so FastAPI requests remain lightning fast
+                    await asyncio.sleep(0.05)
 
-                            for u in users:
-                                try:
-                                    await matcher.match_user_and_job(
-                                        user_id=str(u["_id"]),
-                                        job_id=str(job_id),
-                                        use_ai_reasoning=False,
-                                    )
-                                except Exception:
-                                    pass
-
-                        status_str = "SUCCESS" if len(jobs) > 0 else "NO_JOBS"
-
-                    except CaptchaDetectedException as ce:
-                        status_str = f"CAPTCHA: {ce.captcha_type[:15]}"
-                        err_msg = str(ce)
-                        async with state_lock:
-                            self.state["captchas_encountered"] += 1
-                        logger.warning("Crawler hit CAPTCHA", company=comp_name, captcha=ce.captcha_type)
-
-                    except Exception as e:
-                        status_str = f"ERROR: {str(e)[:30]}"
-                        err_msg = str(e)
-                        logger.error("Crawler error on company", company=comp_name, error=str(e))
-                    finally:
-                        async with checkpoint_lock:
-                            await checkpoint.record_company(
-                                rank=rank,
-                                company_name=comp_name,
-                                url=career_url,
-                                status=status_str,
-                                jobs_found=len(jobs),
-                                jobs_new=new_count,
-                                error_msg=err_msg,
-                            )
-
-                        async with state_lock:
-                            active_companies.discard(comp_name)
-                            completed_count += 1
-                            self.state["active_companies"] = sorted(list(active_companies))
-                            self.state["jobs_discovered"] += len(jobs)
-                            self.state["jobs_saved"] += new_count
-                            self.state["current_index"] = completed_count
-                            pct = int((completed_count / max(1, len(targets))) * 100)
-                            self.state["percent"] = min(100, pct)
-                            if active_companies:
-                                self.state["status_message"] = (
-                                    f"Crawling {len(active_companies)} in parallel ({completed_count}/{len(targets)} completed)... "
-                                    f"[{', '.join(sorted(list(active_companies))[:3])}]"
-                                )
-                            else:
-                                self.state["status_message"] = f"Processed {completed_count}/{len(targets)} companies."
-                            self.state["history"].append({
-                                "rank": rank,
-                                "company": comp_name,
-                                "jobs": len(jobs),
-                                "new_saved": new_count,
-                                "status": status_str,
-                            })
-
-            # Launch parallel worker tasks with graceful exception handling
-            tasks = [crawl_worker(idx, t) for idx, t in pending_targets]
-            await asyncio.gather(*tasks, return_exceptions=True)
+            worker_count = min(concurrency, len(pending_targets))
+            workers = [asyncio.create_task(pool_worker()) for _ in range(worker_count)]
+            await asyncio.gather(*workers, return_exceptions=True)
 
             # Finalize batch state
             self.state["is_running"] = False

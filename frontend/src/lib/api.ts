@@ -3,12 +3,54 @@ const API_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ??
   "http://localhost:8000";
 
+let isRefreshingToken = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function doTokenRefresh(): Promise<boolean> {
+  if (isRefreshingToken && refreshPromise) return refreshPromise;
+  isRefreshingToken = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      isRefreshingToken = false;
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  let res = await fetch(`${API_URL}${path}`, {
     credentials: "include", // send httpOnly cookies
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
   });
+
+  // Transparently refresh token and retry if 401 Unauthorized
+  if (
+    res.status === 401 &&
+    !path.includes("/auth/refresh") &&
+    !path.includes("/auth/discord") &&
+    !path.includes("/auth/dev-login") &&
+    !path.includes("/auth/test-login") &&
+    !path.includes("/auth/logout")
+  ) {
+    const refreshed = await doTokenRefresh();
+    if (refreshed) {
+      res = await fetch(`${API_URL}${path}`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...options?.headers },
+        ...options,
+      });
+    }
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

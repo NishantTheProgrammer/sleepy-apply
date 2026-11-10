@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase, Building2, Search, Filter, Globe, ArrowUpRight,
@@ -20,23 +20,42 @@ export default function AdminAllJobsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [companies, setCompanies] = useState<string[]>([]);
-  const [stats, setStats] = useState({
-    total_jobs: 0,
-    remote_jobs: 0,
-    active_jobs: 0,
-    companies_count: 0,
-    career_jobs: 0,
-    career_crawled_jobs: 0,
-    linkedin_jobs: 0,
-    naukri_jobs: 0,
+
+  // Persistent stats cache across page refreshes to eliminate 0-counter flicker
+  const [stats, setStats] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem("sleepy_admin_stats_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed.total_jobs === "number" && parsed.total_jobs > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    return {
+      total_jobs: 0,
+      remote_jobs: 0,
+      active_jobs: 0,
+      companies_count: 0,
+      career_jobs: 0,
+      career_crawled_jobs: 0,
+      linkedin_jobs: 0,
+      naukri_jobs: 0,
+    };
   });
 
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [remoteFilter, setRemoteFilter] = useState<string>("all"); // "all" | "remote" | "onsite"
 
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const reqIdRef = useRef(0);
   const [fetchingSource, setFetchingSource] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
@@ -136,9 +155,12 @@ export default function AdminAllJobsPage() {
     q = search,
     comp = selectedCompany,
     src = selectedSource,
-    rem = remoteFilter
+    rem = remoteFilter,
+    isRetry = false
   ) => {
+    const curReqId = ++reqIdRef.current;
     setLoading(true);
+    setLoadError(null);
     try {
       const isRemoteParam = rem === "remote" ? true : rem === "onsite" ? false : undefined;
       const res = await adminApi.allJobs({
@@ -150,36 +172,63 @@ export default function AdminAllJobsPage() {
         is_remote: isRemoteParam,
       });
 
+      // Avoid race conditions if another request was triggered
+      if (curReqId !== reqIdRef.current) return;
+
       setJobs(res.items || []);
       setTotal(res.total || 0);
       setCompanies(res.companies || []);
       if (res.stats) {
-        setStats({
-          total_jobs: res.stats.total_jobs || 0,
-          remote_jobs: res.stats.remote_jobs || 0,
-          active_jobs: res.stats.active_jobs || 0,
-          companies_count: res.stats.companies_count || 0,
-          career_jobs: res.stats.career_jobs || 0,
-          career_crawled_jobs: res.stats.career_crawled_jobs || 0,
-          linkedin_jobs: res.stats.linkedin_jobs || 0,
-          naukri_jobs: res.stats.naukri_jobs || 0,
-        });
+        const newStats = {
+          total_jobs: res.stats.total_jobs ?? 0,
+          remote_jobs: res.stats.remote_jobs ?? 0,
+          active_jobs: res.stats.active_jobs ?? 0,
+          companies_count: res.stats.companies_count ?? 0,
+          career_jobs: res.stats.career_jobs ?? 0,
+          career_crawled_jobs: res.stats.career_crawled_jobs ?? 0,
+          linkedin_jobs: res.stats.linkedin_jobs ?? 0,
+          naukri_jobs: res.stats.naukri_jobs ?? 0,
+        };
+        setStats(newStats);
+        try {
+          sessionStorage.setItem("sleepy_admin_stats_cache", JSON.stringify(newStats));
+        } catch {}
       }
+      setInitialLoading(false);
     } catch (err: unknown) {
+      if (curReqId !== reqIdRef.current) return;
       console.error("Failed to load jobs", err);
+      // Auto retry once if first attempt fails (e.g. auth hydration race)
+      if (!isRetry) {
+        setTimeout(() => {
+          loadJobs(p, q, comp, src, rem, true);
+        }, 800);
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "Failed to load jobs from MongoDB";
+      setLoadError(msg);
+      setInitialLoading(false);
     } finally {
-      setLoading(false);
+      if (curReqId === reqIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [page, limit, search, selectedCompany, selectedSource, remoteFilter]);
 
   useEffect(() => {
     loadJobs(page, search, selectedCompany, selectedSource, remoteFilter);
-  }, [page, selectedCompany, selectedSource, remoteFilter, loadJobs]);
+  }, [page, search, selectedCompany, selectedSource, remoteFilter, loadJobs]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearch(searchInput.trim());
     setPage(1);
-    loadJobs(1, search, selectedCompany, selectedSource, remoteFilter);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
   };
 
   const handleFetchSource = async (src: "all" | "career" | "career-crawled" | "linkedin" | "naukri") => {
@@ -684,7 +733,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Total in MongoDB</span>
             <Briefcase className="w-3.5 h-3.5 text-purple-400" />
           </div>
-          <p className="text-2xl font-black text-white">{stats.total_jobs}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-white/10 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-white">{stats.total_jobs.toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-slate-400">All sources</span>
         </motion.div>
 
@@ -694,7 +747,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400">Career Crawled</span>
             <Bot className="w-3.5 h-3.5 text-fuchsia-400" />
           </div>
-          <p className="text-2xl font-black text-fuchsia-400">{stats.career_crawled_jobs || 0}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-fuchsia-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-fuchsia-400">{(stats.career_crawled_jobs || 0).toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-fuchsia-400/80 font-medium">AI Browser Agent</span>
         </motion.div>
 
@@ -704,7 +761,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Career ATS</span>
             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
           </div>
-          <p className="text-2xl font-black text-emerald-400">{stats.career_jobs || 0}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-emerald-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-emerald-400">{(stats.career_jobs || 0).toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-emerald-500/80 font-medium">Portals & ATS</span>
         </motion.div>
 
@@ -714,7 +775,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">LinkedIn</span>
             <Briefcase className="w-3.5 h-3.5 text-sky-400" />
           </div>
-          <p className="text-2xl font-black text-sky-400">{stats.linkedin_jobs || 0}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-sky-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-sky-400">{(stats.linkedin_jobs || 0).toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-sky-500/80 font-medium">LinkedIn India</span>
         </motion.div>
 
@@ -724,7 +789,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Naukri</span>
             <Globe className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          <p className="text-2xl font-black text-amber-400">{stats.naukri_jobs || 0}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-amber-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-amber-400">{(stats.naukri_jobs || 0).toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-amber-500/80 font-medium">Naukri India</span>
         </motion.div>
 
@@ -734,7 +803,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Remote</span>
             <Globe className="w-3.5 h-3.5 text-indigo-400" />
           </div>
-          <p className="text-2xl font-black text-white">{stats.remote_jobs}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-indigo-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-white">{stats.remote_jobs.toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-indigo-400 font-semibold">Remote-friendly</span>
         </motion.div>
 
@@ -744,7 +817,11 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Companies</span>
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
           </div>
-          <p className="text-2xl font-black text-white">{stats.companies_count}</p>
+          {initialLoading && stats.total_jobs === 0 ? (
+            <div className="h-8 w-16 bg-cyan-500/20 rounded-lg animate-pulse my-0.5" />
+          ) : (
+            <p className="text-2xl font-black text-white">{stats.companies_count.toLocaleString()}</p>
+          )}
           <span className="text-[10px] text-cyan-400 font-semibold">Distinct Orgs</span>
         </motion.div>
       </div>
@@ -756,27 +833,44 @@ export default function AdminAllJobsPage() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              if (e.target.value === "" && search !== "") {
+                handleClearSearch();
+              }
+            }}
             placeholder="Search title, company, skills, or location..."
-            className="w-full pl-9 pr-20 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+            className="w-full pl-9 pr-24 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
           />
-          <button
-            type="submit"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold transition-all cursor-pointer"
-          >
-            Search
-          </button>
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {searchInput && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              type="submit"
+              className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold transition-all cursor-pointer"
+            >
+              Search
+            </button>
+          </div>
         </form>
 
         {/* Source Filter Tabs */}
         <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap">
           {[
-            { id: "all", label: `All (${stats.total_jobs})` },
-            { id: "career-crawled", label: `Career Crawled (${stats.career_crawled_jobs || 0})` },
-            { id: "career", label: `Career ATS (${stats.career_jobs || 0})` },
-            { id: "linkedin", label: `LinkedIn (${stats.linkedin_jobs || 0})` },
-            { id: "naukri", label: `Naukri (${stats.naukri_jobs || 0})` },
+            { id: "all", label: `All (${initialLoading && stats.total_jobs === 0 ? "…" : stats.total_jobs.toLocaleString()})` },
+            { id: "career-crawled", label: `Career Crawled (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.career_crawled_jobs || 0).toLocaleString()})` },
+            { id: "career", label: `Career ATS (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.career_jobs || 0).toLocaleString()})` },
+            { id: "linkedin", label: `LinkedIn (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.linkedin_jobs || 0).toLocaleString()})` },
+            { id: "naukri", label: `Naukri (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.naukri_jobs || 0).toLocaleString()})` },
           ].map((s) => (
             <button
               key={s.id}
@@ -813,7 +907,9 @@ export default function AdminAllJobsPage() {
             }}
             className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50"
           >
-            <option value="all">All Companies ({companies.length})</option>
+            <option value="all">
+              All Companies ({initialLoading && companies.length === 0 ? "…" : companies.length.toLocaleString()})
+            </option>
             {companies.map((c, i) => (
               <option key={`${c}-${i}`} value={c}>{c}</option>
             ))}
@@ -846,12 +942,11 @@ export default function AdminAllJobsPage() {
           {(search || selectedCompany !== "all" || selectedSource !== "all" || remoteFilter !== "all") && (
             <button
               onClick={() => {
-                setSearch("");
+                handleClearSearch();
                 setSelectedCompany("all");
                 setSelectedSource("all");
                 setRemoteFilter("all");
                 setPage(1);
-                loadJobs(1, "", "all", "all", "all");
               }}
               className="text-[11px] text-slate-400 hover:text-rose-400 px-2 py-1 underline transition-colors cursor-pointer"
             >
@@ -867,7 +962,7 @@ export default function AdminAllJobsPage() {
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-sm text-white">MongoDB Ingested Jobs</h2>
             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
-              Showing {jobs.length} of {total} jobs
+              {loading && total === 0 ? "Loading jobs..." : `Showing ${jobs.length} of ${total} jobs`}
             </span>
           </div>
           {loading && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
@@ -887,10 +982,32 @@ export default function AdminAllJobsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {jobs.length === 0 ? (
+              {loadError ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-xs">
+                    <div className="flex flex-col items-center justify-center gap-2 text-rose-400">
+                      <AlertTriangle className="w-6 h-6 text-rose-400" />
+                      <span className="font-semibold">{loadError}</span>
+                      <button
+                        onClick={() => loadJobs(page, search, selectedCompany, selectedSource, remoteFilter)}
+                        className="mt-2 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Retry Loading
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : jobs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-xs text-slate-500">
-                    {loading ? "Loading jobs from MongoDB..." : "No job postings matched your filters."}
+                    {loading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+                        <span>Loading jobs from MongoDB...</span>
+                      </div>
+                    ) : (
+                      "No job postings matched your filters."
+                    )}
                   </td>
                 </tr>
               ) : (

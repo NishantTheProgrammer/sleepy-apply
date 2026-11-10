@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks, Query
 from pydantic import BaseModel
 from datetime import datetime, timezone
+import asyncio
 from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
@@ -252,17 +253,27 @@ async def list_all_jobs_admin(
 
         items.append(j)
 
-    # Distinct companies for filter dropdown
-    distinct_companies = await db.jobs.distinct("company")
-    distinct_companies = sorted([c for c in distinct_companies if c])
-
-    total_all = await db.jobs.count_documents({})
-    remote_all = await db.jobs.count_documents({"is_remote": True})
-    active_all = await db.jobs.count_documents({"is_active": True})
-    career_all = await db.jobs.count_documents({"source": "career"})
-    career_crawled_all = await db.jobs.count_documents({"source": "career-crawled"})
-    linkedin_all = await db.jobs.count_documents({"source": "linkedin"})
-    naukri_all = await db.jobs.count_documents({"source": "naukri"})
+    # Fast parallel execution of distinct companies and source metrics
+    (
+        raw_companies,
+        total_all,
+        remote_all,
+        active_all,
+        career_all,
+        career_crawled_all,
+        linkedin_all,
+        naukri_all,
+    ) = await asyncio.gather(
+        db.jobs.distinct("company"),
+        db.jobs.count_documents({}),
+        db.jobs.count_documents({"is_remote": True}),
+        db.jobs.count_documents({"is_active": True}),
+        db.jobs.count_documents({"source": "career"}),
+        db.jobs.count_documents({"source": "career-crawled"}),
+        db.jobs.count_documents({"source": "linkedin"}),
+        db.jobs.count_documents({"source": "naukri"}),
+    )
+    distinct_companies = sorted([c for c in raw_companies if c])
 
     return {
         "items": items,

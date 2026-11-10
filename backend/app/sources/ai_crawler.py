@@ -609,243 +609,254 @@ class AICareerCrawlerAgent:
                 slow_mo=actual_slow_mo,
                 args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
             )
-
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 850},
-            )
-            page = await context.new_page()
-
-            # Handle potential new tabs opened via target="_blank"
-            async def handle_new_page(new_page: Page):
-                nonlocal page
-                logger.info("New browser tab opened; switching focus", url=new_page.url)
-                page = new_page
-                await page.bring_to_front()
-
-            context.on("page", handle_new_page)
-
-            print(f"🌐 [Step 0] Navigating to career page: {start_url}")
+            context = None
             try:
-                await page.goto(start_url, wait_until="domcontentloaded", timeout=25000)
-                await page.wait_for_timeout(1000)
-            except Exception as e:
-                print(f"⚠️ Initial navigation warning: {e}")
 
-            # 🛡️ CAPTCHA Barrier Check (Initial Navigation)
-            is_cap, cap_type = await self.detect_captcha(page)
-            if is_cap:
-                msg = f"CAPTCHA detected on {company} ({start_url}): {cap_type}. Aborting crawl."
-                print(f"🚨 {msg}")
-                await log_system_event(
-                    level="ERROR",
-                    category="crawler",
-                    message=msg,
-                    details={"company": company, "url": page.url, "captcha_type": cap_type, "aborted": True}
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    viewport={"width": 1280, "height": 850},
                 )
-                raise CaptchaDetectedException(msg, captcha_type=cap_type, url=page.url)
+                page = await context.new_page()
 
-            for step in range(1, self.max_steps + 1):
-                cur_url = page.url
-                cur_title = await page.title()
+                # Handle potential new tabs opened via target="_blank"
+                async def handle_new_page(new_page: Page):
+                    nonlocal page
+                    logger.info("New browser tab opened; switching focus", url=new_page.url)
+                    page = new_page
+                    await page.bring_to_front()
 
-                # 🛡️ CAPTCHA Barrier Check (Step Navigation)
+                context.on("page", handle_new_page)
+
+                print(f"🌐 [Step 0] Navigating to career page: {start_url}")
+                try:
+                    await page.goto(start_url, wait_until="domcontentloaded", timeout=25000)
+                    await page.wait_for_timeout(1000)
+                except Exception as e:
+                    print(f"⚠️ Initial navigation warning: {e}")
+
+                # 🛡️ CAPTCHA Barrier Check (Initial Navigation)
                 is_cap, cap_type = await self.detect_captcha(page)
                 if is_cap:
-                    msg = f"CAPTCHA challenge encountered on {company} at step {step}: {cap_type}. Aborting crawl."
+                    msg = f"CAPTCHA detected on {company} ({start_url}): {cap_type}. Aborting crawl."
                     print(f"🚨 {msg}")
                     await log_system_event(
                         level="ERROR",
                         category="crawler",
                         message=msg,
-                        details={"company": company, "url": cur_url, "step": step, "captcha_type": cap_type, "aborted": True}
+                        details={"company": company, "url": page.url, "captcha_type": cap_type, "aborted": True}
                     )
-                    raise CaptchaDetectedException(msg, captcha_type=cap_type, url=cur_url)
+                    raise CaptchaDetectedException(msg, captcha_type=cap_type, url=page.url)
 
-                print(f"\n🔍 [Step {step}/{self.max_steps}] Observing page: {cur_title}")
-                print(f"   URL: {cur_url}")
+                for step in range(1, self.max_steps + 1):
+                    cur_url = page.url
+                    cur_title = await page.title()
 
-                # 1. Ultra-fast direct check if target jobs are already visible on this page
-                instant_jobs = await self._quick_check_target_jobs(page, company, target_query)
-                if instant_jobs:
-                    print(f"🎉 Instant match! Discovered {len(instant_jobs)} postings matching '{target_query}' directly on page.")
-                    collected_jobs.extend(instant_jobs)
-                    break
+                    # 🛡️ CAPTCHA Barrier Check (Step Navigation)
+                    is_cap, cap_type = await self.detect_captcha(page)
+                    if is_cap:
+                        msg = f"CAPTCHA challenge encountered on {company} at step {step}: {cap_type}. Aborting crawl."
+                        print(f"🚨 {msg}")
+                        await log_system_event(
+                            level="ERROR",
+                            category="crawler",
+                            message=msg,
+                            details={"company": company, "url": cur_url, "step": step, "captcha_type": cap_type, "aborted": True}
+                        )
+                        raise CaptchaDetectedException(msg, captcha_type=cap_type, url=cur_url)
 
-                elements, job_count = await self._observe_page(page)
-                print(f"   Interactive elements found: {len(elements)} | Job listings detected: {job_count}")
+                    print(f"\n🔍 [Step {step}/{self.max_steps}] Observing page: {cur_title}")
+                    print(f"   URL: {cur_url}")
 
-                # If job count is significant or target jobs appear, extract first
-                if job_count >= 1:
-                    print(f"💡 Found {job_count} visible job listings on page; evaluating extraction...")
-                    jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
-                    matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
-                    if matching:
-                        print(f"🎉 Successfully extracted {len(matching)} matching tech jobs!")
+                    # 1. Ultra-fast direct check if target jobs are already visible on this page
+                    instant_jobs = await self._quick_check_target_jobs(page, company, target_query)
+                    if instant_jobs:
+                        print(f"🎉 Instant match! Discovered {len(instant_jobs)} postings matching '{target_query}' directly on page.")
+                        collected_jobs.extend(instant_jobs)
+                        break
+
+                    elements, job_count = await self._observe_page(page)
+                    print(f"   Interactive elements found: {len(elements)} | Job listings detected: {job_count}")
+
+                    # If job count is significant or target jobs appear, extract first
+                    if job_count >= 1:
+                        print(f"💡 Found {job_count} visible job listings on page; evaluating extraction...")
+                        jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
+                        matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
+                        if matching:
+                            print(f"🎉 Successfully extracted {len(matching)} matching tech jobs!")
+                            collected_jobs.extend(matching)
+                            if len(collected_jobs) >= limit:
+                                break
+
+                    # Prepare prompt for LLM decision
+                    elements_text = "\n".join(
+                        f"[{el['id']}] <{el['tag']}> {el.get('text', '') or el.get('placeholder', '')} (href: {el.get('href', '')})"
+                        for el in elements[:18]
+                    )
+
+                    prompt = f"""You are an autonomous web crawler agent tasked with finding job postings for: "{target_query}" at {company}.
+    Starting from the company's career page, navigate through portals, search forms, and listings to discover matching jobs.
+
+    STRICT LOCATION CONSTRAINT:
+    The user only wants jobs located in Delhi NCR (Delhi, Gurgaon / Gurugram, Noida, Greater Noida, Faridabad, Ghaziabad) OR Remote roles.
+    Do NOT target or click into postings located in foreign countries (e.g. US, Dublin, Mexico, Europe) or on-site roles outside Delhi NCR.
+    If there are location filters or search inputs, prefer entering or selecting "Delhi", "Gurugram", "Noida", "India", or "Remote".
+
+    CURRENT PAGE STATE:
+    - Page Title: {cur_title}
+    - Current URL: {cur_url}
+    - Job Listings Detected on Page: {job_count}
+
+    INTERACTIVE ELEMENTS DETECTED ON THIS PAGE:
+    {elements_text}
+
+    INSTRUCTIONS:
+    Decide the single next best action to reach or search for jobs matching "{target_query}".
+    Available actions:
+    1. "click": Click a button or link (e.g. "Explore Open Positions", "Search Jobs", "India Careers", "View All Jobs", or pagination).
+    2. "fill": Type your target search query into a search bar / input box.
+    3. "scroll": Scroll down to reveal more jobs or lazy-loaded elements.
+    4. "extract": Extract the visible job postings on this page (choose this if you see job postings or search results).
+    5. "finish": If target jobs have been collected or no further actions are possible.
+
+    Return ONLY a valid JSON object matching this schema:
+    {{
+      "thought": "Brief explanation of your observation and rationale",
+      "action": "click" | "fill" | "scroll" | "extract" | "finish",
+      "element_id": "el_1",
+      "value": "{target_query}",
+      "submit": true
+    }}"""
+
+                    decision = await self._query_llm(prompt)
+                    if not decision:
+                        print("⚠️ AI decision empty; falling back to heuristic scroll/extract.")
+                        decision = {"action": "scroll", "thought": "Fallback scroll to discover elements"}
+
+                    action = decision.get("action", "scroll").lower()
+                    thought = decision.get("thought", "")
+                    el_id = decision.get("element_id")
+                    value = decision.get("value") or target_query
+
+                    print(f"🧠 AI Thought: {thought}")
+                    print(f"⚡ AI Action : {action.upper()} (element: {el_id}, value: {value if action == 'fill' else ''})")
+
+                    if action == "finish":
+                        print("🏁 AI decided to conclude crawl.")
+                        break
+
+                    elif action == "extract":
+                        jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
+                        matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
+                        print(f"✅ Extracted {len(matching)} relevant tech jobs on AI demand.")
                         collected_jobs.extend(matching)
-                        if len(collected_jobs) >= limit:
-                            break
+                        break
 
-                # Prepare prompt for LLM decision
-                elements_text = "\n".join(
-                    f"[{el['id']}] <{el['tag']}> {el.get('text', '') or el.get('placeholder', '')} (href: {el.get('href', '')})"
-                    for el in elements[:18]
-                )
-
-                prompt = f"""You are an autonomous web crawler agent tasked with finding job postings for: "{target_query}" at {company}.
-Starting from the company's career page, navigate through portals, search forms, and listings to discover matching jobs.
-
-STRICT LOCATION CONSTRAINT:
-The user only wants jobs located in Delhi NCR (Delhi, Gurgaon / Gurugram, Noida, Greater Noida, Faridabad, Ghaziabad) OR Remote roles.
-Do NOT target or click into postings located in foreign countries (e.g. US, Dublin, Mexico, Europe) or on-site roles outside Delhi NCR.
-If there are location filters or search inputs, prefer entering or selecting "Delhi", "Gurugram", "Noida", "India", or "Remote".
-
-CURRENT PAGE STATE:
-- Page Title: {cur_title}
-- Current URL: {cur_url}
-- Job Listings Detected on Page: {job_count}
-
-INTERACTIVE ELEMENTS DETECTED ON THIS PAGE:
-{elements_text}
-
-INSTRUCTIONS:
-Decide the single next best action to reach or search for jobs matching "{target_query}".
-Available actions:
-1. "click": Click a button or link (e.g. "Explore Open Positions", "Search Jobs", "India Careers", "View All Jobs", or pagination).
-2. "fill": Type your target search query into a search bar / input box.
-3. "scroll": Scroll down to reveal more jobs or lazy-loaded elements.
-4. "extract": Extract the visible job postings on this page (choose this if you see job postings or search results).
-5. "finish": If target jobs have been collected or no further actions are possible.
-
-Return ONLY a valid JSON object matching this schema:
-{{
-  "thought": "Brief explanation of your observation and rationale",
-  "action": "click" | "fill" | "scroll" | "extract" | "finish",
-  "element_id": "el_1",
-  "value": "{target_query}",
-  "submit": true
-}}"""
-
-                decision = await self._query_llm(prompt)
-                if not decision:
-                    print("⚠️ AI decision empty; falling back to heuristic scroll/extract.")
-                    decision = {"action": "scroll", "thought": "Fallback scroll to discover elements"}
-
-                action = decision.get("action", "scroll").lower()
-                thought = decision.get("thought", "")
-                el_id = decision.get("element_id")
-                value = decision.get("value") or target_query
-
-                print(f"🧠 AI Thought: {thought}")
-                print(f"⚡ AI Action : {action.upper()} (element: {el_id}, value: {value if action == 'fill' else ''})")
-
-                if action == "finish":
-                    print("🏁 AI decided to conclude crawl.")
-                    break
-
-                elif action == "extract":
-                    jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
-                    matching = [j for j in jobs if is_relevant_tech_job(j.title, target_query)]
-                    print(f"✅ Extracted {len(matching)} relevant tech jobs on AI demand.")
-                    collected_jobs.extend(matching)
-                    break
-
-                elif action == "click":
-                    if el_id:
-                        try:
-                            await self._auto_dismiss_banners(page)
-                            target_el = page.locator(f'[data-ai-id="{el_id}"]')
-                            if await target_el.count() > 0:
-                                # Check if it's an anchor with an href
-                                href = await target_el.first.get_attribute("href")
-                                if href and not href.startswith("javascript:") and not href.startswith("#"):
-                                    if href.startswith("/"):
-                                        parsed_base = urllib.parse.urlparse(page.url)
-                                        href = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
-                                    print(f"🔗 Clicking link to target: {href}")
-                                    try:
+                    elif action == "click":
+                        if el_id:
+                            try:
+                                await self._auto_dismiss_banners(page)
+                                target_el = page.locator(f'[data-ai-id="{el_id}"]')
+                                if await target_el.count() > 0:
+                                    # Check if it's an anchor with an href
+                                    href = await target_el.first.get_attribute("href")
+                                    if href and not href.startswith("javascript:") and not href.startswith("#"):
+                                        if href.startswith("/"):
+                                            parsed_base = urllib.parse.urlparse(page.url)
+                                            href = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
+                                        print(f"🔗 Clicking link to target: {href}")
+                                        try:
+                                            await target_el.first.click(force=True, timeout=4000)
+                                        except Exception:
+                                            print(f"Direct navigating to link href: {href}")
+                                            await page.goto(href, wait_until="domcontentloaded", timeout=25000)
+                                    else:
                                         await target_el.first.click(force=True, timeout=4000)
-                                    except Exception:
-                                        print(f"Direct navigating to link href: {href}")
-                                        await page.goto(href, wait_until="domcontentloaded", timeout=25000)
+                                    await page.wait_for_timeout(1200)
                                 else:
-                                    await target_el.first.click(force=True, timeout=4000)
-                                await page.wait_for_timeout(1200)
-                            else:
-                                print(f"⚠️ Element {el_id} not found in DOM, scrolling instead.")
-                                await page.evaluate("window.scrollBy(0, 600);")
-                        except Exception as e:
-                            print(f"⚠️ Click failed ({e}), continuing...")
-                    else:
-                        await page.evaluate("window.scrollBy(0, 600);")
+                                    print(f"⚠️ Element {el_id} not found in DOM, scrolling instead.")
+                                    await page.evaluate("window.scrollBy(0, 600);")
+                            except Exception as e:
+                                print(f"⚠️ Click failed ({e}), continuing...")
+                        else:
+                            await page.evaluate("window.scrollBy(0, 600);")
 
-                elif action == "fill":
-                    if el_id:
-                        try:
-                            target_inp = page.locator(f'[data-ai-id="{el_id}"]')
-                            if await target_inp.count() > 0:
-                                tag_name = await target_inp.first.evaluate("el => el.tagName.toLowerCase()")
-                                if tag_name not in ["input", "textarea"]:
-                                    # If LLM targeted a button/anchor, click it to activate search input
-                                    await target_inp.first.click(force=True, timeout=3000)
-                                    await page.wait_for_timeout(800)
-                                    visible_inp = page.locator('input[type="text"], input[type="search"], input:not([type])')
-                                    if await visible_inp.count() > 0:
-                                        await visible_inp.first.fill(value)
+                    elif action == "fill":
+                        if el_id:
+                            try:
+                                target_inp = page.locator(f'[data-ai-id="{el_id}"]')
+                                if await target_inp.count() > 0:
+                                    tag_name = await target_inp.first.evaluate("el => el.tagName.toLowerCase()")
+                                    if tag_name not in ["input", "textarea"]:
+                                        # If LLM targeted a button/anchor, click it to activate search input
+                                        await target_inp.first.click(force=True, timeout=3000)
+                                        await page.wait_for_timeout(800)
+                                        visible_inp = page.locator('input[type="text"], input[type="search"], input:not([type])')
+                                        if await visible_inp.count() > 0:
+                                            await visible_inp.first.fill(value)
+                                            if decision.get("submit", True):
+                                                await visible_inp.first.press("Enter")
+                                                await page.wait_for_timeout(1500)
+                                    else:
+                                        await target_inp.first.fill(value)
+                                        await page.wait_for_timeout(300)
                                         if decision.get("submit", True):
-                                            await visible_inp.first.press("Enter")
+                                            await target_inp.first.press("Enter")
                                             await page.wait_for_timeout(1500)
                                 else:
-                                    await target_inp.first.fill(value)
-                                    await page.wait_for_timeout(300)
-                                    if decision.get("submit", True):
-                                        await target_inp.first.press("Enter")
-                                        await page.wait_for_timeout(1500)
-                            else:
-                                print(f"⚠️ Input {el_id} not found.")
-                        except Exception as e:
-                            print(f"⚠️ Fill failed ({e}), continuing...")
-                    else:
-                        print("⚠️ No element_id provided for fill action.")
-
-                elif action == "scroll":
-                    await page.evaluate("window.scrollBy(0, 800);")
-                    await page.wait_for_timeout(1500)
-
-                await page.wait_for_timeout(1000)
-
-            # Final check if jobs collected
-            if not collected_jobs:
-                print("🔄 Performing final sweep extraction on current page...")
-                collected_jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
-
-            # Deduplicate by URL before fetching JDs
-            unique_results = []
-            seen_urls = set()
-            for j in collected_jobs:
-                if j.source_url not in seen_urls:
-                    seen_urls.add(j.source_url)
-                    unique_results.append(j)
-
-            target_jobs = unique_results[:limit]
-            final_jobs = []
-            if target_jobs:
-                print(f"📥 Extracting full Job Descriptions (JDs) for {len(target_jobs)} postings...")
-                for idx, j in enumerate(target_jobs, 1):
-                    if j.source_url and j.source_url != start_url:
-                        print(f"[{idx}/{len(target_jobs)}] Fetching JD for: '{j.title}'")
-                        await self.enrich_job_with_full_jd(page, j)
-
-                    # Strict Delhi NCR and Remote location filter
-                    if delhi_ncr_only:
-                        if is_delhi_ncr_or_remote_job(j.location, j.title, j.description or ""):
-                            final_jobs.append(j)
+                                    print(f"⚠️ Input {el_id} not found.")
+                            except Exception as e:
+                                print(f"⚠️ Fill failed ({e}), continuing...")
                         else:
-                            print(f"   ⏩ Skipping '{j.title}' (Location: {j.location}) - not Delhi NCR or Remote.")
-                    else:
-                        final_jobs.append(j)
+                            print("⚠️ No element_id provided for fill action.")
 
-            await browser.close()
+                    elif action == "scroll":
+                        await page.evaluate("window.scrollBy(0, 800);")
+                        await page.wait_for_timeout(1500)
+
+                    await page.wait_for_timeout(1000)
+
+                # Final check if jobs collected
+                if not collected_jobs:
+                    print("🔄 Performing final sweep extraction on current page...")
+                    collected_jobs = await self._extract_jobs_from_page(page, company, target_query, delhi_ncr_only)
+
+                # Deduplicate by URL before fetching JDs
+                unique_results = []
+                seen_urls = set()
+                for j in collected_jobs:
+                    if j.source_url not in seen_urls:
+                        seen_urls.add(j.source_url)
+                        unique_results.append(j)
+
+                target_jobs = unique_results[:limit]
+                final_jobs = []
+                if target_jobs:
+                    print(f"📥 Extracting full Job Descriptions (JDs) for {len(target_jobs)} postings...")
+                    for idx, j in enumerate(target_jobs, 1):
+                        if j.source_url and j.source_url != start_url:
+                            print(f"[{idx}/{len(target_jobs)}] Fetching JD for: '{j.title}'")
+                            await self.enrich_job_with_full_jd(page, j)
+
+                        # Strict Delhi NCR and Remote location filter
+                        if delhi_ncr_only:
+                            if is_delhi_ncr_or_remote_job(j.location, j.title, j.description or ""):
+                                final_jobs.append(j)
+                            else:
+                                print(f"   ⏩ Skipping '{j.title}' (Location: {j.location}) - not Delhi NCR or Remote.")
+                        else:
+                            final_jobs.append(j)
+
+            finally:
+                if context:
+                    try:
+                        await context.close()
+                    except Exception:
+                        pass
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
         return final_jobs
 

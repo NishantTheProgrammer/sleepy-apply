@@ -20,6 +20,11 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     # jobs
     await db.jobs.create_index("content_hash", unique=True)
     await db.jobs.create_index("is_active")
+    await db.jobs.create_index("source")
+    await db.jobs.create_index("is_remote")
+    await db.jobs.create_index([("discovered_at", -1)])
+    await db.jobs.create_index([("source", 1), ("discovered_at", -1)])
+    await db.jobs.create_index([("company", 1), ("discovered_at", -1)])
     await db.jobs.create_index("is_delhi_ncr")
     await db.jobs.create_index("delhi_ncr_hub")
     await db.jobs.create_index([("title", "text"), ("company", "text"), ("description", "text")])

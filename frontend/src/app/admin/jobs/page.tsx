@@ -20,31 +20,33 @@ export default function AdminAllJobsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [companies, setCompanies] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
 
-  // Persistent stats cache across page refreshes to eliminate 0-counter flicker
-  const [stats, setStats] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem("sleepy_admin_stats_cache");
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && typeof parsed.total_jobs === "number" && parsed.total_jobs > 0) {
-            return parsed;
-          }
-        }
-      } catch {}
-    }
-    return {
-      total_jobs: 0,
-      remote_jobs: 0,
-      active_jobs: 0,
-      companies_count: 0,
-      career_jobs: 0,
-      career_crawled_jobs: 0,
-      linkedin_jobs: 0,
-      naukri_jobs: 0,
-    };
+  const [stats, setStats] = useState({
+    total_jobs: 0,
+    remote_jobs: 0,
+    active_jobs: 0,
+    companies_count: 0,
+    career_jobs: 0,
+    career_crawled_jobs: 0,
+    linkedin_jobs: 0,
+    naukri_jobs: 0,
   });
+
+  // Client-only cache hydration to prevent Next.js SSR hydration mismatches
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const cached = sessionStorage.getItem("sleepy_admin_stats_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.total_jobs === "number" && parsed.total_jobs > 0) {
+          setStats(parsed);
+          setInitialLoading(false);
+        }
+      }
+    } catch {}
+  }, []);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -363,6 +365,8 @@ export default function AdminAllJobsPage() {
     }
     return url;
   };
+
+  const isStatsLoading = !mounted || (initialLoading && stats.total_jobs === 0);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto">
@@ -733,7 +737,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Total in MongoDB</span>
             <Briefcase className="w-3.5 h-3.5 text-purple-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-white/10 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-white">{stats.total_jobs.toLocaleString()}</p>
@@ -747,7 +751,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400">Career Crawled</span>
             <Bot className="w-3.5 h-3.5 text-fuchsia-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-fuchsia-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-fuchsia-400">{(stats.career_crawled_jobs || 0).toLocaleString()}</p>
@@ -761,7 +765,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Career ATS</span>
             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-emerald-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-emerald-400">{(stats.career_jobs || 0).toLocaleString()}</p>
@@ -775,7 +779,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">LinkedIn</span>
             <Briefcase className="w-3.5 h-3.5 text-sky-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-sky-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-sky-400">{(stats.linkedin_jobs || 0).toLocaleString()}</p>
@@ -789,7 +793,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Naukri</span>
             <Globe className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-amber-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-amber-400">{(stats.naukri_jobs || 0).toLocaleString()}</p>
@@ -803,7 +807,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Remote</span>
             <Globe className="w-3.5 h-3.5 text-indigo-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-indigo-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-white">{stats.remote_jobs.toLocaleString()}</p>
@@ -817,7 +821,7 @@ export default function AdminAllJobsPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wider">Companies</span>
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
           </div>
-          {initialLoading && stats.total_jobs === 0 ? (
+          {isStatsLoading ? (
             <div className="h-8 w-16 bg-cyan-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
             <p className="text-2xl font-black text-white">{stats.companies_count.toLocaleString()}</p>
@@ -866,11 +870,11 @@ export default function AdminAllJobsPage() {
         {/* Source Filter Tabs */}
         <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap">
           {[
-            { id: "all", label: `All (${initialLoading && stats.total_jobs === 0 ? "…" : stats.total_jobs.toLocaleString()})` },
-            { id: "career-crawled", label: `Career Crawled (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.career_crawled_jobs || 0).toLocaleString()})` },
-            { id: "career", label: `Career ATS (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.career_jobs || 0).toLocaleString()})` },
-            { id: "linkedin", label: `LinkedIn (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.linkedin_jobs || 0).toLocaleString()})` },
-            { id: "naukri", label: `Naukri (${initialLoading && stats.total_jobs === 0 ? "…" : (stats.naukri_jobs || 0).toLocaleString()})` },
+            { id: "all", label: `All (${isStatsLoading ? "…" : stats.total_jobs.toLocaleString()})` },
+            { id: "career-crawled", label: `Career Crawled (${isStatsLoading ? "…" : (stats.career_crawled_jobs || 0).toLocaleString()})` },
+            { id: "career", label: `Career ATS (${isStatsLoading ? "…" : (stats.career_jobs || 0).toLocaleString()})` },
+            { id: "linkedin", label: `LinkedIn (${isStatsLoading ? "…" : (stats.linkedin_jobs || 0).toLocaleString()})` },
+            { id: "naukri", label: `Naukri (${isStatsLoading ? "…" : (stats.naukri_jobs || 0).toLocaleString()})` },
           ].map((s) => (
             <button
               key={s.id}
@@ -908,7 +912,7 @@ export default function AdminAllJobsPage() {
             className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50"
           >
             <option value="all">
-              All Companies ({initialLoading && companies.length === 0 ? "…" : companies.length.toLocaleString()})
+              All Companies ({isStatsLoading || companies.length === 0 ? "…" : companies.length.toLocaleString()})
             </option>
             {companies.map((c, i) => (
               <option key={`${c}-${i}`} value={c}>{c}</option>

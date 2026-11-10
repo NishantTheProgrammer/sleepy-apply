@@ -62,8 +62,9 @@ class BrowserFormFillerAgent:
     Submit / Apply button, injects a review banner, and takes a full preview screenshot.
     """
 
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, slow_mo: int = 0):
         self.headless = headless
+        self.slow_mo = slow_mo
 
     async def fill_application_form(
         self,
@@ -73,6 +74,7 @@ class BrowserFormFillerAgent:
         resume: dict[str, Any] | None = None,
         dry_run: bool = True,
         app_id: str | None = None,
+        keep_open: bool = False,
     ) -> FormFillResult:
         from playwright.async_api import async_playwright, Page
 
@@ -171,13 +173,15 @@ class BrowserFormFillerAgent:
             dry_run=dry_run,
         )
 
-        is_in_docker = os.path.exists("/.dockerenv") or not os.environ.get("DISPLAY")
-        actual_headless = True if is_in_docker else self.headless
+        is_in_docker = os.path.exists("/.dockerenv")
+        # On macOS host, DISPLAY is not set, but Chromium runs natively in headed mode!
+        actual_headless = True if (is_in_docker and not os.environ.get("DISPLAY")) else self.headless
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
                 headless=actual_headless,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+                slow_mo=self.slow_mo if not actual_headless else 0,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_in_docker else [],
             )
             context = None
             try:
@@ -198,8 +202,14 @@ class BrowserFormFillerAgent:
                 except Exception as e:
                     logger.warning("Initial navigation issue, proceeding", error=str(e))
 
+                # Dismiss any initial cookie banners, tracking modals, or obstructive popups
+                await self._dismiss_overlays_and_popups(page)
+
                 # If on a JD landing page, find and click "Apply" button to reveal form
                 await self._navigate_to_form(page)
+
+                # Dismiss popups again if opened during Apply click
+                await self._dismiss_overlays_and_popups(page)
 
                 # ── 2. Fill Common Personal Information Fields ──
                 # Name
@@ -343,19 +353,14 @@ class BrowserFormFillerAgent:
                 except Exception as ie:
                     logger.debug("Banner injection skipped", error=str(ie))
 
-                # ── 7. Capture Full Page Screenshot Preview ──
-                unique_name = app_id or f"{job.get('_id', 'preview')}_{int(datetime.now().timestamp())}"
-                static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "form_previews")
-                os.makedirs(static_dir, exist_ok=True)
-                screenshot_filename = f"form_fill_{unique_name}.png"
-                full_screenshot_path = os.path.join(static_dir, screenshot_filename)
-
-                screenshot_bytes = await page.screenshot(full_page=False)
-                with open(full_screenshot_path, "wb") as f:
-                    f.write(screenshot_bytes)
-
-                screenshot_path = f"/static/form_previews/{screenshot_filename}"
-                screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot_bytes).decode('utf-8')}"
+                # ── 7. In-Memory Preview Only (Do NOT write images to disk) ──
+                screenshot_base64 = None
+                screenshot_path = None
+                try:
+                    screenshot_bytes = await page.screenshot(full_page=False)
+                    screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot_bytes).decode('utf-8')}"
+                except Exception:
+                    pass
 
                 msg = (
                     f"✅ Form successfully autofilled with {len(fields_filled)} fields for {company} ({title}). "
@@ -388,6 +393,12 @@ class BrowserFormFillerAgent:
                 )
 
             finally:
+                if not actual_headless and keep_open and page:
+                    print("👀 Visible browser is active for user inspection. Window will stay open for human review (close window when done)...")
+                    try:
+                        await page.wait_for_event("close", timeout=600000)
+                    except Exception:
+                        pass
                 if context:
                     try:
                         await context.close()
@@ -398,8 +409,78 @@ class BrowserFormFillerAgent:
                 except Exception:
                     pass
 
+    async def _dismiss_overlays_and_popups(self, page: Any) -> None:
+        """Intelligently detects and dismisses cookie banners, tracking popups, and dialog overlays."""
+        # 1. Target standard Accept / Dismiss buttons
+        popup_triggers = [
+            'button:has-text("Accept")',
+            'button:has-text("Accept All")',
+            'button:has-text("Accept all cookies")',
+            'button:has-text("I Accept")',
+            'button:has-text("Agree")',
+            'button:has-text("Allow all")',
+            'button:has-text("Got it")',
+            'button:has-text("OK")',
+            'button:has-text("Dismiss")',
+            'a:has-text("Accept")',
+            'a:has-text("Accept All")',
+            '#onetrust-accept-btn-handler',
+            '#onetrust-banner-sdk button',
+            '.cc-accept',
+            '.cc-btn.cc-allow',
+            '[aria-label="Accept Cookies"]',
+            '[aria-label="Accept all cookies"]',
+            '[data-qa="cookie-consent-accept"]',
+            '[data-action="accept-cookies"]',
+            'button[aria-label="Close"]',
+            'button.close',
+            '.modal-close',
+            '.close-button',
+        ]
+        for sel in popup_triggers:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() > 0 and await loc.is_visible():
+                    print(f"🍪 [Popup / Cookie Consent] Dismissing '{sel}'...")
+                    await loc.click(timeout=1500)
+                    await page.wait_for_timeout(500)
+                    break
+            except Exception:
+                continue
+
+        # 2. JavaScript DOM cleanup for obstructive fixed overlays & backdrop traps
+        try:
+            await page.evaluate("""
+                () => {
+                    const buttons = Array.from(document.querySelectorAll('button, a'));
+                    for (const b of buttons) {
+                        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+                        if (['accept', 'accept all', 'i accept', 'agree', 'allow all', 'got it'].includes(txt)) {
+                            b.click();
+                            break;
+                        }
+                    }
+                    const overlays = document.querySelectorAll(
+                        '#onetrust-banner-sdk, .modal-backdrop, .overlay, [class*="cookie" i], [id*="cookie" i], [role="dialog"]'
+                    );
+                    overlays.forEach(el => {
+                        const txt = (el.innerText || '').toLowerCase();
+                        if (txt.includes('cookie') || txt.includes('tracking') || txt.includes('privacy') || txt.includes('notice')) {
+                            el.remove();
+                        }
+                    });
+                    document.body.style.overflow = 'auto';
+                    if (document.documentElement) {
+                        document.documentElement.style.overflow = 'auto';
+                    }
+                }
+            """)
+        except Exception:
+            pass
+
     async def _navigate_to_form(self, page: Any) -> None:
         """Finds and clicks 'Apply' or 'Apply for this job' button if landing on a JD view."""
+        await self._dismiss_overlays_and_popups(page)
         apply_triggers = [
             'a[href*="#apply"]',
             'a:has-text("Apply for this job")',
@@ -408,6 +489,7 @@ class BrowserFormFillerAgent:
             'button:has-text("Apply for this job")',
             'button:has-text("Apply Now")',
             'button:has-text("Apply")',
+            'a[href*="/apply"]',
             '[data-qa="btn-apply"]',
             '.postings-btn',
         ]
@@ -418,6 +500,7 @@ class BrowserFormFillerAgent:
                     print(f"🔗 Clicking '{sel}' to reveal application form...")
                     await loc.click(timeout=5000)
                     await page.wait_for_timeout(1500)
+                    await self._dismiss_overlays_and_popups(page)
                     break
             except Exception:
                 continue

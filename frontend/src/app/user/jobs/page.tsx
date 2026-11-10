@@ -318,6 +318,10 @@ function JobsPageContent() {
     message: string;
   } | null>(null);
 
+  // Visible Browser (Headless: False) State
+  const [launchingVisibleId, setLaunchingVisibleId] = useState<string | null>(null);
+  const [visibleToast, setVisibleToast] = useState<{ company: string; message: string } | null>(null);
+
   const load = async (p = 1) => {
     setLoading(true);
     try {
@@ -409,6 +413,27 @@ function JobsPageContent() {
       alert(msg);
     } finally {
       setApplying(null);
+    }
+  };
+
+  const handleApplyVisible = async (jobId: string, directUrl?: string) => {
+    setLaunchingVisibleId(jobId);
+    try {
+      const targetItem = jobs.find((j) => j.job._id === jobId || j._id === jobId || j.job_id === jobId);
+      const compName = targetItem?.job.company || "Target Company";
+      const res = await jobsApi.applyVisible(jobId);
+      setVisibleToast({
+        company: compName,
+        message: res.message || `Visible Chromium window opened on your screen for ${compName}! Watch the form being autofilled live without submitting.`,
+      });
+      setTimeout(() => setVisibleToast(null), 12000);
+    } catch (err: unknown) {
+      console.warn("Direct visible browser launch error", err);
+      if (directUrl) {
+        window.open(directUrl, "_blank");
+      }
+    } finally {
+      setLaunchingVisibleId(null);
     }
   };
 
@@ -984,32 +1009,49 @@ function JobsPageContent() {
                       </button>
                     )}
 
-                    <a
-                      href={getValidJobUrl(selectedItem.job)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
-                        selectedItem.job.source === "career-crawled"
-                          ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
-                          : selectedItem.job.source === "linkedin"
-                          ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
-                          : selectedItem.job.source === "naukri"
-                          ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
-                          : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
-                      }`}
-                      title={`Open ${selectedItem.job.source === "career-crawled" ? "crawled career" : selectedItem.job.source === "linkedin" ? "LinkedIn" : selectedItem.job.source === "naukri" ? "Naukri" : "career portal"} job posting`}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span className="hidden sm:inline">
-                        {selectedItem.job.source === "career-crawled"
-                          ? "Apply on Career Portal"
-                          : selectedItem.job.source === "linkedin"
-                          ? "Apply on LinkedIn"
-                          : selectedItem.job.source === "naukri"
-                          ? "Apply on Naukri"
-                          : "Apply on Career Portal"}
-                      </span>
-                    </a>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleApplyVisible(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
+                        disabled={launchingVisibleId === selectedItem.job._id}
+                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          selectedItem.job.source === "career-crawled"
+                            ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
+                            : selectedItem.job.source === "linkedin"
+                            ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                            : selectedItem.job.source === "naukri"
+                            ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
+                            : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
+                        }`}
+                        title="Opens a visible browser window (headless: false) to autofill the form live step-by-step without submitting"
+                      >
+                        {launchingVisibleId === selectedItem.job._id ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                        ) : (
+                          <ExternalLink className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {launchingVisibleId === selectedItem.job._id
+                            ? "Opening Visible Chrome..."
+                            : selectedItem.job.source === "career-crawled"
+                            ? "Apply on Career Portal"
+                            : selectedItem.job.source === "linkedin"
+                            ? "Apply on LinkedIn"
+                            : selectedItem.job.source === "naukri"
+                            ? "Apply on Naukri"
+                            : "Apply on Career Portal"}
+                        </span>
+                      </button>
+
+                      <a
+                        href={getValidJobUrl(selectedItem.job)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                        title="Open direct job URL in a new browser tab"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
                 </div>
 
@@ -1993,6 +2035,41 @@ function JobsPageContent() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Active Visible Browser Toast Notification */}
+      <AnimatePresence>
+        {visibleToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-6 right-6 z-50 max-w-md bg-gradient-to-r from-purple-950/95 to-slate-900/95 border-2 border-purple-500/50 backdrop-blur-xl p-4 rounded-2xl shadow-2xl flex items-start gap-3.5"
+          >
+            <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 shrink-0 border border-purple-500/30 animate-pulse">
+              <ExternalLink className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  🖥️ Live Browser Active (Headless: False)
+                </h4>
+                <button
+                  onClick={() => setVisibleToast(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-purple-200 mt-1 leading-relaxed">
+                {visibleToast.message}
+              </p>
+              <p className="text-[11px] text-amber-300/90 mt-1.5 font-medium flex items-center gap-1">
+                <span>🛑 Safety:</span> Form autofilled with details & resume. Submit button is held for your review!
+              </p>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

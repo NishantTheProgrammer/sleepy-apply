@@ -239,6 +239,14 @@ export const jobsApi = {
       screenshot_base64?: string;
       questions_answered?: Array<{ field: string; answer: string }>;
     }>(`/api/jobs/${id}/auto-apply-form`, { method: "POST" }),
+  applyVisible: (jobId: string) =>
+    request<{
+      ok: boolean;
+      mode: string;
+      message: string;
+      target_url?: string;
+      details?: Record<string, unknown>;
+    }>(`/api/jobs/${jobId}/apply-visible`, { method: "POST" }),
   fetchNow: () => request<{ ok: boolean; message: string }>("/api/jobs/fetch-now", { method: "POST" }),
   generateResume: (jobId: string, template?: string) =>
     request<{

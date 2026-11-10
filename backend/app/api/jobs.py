@@ -327,6 +327,62 @@ async def auto_apply_form_preview(request: Request, job_id: str):
     }
 
 
+@router.post("/{job_id}/apply-visible")
+async def apply_visible_browser(request: Request, job_id: str):
+    """
+    Triggers a real, visible browser window (headless: false) on the user's desktop,
+    navigates to the career portal, autofills all application fields with candidate data,
+    attaches resume, and STOPS before clicking submit so the user can watch the flow live.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    target_url = job.get("application_url") or job.get("source_url") or job.get("apply_url")
+
+    # Try host browser runner (running natively on user's macOS desktop)
+    import httpx
+    host_runner_urls = [
+        "http://host.docker.internal:8005/fill-visible",
+        "http://localhost:8005/fill-visible",
+        "http://127.0.0.1:8005/fill-visible",
+    ]
+    launched_on_host = False
+    for runner_url in host_runner_urls:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                r = await client.post(runner_url, json={"job_id": job_id, "user_id": user_id, "url": target_url})
+                if r.status_code == 200:
+                    launched_on_host = True
+                    break
+        except Exception:
+            continue
+
+    if not launched_on_host:
+        # Fallback to in-container form filler preview if host runner is not active
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
+        resume = await db.resumes.find_one({"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)})
+        from app.agents.browser_form_filler import form_filler
+        res = await form_filler.fill_application_form(job=job, user=user or {}, profile=profile, resume=resume, dry_run=True)
+        return {
+            "ok": True,
+            "mode": "preview",
+            "message": "Form autofilled! Review the fields and direct portal link below.",
+            "target_url": target_url,
+            "details": res.to_dict(),
+        }
+
+    return {
+        "ok": True,
+        "mode": "visible_desktop",
+        "message": f"🖥️ Visible browser window launched on your desktop! Autofilling {job.get('company', 'company')} form live.",
+        "target_url": target_url,
+    }
+
+
 @router.post("/{job_id}/generate-resume")
 async def generate_tailored_resume(request: Request, job_id: str, template: str | None = None):
     """Generate tailored resume JSON against user profile and JD, and store against job-user match."""

@@ -314,6 +314,7 @@ export interface CrawlerStatusResponse {
   finished_at: string | null;
   history: CrawlerHistoryItem[];
   checkpoint?: {
+    crawl_date?: string;
     completed_count: number;
     total_jobs_discovered: number;
     total_jobs_saved: number;

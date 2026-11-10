@@ -95,6 +95,12 @@ class CrawlerManager:
             checkpoint = CrawlCheckpoint()
             await checkpoint.load()
             targets = get_default_targets(companies=companies)
+
+            # Auto-reset if all targets were already completed in checkpoint (enables clean restart of full list)
+            if not companies and len(checkpoint.data.get("completed_ranks", [])) >= len(targets):
+                logger.info("All target companies already completed in checkpoint; auto-resetting for a fresh run.")
+                await checkpoint.reset()
+
             concurrency = max(1, min(concurrency, 6))
 
             now_iso = datetime.now(timezone.utc).isoformat()

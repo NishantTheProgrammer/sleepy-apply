@@ -90,6 +90,7 @@ async def get_user_crawler_status(request: Request):
     checkpoint = CrawlCheckpoint()
     await checkpoint.load()
     status["checkpoint"] = {
+        "crawl_date": checkpoint.data.get("crawl_date"),
         "completed_count": len(checkpoint.data.get("completed_ranks", [])),
         "total_jobs_discovered": checkpoint.data.get("stats", {}).get("total_jobs_discovered", 0),
         "total_jobs_saved": checkpoint.data.get("stats", {}).get("total_jobs_saved", 0),

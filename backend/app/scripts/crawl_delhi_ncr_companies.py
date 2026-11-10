@@ -64,6 +64,7 @@ class CrawlCheckpoint:
         self.doc_id = doc_id
         self.data: dict[str, Any] = {
             "_id": self.doc_id,
+            "crawl_date": None,
             "source_file": "",
             "started_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -79,16 +80,37 @@ class CrawlCheckpoint:
             "history": [],
         }
 
+    def should_reset_daily(self) -> bool:
+        """Returns True if the loaded checkpoint belongs to a previous calendar date."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        stored_date = self.data.get("crawl_date")
+        if not stored_date:
+            ts = self.data.get("updated_at") or self.data.get("started_at")
+            if ts:
+                stored_date = str(ts)[:10]
+        if not stored_date:
+            return False
+        return stored_date < today
+
     async def load(self) -> dict[str, Any]:
-        """Load checkpoint state from MongoDB db.crawler_checkpoints."""
+        """Load checkpoint state from MongoDB db.crawler_checkpoints. Resets automatically on new calendar day."""
         try:
             db = get_db()
             doc = await db.crawler_checkpoints.find_one({"_id": self.doc_id})
             if doc:
-                self.data.update(doc)
+                self.data = dict(doc)
         except Exception as e:
             logger.warning("Could not read checkpoint from async MongoDB, trying sync fallback", error=str(e))
             self._load_sync()
+
+        # Automatic daily rollover check
+        if self.should_reset_daily():
+            prev_date = self.data.get("crawl_date") or str(self.data.get("updated_at", ""))[:10]
+            logger.info("Crawl checkpoint belongs to previous date; performing daily reset", previous_date=prev_date, today=datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+            await self.reset()
+        elif not self.data.get("crawl_date"):
+            self.data["crawl_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
         return self.data
 
     def _load_sync(self) -> None:
@@ -98,7 +120,11 @@ class CrawlCheckpoint:
             client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
             doc = client[get_settings().mongodb_db_name]["crawler_checkpoints"].find_one({"_id": self.doc_id})
             if doc:
-                self.data.update(doc)
+                self.data = dict(doc)
+                if self.should_reset_daily():
+                    self._reset_sync()
+                elif not self.data.get("crawl_date"):
+                    self.data["crawl_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             client.close()
         except Exception:
             pass
@@ -106,6 +132,8 @@ class CrawlCheckpoint:
     async def save(self) -> None:
         """Persist checkpoint state to MongoDB db.crawler_checkpoints."""
         self.data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        if not self.data.get("crawl_date"):
+            self.data["crawl_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         try:
             db = get_db()
             await db.crawler_checkpoints.replace_one(
@@ -122,6 +150,8 @@ class CrawlCheckpoint:
             from pymongo import MongoClient
             from app.core.config import get_settings
             client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
+            if not self.data.get("crawl_date"):
+                self.data["crawl_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             client[get_settings().mongodb_db_name]["crawler_checkpoints"].replace_one(
                 {"_id": self.doc_id},
                 self.data,
@@ -132,10 +162,12 @@ class CrawlCheckpoint:
             logger.error("Failed sync checkpoint save to MongoDB", error=str(e))
 
     async def reset(self) -> None:
-        """Reset checkpoint in MongoDB."""
+        """Reset checkpoint in MongoDB for the current day."""
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         self.data = {
             "_id": self.doc_id,
-            "source_file": "",
+            "crawl_date": today,
+            "source_file": self.data.get("source_file", ""),
             "started_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "completed_ranks": [],
@@ -151,7 +183,11 @@ class CrawlCheckpoint:
         }
         try:
             db = get_db()
-            await db.crawler_checkpoints.delete_one({"_id": self.doc_id})
+            await db.crawler_checkpoints.replace_one(
+                {"_id": self.doc_id},
+                self.data,
+                upsert=True,
+            )
         except Exception:
             self._reset_sync()
 
@@ -160,7 +196,29 @@ class CrawlCheckpoint:
             from pymongo import MongoClient
             from app.core.config import get_settings
             client = MongoClient(get_settings().mongodb_uri, serverSelectionTimeoutMS=1500)
-            client[get_settings().mongodb_db_name]["crawler_checkpoints"].delete_one({"_id": self.doc_id})
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            self.data = {
+                "_id": self.doc_id,
+                "crawl_date": today,
+                "source_file": self.data.get("source_file", ""),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "completed_ranks": [],
+                "completed_companies": [],
+                "stats": {
+                    "total_crawled": 0,
+                    "total_jobs_discovered": 0,
+                    "total_jobs_saved": 0,
+                    "captchas_encountered": 0,
+                    "errors_encountered": 0,
+                },
+                "history": [],
+            }
+            client[get_settings().mongodb_db_name]["crawler_checkpoints"].replace_one(
+                {"_id": self.doc_id},
+                self.data,
+                upsert=True,
+            )
             client.close()
         except Exception:
             pass

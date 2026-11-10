@@ -34,9 +34,34 @@ async def lifespan(app: FastAPI):
     # Start Discord bot in background (if configured)
     await start_discord_bot()
 
+    # Verify and auto-reset crawler checkpoint if a new calendar day has started
+    try:
+        from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+        cp = CrawlCheckpoint()
+        await cp.load()
+    except Exception as e:
+        logger.warning("Daily checkpoint verification on startup failed", error=str(e))
+
+    import asyncio
+
+    async def _daily_checkpoint_watcher():
+        while True:
+            try:
+                await asyncio.sleep(1800)  # check every 30 minutes
+                from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+                cp = CrawlCheckpoint()
+                await cp.load()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning("Daily checkpoint watcher warning", error=str(e))
+
+    watcher_task = asyncio.create_task(_daily_checkpoint_watcher())
+
     logger.info("Sleepy Apply backend started", env=settings_cfg.environment)
     yield
     # Shutdown
+    watcher_task.cancel()
     await stop_discord_bot()
     await close_db()
     logger.info("Sleepy Apply backend stopped")

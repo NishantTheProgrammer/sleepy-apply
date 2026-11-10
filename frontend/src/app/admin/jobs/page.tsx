@@ -526,7 +526,7 @@ export default function AdminAllJobsPage() {
             <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                Persistent Checkpoint: <strong className="text-white">{crawlerStatus.checkpoint.completed_count}</strong> companies completed
+                Daily Checkpoint ({crawlerStatus.checkpoint.crawl_date || "Today"}): <strong className="text-white">{crawlerStatus.checkpoint.completed_count}</strong>/500 companies completed (resets daily)
               </span>
               <span>
                 Total Jobs Saved: <strong className="text-emerald-300 font-bold">{crawlerStatus.checkpoint.total_jobs_saved}</strong>

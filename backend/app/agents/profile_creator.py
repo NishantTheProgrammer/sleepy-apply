@@ -397,6 +397,24 @@ class ProfileCreatorAgent:
                 if o_co and o_co.lower() in jt.lower():
                     exp["title"] = "Software Engineer"
 
+            # If title is excessively long (> 50 chars) or absorbed a company overview sentence:
+            jt = exp.get("title", "")
+            if len(jt) > 50 or any(w in jt.lower() for w in ["providing", "consulting company", "solutions to", "venture that", "enterprises"]):
+                desc = exp.get("description", "")
+                title_match = re.search(
+                    r"\b((?:Senior|Lead|Staff|Principal|Junior)?\s*(?:Software\s+Engineer|SDE(?:-[123]|[\s-]?II)?|Full\s+Stack\s+Developer|Backend\s+Developer|Mobile\s+Application\s+Developer|Frontend\s+Developer|Web\s+Developer))\b",
+                    desc,
+                    re.IGNORECASE,
+                )
+                if title_match:
+                    real_title = title_match.group(1).strip()
+                    exp["title"] = real_title
+                    exp["jobTitle"] = real_title
+                    exp["description"] = re.sub(re.escape(real_title), "", desc).strip(" .-")
+                else:
+                    exp["title"] = "Senior Software Engineer" if "senior" in (jt + " " + desc).lower() else "Software Engineer"
+                    exp["jobTitle"] = exp["title"]
+
         data["experience"] = cleaned_exp_list
 
         # Normalize standalone projects
@@ -816,7 +834,12 @@ class ProfileCreatorAgent:
                 elif current_job["_collecting_bullets"]:
                     current_bullet.append(line)
                 else:
-                    if any(t in line.lower() for t in ["sde", "developer", "engineer", "lead", "architect", "manager", "consultant", "analyst"]) and not current_job["jobTitle"]:
+                    is_title_line = (
+                        len(line) <= 50
+                        and not any(w in line.lower() for w in ["providing", "consulting company", "solutions to", "venture that", "enterprises."])
+                        and any(t in line.lower() for t in ["sde", "developer", "engineer", "lead", "architect", "manager", "analyst"])
+                    )
+                    if is_title_line and not current_job["jobTitle"]:
                         current_job["jobTitle"] = line
                         current_job["title"] = line
                     elif not current_job["description"]:

@@ -411,6 +411,16 @@ async def admin_fetch_live_jobs(
                 logger.info("Admin triggered live job fetcher", source=source, delhi_ncr_only=delhi_ncr_only)
                 res = await fetcher.fetch_and_store_jobs(source=source, delhi_ncr_only=delhi_ncr_only)
                 logger.info("Live job fetcher completed", source=source, count=len(res))
+                try:
+                    from app.agents.discord_bot import DiscordAgent
+                    discord_agent = DiscordAgent()
+                    await discord_agent.notify_admin_crawl(
+                        crawled_count=len(res),
+                        source_breakdown={source: len(res)},
+                        checkpoint_summary=f"Admin live sync: {len(res)} jobs fetched from {source}.",
+                    )
+                except Exception as d_err:
+                    logger.warning("Discord crawl notification failed", error=str(d_err))
         except Exception as e:
             logger.error("Live job fetcher failed", source=source, error=str(e))
 

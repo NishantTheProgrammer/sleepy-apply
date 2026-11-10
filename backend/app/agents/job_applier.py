@@ -93,8 +93,7 @@ class JobApplierAgent:
         cand_discord_id = user.get("discord_id") if user else None
         notif_prefs = (settings_doc or {}).get("notification_preferences", {})
         user_webhook_url = notif_prefs.get("discord_webhook_url")
-        send_dm = notif_prefs.get("discord_dm", True)
-        target_discord_id = cand_discord_id if send_dm else None
+        target_discord_id = cand_discord_id
 
         if result.status == "APPLIED":
             await self._update_status(app_doc["_id"], "APPLIED", reason=result.message)

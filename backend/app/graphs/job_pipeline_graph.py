@@ -151,6 +151,7 @@ async def notify_matches_node(state: JobPipelineState) -> JobPipelineState:
             location=job.get("location", "Delhi NCR / Remote"),
             matching_skills=top_match.get("matched_skills", []),
             discord_user_id=discord_id,
+            job_id=str(job["_id"]),
         )
 
     # Broadcast matching completed summary to #admin

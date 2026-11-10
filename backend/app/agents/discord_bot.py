@@ -29,6 +29,81 @@ def is_valid_token(token: str | None) -> bool:
     return len(t) > 20 and "." in t
 
 
+class AnswerScreeningModal(discord.ui.Modal, title="Answer Application Question"):
+    answer_input = discord.ui.TextInput(
+        label="Your Answer",
+        style=discord.TextStyle.paragraph,
+        placeholder="e.g. 30 days notice period, open to early joining",
+        required=True,
+        max_length=500,
+    )
+
+    def __init__(self, question_id: str, question_text: str = ""):
+        super().__init__()
+        self.question_id = question_id
+        self.question_text = question_text
+        if question_text:
+            truncated = question_text[:42] + "..." if len(question_text) > 45 else question_text
+            self.answer_input.label = truncated
+
+    async def on_submit(self, interaction: discord.Interaction):
+        answer_val = self.answer_input.value.strip()
+        author_id = str(interaction.user.id)
+        db = get_db()
+        user = await db.users.find_one({"discord_id": author_id})
+        if not user:
+            await interaction.response.send_message("⚠️ Discord account not linked.", ephemeral=True)
+            return
+
+        profile = await db.profiles.find_one({"user_id": user["_id"]})
+        now = datetime.now(timezone.utc)
+        qa_history = profile.get("qa_history", []) if profile else []
+        existing_map = {item.get("id"): item for item in qa_history}
+        existing_map[self.question_id] = {
+            "id": self.question_id,
+            "question": self.question_text or f"Question {self.question_id}",
+            "answer": answer_val,
+            "category": "screening",
+            "answered_at": now.isoformat(),
+            "source": "discord_modal",
+        }
+        screening_qs = profile.get("screening_questions", []) if profile else []
+        for sq in screening_qs:
+            if sq.get("id") == self.question_id:
+                sq["answer"] = answer_val
+                sq["answered_at"] = now.isoformat()
+
+        if profile:
+            await db.profiles.update_one(
+                {"_id": profile["_id"]},
+                {"$set": {
+                    "qa_history": list(existing_map.values()),
+                    "screening_questions": screening_qs,
+                    "updated_at": now,
+                }}
+            )
+
+        # Trigger background re-matching with the new answer
+        try:
+            from app.agents.job_matcher import JobMatcherAgent
+            async def rescore_user_jobs():
+                try:
+                    matcher = JobMatcherAgent()
+                    cursor = db.jobs.find({"is_active": True}).limit(40)
+                    async for j in cursor:
+                        await matcher.match_user_and_job(user_id=str(user["_id"]), job_id=str(j["_id"]), use_ai_reasoning=False)
+                except Exception:
+                    pass
+            asyncio.create_task(rescore_user_jobs())
+        except Exception:
+            pass
+
+        await interaction.response.send_message(
+            f"✅ <@{author_id}> Answer recorded permanently for future job applications:\n> **{answer_val}**",
+            ephemeral=False,
+        )
+
+
 class DiscordAgent:
     """Sends rich notifications and alerts to users via Discord webhook and/or Bot DM."""
 
@@ -188,8 +263,9 @@ class DiscordAgent:
         color: int = 0x6366F1,
         url: str | None = None,
         content: str | None = None,
+        components: list[dict[str, Any]] | None = None,
     ) -> bool:
-        """Send an embed message directly to a Discord server text channel with optional user tagging."""
+        """Send an embed message directly to a Discord server text channel with optional user tagging and interactive buttons."""
         cid = channel_id or self.settings.discord_channel_id
         if not cid:
             return False
@@ -198,9 +274,9 @@ class DiscordAgent:
         if not is_valid_token(token):
             return False
 
-        # Try live gateway client first
+        # Try live gateway client first when no custom components needed
         global _bot_instance
-        if _bot_instance and _bot_instance.is_ready():
+        if not components and _bot_instance and _bot_instance.is_ready():
             try:
                 ch = _bot_instance.get_channel(int(cid)) or await _bot_instance.fetch_channel(int(cid))
                 if ch:
@@ -226,7 +302,7 @@ class DiscordAgent:
             except Exception as e:
                 logger.warning("Gateway channel message failed, falling back to REST", error=str(e), channel_id=cid)
 
-        # Fallback to REST API
+        # Deliver via REST API with component buttons
         try:
             embed_payload: dict[str, Any] = {
                 "title": title,
@@ -246,6 +322,8 @@ class DiscordAgent:
             msg_payload: dict[str, Any] = {"embeds": [embed_payload]}
             if content:
                 msg_payload["content"] = content
+            if components:
+                msg_payload["components"] = components
 
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
@@ -424,9 +502,10 @@ class DiscordAgent:
         location: str = "Delhi NCR / Remote",
         matching_skills: list[str] | None = None,
         discord_user_id: str | None = None,
+        job_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        """Post match notifications to #match channel and tag candidate."""
+        """Post match notifications to #match channel with interactive 1-click action buttons."""
         cid = self.settings.discord_channel_match or self.settings.discord_channel_id
         tag_content = f"<@{discord_user_id}>" if discord_user_id else None
         fields = [
@@ -437,6 +516,28 @@ class DiscordAgent:
         if matching_skills:
             fields.append({"name": "Verified Skills", "value": ", ".join(matching_skills[:6]), "inline": False})
 
+        components = None
+        if job_id:
+            components = [
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 1,
+                            "label": "📄 Tailor Resume",
+                            "custom_id": f"tailor_action:{job_id}",
+                        },
+                        {
+                            "type": 2,
+                            "style": 3,
+                            "label": "🚀 Apply Now",
+                            "custom_id": f"apply_action:{job_id}",
+                        },
+                    ],
+                }
+            ]
+
         return await self.send_channel(
             channel_id=cid,
             content=tag_content,
@@ -444,6 +545,7 @@ class DiscordAgent:
             description=f"New opening matching candidate profile with **{top_score}%** compatibility.",
             fields=fields,
             color=0x8B5CF6,
+            components=components,
         )
 
     async def notify_tailored_resume_ready(
@@ -454,9 +556,10 @@ class DiscordAgent:
         matched_skills_count: int = 0,
         score: int = 0,
         discord_user_id: str | None = None,
+        job_id: str | None = None,
         webhook_url: str | None = None,
     ) -> bool:
-        """Post resume tailoring report to #tailored channel and tag candidate."""
+        """Post resume tailoring report to #tailored channel with 1-click Apply button."""
         cid = self.settings.discord_channel_tailored or self.settings.discord_channel_id
         tag_content = f"<@{discord_user_id}>" if discord_user_id else None
         fields = [
@@ -465,6 +568,22 @@ class DiscordAgent:
             {"name": "Tailored Score", "value": f"⭐ **{score}%**" if score else "Verified", "inline": True},
             {"name": "Verified Skills", "value": f"**{matched_skills_count}** skills bolded", "inline": True},
         ]
+        components = None
+        if job_id:
+            components = [
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 3,
+                            "label": "🚀 Apply with this Resume",
+                            "custom_id": f"apply_action:{job_id}",
+                        },
+                    ],
+                }
+            ]
+
         return await self.send_channel(
             channel_id=cid,
             content=tag_content,
@@ -472,6 +591,7 @@ class DiscordAgent:
             description=f"Tailored resume built for **{job_title}** at **{company}** with zero hallucination.",
             fields=fields,
             color=0x3B82F6,
+            components=components,
         )
 
     async def ask_screening_question(
@@ -482,12 +602,25 @@ class DiscordAgent:
         job_title: str = "",
         discord_user_id: str | None = None,
     ) -> bool:
-        """Post screening form question to #question channel and tag candidate."""
+        """Post screening form question to #question channel with interactive Answer button."""
         cid = self.settings.discord_channel_question or self.settings.discord_channel_id
         tag_content = f"<@{discord_user_id}>" if discord_user_id else None
         fields = [
             {"name": "Question", "value": f"**{question_text}**", "inline": False},
-            {"name": "How to Answer", "value": "Reply directly in this channel:\n`!answer <your response>`", "inline": False},
+            {"name": "How to Answer", "value": "Click **Answer Question** below or reply:\n`!answer <your response>`", "inline": False},
+        ]
+        components = [
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 2,
+                        "style": 1,
+                        "label": "✍️ Answer Question",
+                        "custom_id": f"answer_action:{question_id}",
+                    },
+                ],
+            }
         ]
         comp_str = f" to **{company}**" if company else ""
         return await self.send_channel(
@@ -497,6 +630,7 @@ class DiscordAgent:
             description=f"To submit your application{comp_str}, please answer the following screening question:",
             fields=fields,
             color=0xF59E0B,
+            components=components,
         )
 
     async def notify_test(
@@ -585,6 +719,156 @@ def create_bot() -> commands.Bot:
         else:
             logger.error("Discord bot command execution error", command=ctx.command.name if ctx.command else "unknown", error=str(error))
             await ctx.send(f"⚠️ Error executing command: {str(error)[:150]}")
+
+    @bot.event
+    async def on_interaction(interaction: discord.Interaction):
+        """Handle interactive component buttons and modal submissions from Discord channels."""
+        # Note: modal submissions are handled by their Modal class (e.g. AnswerScreeningModal.on_submit)
+        if interaction.type != discord.InteractionType.component:
+            return
+
+        custom_id = interaction.data.get("custom_id", "") if interaction.data else ""
+        if not custom_id:
+            return
+
+        logger.info("Discord component interaction received", custom_id=custom_id, author_id=interaction.user.id)
+        db = get_db()
+        discord_id = str(interaction.user.id)
+        user = await db.users.find_one({"discord_id": discord_id})
+
+        if not user:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "⚠️ Your Discord account is not linked to any Sleepy Apply profile.\n"
+                    "Please log in to your Sleepy Apply web app to link your account.",
+                    ephemeral=True,
+                )
+            return
+
+        # 1. Answer Question Button -> Prompt Discord Modal
+        if custom_id.startswith("answer_action:"):
+            question_id = custom_id.split(":", 1)[1]
+            profile = await db.profiles.find_one({"user_id": user["_id"]})
+            q_text = ""
+            if profile:
+                for sq in profile.get("screening_questions", []):
+                    if sq.get("id") == question_id:
+                        q_text = sq.get("question", "")
+                        break
+            modal = AnswerScreeningModal(question_id=question_id, question_text=q_text)
+            await interaction.response.send_modal(modal)
+            return
+
+        # 2. Tailor Resume Button -> Run ResumeBuilderAgent & broadcast to #tailored
+        if custom_id.startswith("tailor_action:"):
+            job_id = custom_id.split(":", 1)[1]
+            await interaction.response.defer(ephemeral=False)
+
+            try:
+                job_oid = ObjectId(job_id)
+                job = await db.jobs.find_one({"_id": job_oid})
+            except Exception:
+                job = None
+
+            if not job:
+                await interaction.followup.send(f"❌ Job not found with ID `{job_id}`.")
+                return
+
+            job_title = job.get("title", "Role")
+            company = job.get("company", "Company")
+
+            from app.agents.resume_builder import ResumeBuilderAgent
+            builder = ResumeBuilderAgent()
+
+            try:
+                tailored = await builder.build_tailored_resume(user_id=str(user["_id"]), job_id=job_id)
+                if not tailored:
+                    await interaction.followup.send(
+                        f"❌ Failed to generate tailored resume for **{job_title}** at **{company}**."
+                    )
+                    return
+
+                content = tailored.get("content", {})
+                headline = content.get("target_headline") or job_title
+                matched_skills = content.get("matching_skills", [])
+                score = content.get("compatibility_score", 0)
+
+                agent = DiscordAgent()
+                await agent.notify_tailored_resume_ready(
+                    job_title=job_title,
+                    company=company,
+                    headline=headline,
+                    matched_skills_count=len(matched_skills),
+                    score=score,
+                    discord_user_id=discord_id,
+                    job_id=job_id,
+                )
+
+                cid_tailored = agent.settings.discord_channel_tailored
+                chan_ref = f"<#{cid_tailored}>" if cid_tailored else "#tailored"
+                await interaction.followup.send(
+                    f"✅ <@{discord_id}> Tailored resume successfully generated for **{job_title}** at **{company}**!\n"
+                    f"View full breakdown and 1-click apply button in {chan_ref}."
+                )
+            except Exception as e:
+                logger.error("Error executing Discord tailor action", error=str(e), job_id=job_id)
+                await interaction.followup.send(f"❌ Error tailoring resume: {str(e)[:150]}")
+            return
+
+        # 3. Apply Now Button -> Run JobApplierAgent & broadcast to #auto-applied
+        if custom_id.startswith("apply_action:"):
+            job_id = custom_id.split(":", 1)[1]
+            await interaction.response.defer(ephemeral=False)
+
+            try:
+                job_oid = ObjectId(job_id)
+                job = await db.jobs.find_one({"_id": job_oid})
+            except Exception:
+                job = None
+
+            if not job:
+                await interaction.followup.send(f"❌ Job not found with ID `{job_id}`.")
+                return
+
+            job_title = job.get("title", "Role")
+            company = job.get("company", "Company")
+
+            from app.agents.job_applier import JobApplierAgent
+            applier = JobApplierAgent()
+
+            try:
+                result = await applier.apply_to_job(user_id=str(user["_id"]), job_id=job_id, force=True)
+                status = result.get("status") if isinstance(result, dict) else getattr(result, "status", "UNKNOWN")
+
+                agent = DiscordAgent()
+                cid_applied = agent.settings.discord_channel_auto_applied
+                chan_ref = f"<#{cid_applied}>" if cid_applied else "#auto-applied"
+
+                if status == "APPLIED":
+                    await interaction.followup.send(
+                        f"🚀 <@{discord_id}> Application submitted for **{job_title}** at **{company}**!\n"
+                        f"Logged in {chan_ref}."
+                    )
+                elif status == "REQUIRES_USER_ACTION":
+                    app_url = job.get("application_url", "")
+                    link_text = f" [Open Application Form]({app_url})" if app_url else ""
+                    await interaction.followup.send(
+                        f"⚠️ <@{discord_id}> Action required to finalize application for **{job_title}** at **{company}**:{link_text}"
+                    )
+                else:
+                    reason = (
+                        (result.get("failure_reason") if isinstance(result, dict) else None)
+                        or (result.get("reason") if isinstance(result, dict) else None)
+                        or getattr(result, "message", None)
+                        or "Application could not be completed"
+                    )
+                    await interaction.followup.send(
+                        f"❌ Could not apply to **{job_title}** at **{company}**: {reason}"
+                    )
+            except Exception as e:
+                logger.error("Error executing Discord apply action", error=str(e), job_id=job_id)
+                await interaction.followup.send(f"❌ Error during application submission: {str(e)[:150]}")
+            return
 
     @bot.command(name="help")
     async def help_command(ctx: commands.Context):
@@ -924,6 +1208,21 @@ def create_bot() -> commands.Bot:
                     "updated_at": now,
                 }}
             )
+
+        # Trigger background re-matching
+        try:
+            from app.agents.job_matcher import JobMatcherAgent
+            async def rescore_user_jobs():
+                try:
+                    matcher = JobMatcherAgent()
+                    cursor = db.jobs.find({"is_active": True}).limit(40)
+                    async for j in cursor:
+                        await matcher.match_user_and_job(user_id=str(user["_id"]), job_id=str(j["_id"]), use_ai_reasoning=False)
+                except Exception:
+                    pass
+            asyncio.create_task(rescore_user_jobs())
+        except Exception:
+            pass
 
         embed = discord.Embed(
             title="✅ Answer Saved Permanently!",

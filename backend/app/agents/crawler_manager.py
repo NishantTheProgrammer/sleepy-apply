@@ -357,6 +357,22 @@ class CrawlerManager:
                 },
             )
 
+            # Broadcast crawl summary to Discord #admin channel
+            try:
+                from app.agents.discord_bot import DiscordAgent
+                discord_agent = DiscordAgent()
+                await discord_agent.notify_admin_crawl(
+                    crawled_count=self.state["jobs_discovered"],
+                    source_breakdown={
+                        "Delhi NCR ATS": self.state["jobs_discovered"],
+                        "New Saved": self.state["jobs_saved"],
+                        "Captchas": self.state["captchas_encountered"],
+                    },
+                    checkpoint_summary=f"Processed {len(self.state['history'])} target companies.",
+                )
+            except Exception as d_err:
+                logger.warning("Discord admin crawl notification failed", error=str(d_err))
+
         except Exception as e:
             self.state["is_running"] = False
             self.state["status_message"] = f"Fatal crawler error: {e}"

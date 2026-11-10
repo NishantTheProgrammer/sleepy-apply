@@ -273,6 +273,7 @@ async def generate_tailored_resume(request: Request, job_id: str, template: str 
                 matched_skills_count=len(matched_skills),
                 score=score,
                 discord_user_id=discord_id,
+                job_id=job_id,
             )
         )
     except Exception as e:

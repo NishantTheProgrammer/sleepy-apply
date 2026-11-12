@@ -526,6 +526,29 @@ class DiscordAgent:
             url=action_url,
         )
 
+    async def notify_apply_issue(
+        self,
+        job_title: str,
+        company: str,
+        issue_message: str,
+        target_url: str,
+        discord_user_id: str | None = None,
+    ) -> bool:
+        cid = self.settings.discord_channel_auto_applied or self.settings.discord_channel_id
+        tag_content = f"<@{discord_user_id}>" if discord_user_id else None
+        return await self.send_channel(
+            channel_id=cid,
+            content=tag_content,
+            title=f"⚠️ Application Attention Needed: {company}",
+            description=f"Sleepy Apply autofilled candidate details for **{job_title}** at **{company}**, but encountered an item requiring human attention.",
+            fields=[
+                {"name": "Attention Reason", "value": issue_message[:500], "inline": False},
+                {"name": "Career Portal", "value": f"[Open & Complete on Career Portal]({target_url})", "inline": False},
+            ],
+            color=0xF59E0B,
+            url=target_url,
+        )
+
     async def notify_new_matches(
         self,
         count: int,

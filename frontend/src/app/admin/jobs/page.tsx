@@ -730,9 +730,9 @@ export default function AdminAllJobsPage() {
       )}
 
       {/* ── KPI Stat Cards (With Source Breakdown) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6" suppressHydrationWarning>
         {/* Total */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-3.5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-3.5" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider">Total in MongoDB</span>
             <Briefcase className="w-3.5 h-3.5 text-purple-400" />
@@ -740,13 +740,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-white/10 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-white">{stats.total_jobs.toLocaleString()}</p>
+            <p className="text-2xl font-black text-white" suppressHydrationWarning>{stats.total_jobs.toLocaleString()}</p>
           )}
           <span className="text-[10px] text-slate-400">All sources</span>
         </motion.div>
 
         {/* Career Crawled */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass rounded-2xl p-3.5 border-fuchsia-500/30 bg-fuchsia-950/10">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass rounded-2xl p-3.5 border-fuchsia-500/30 bg-fuchsia-950/10" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-400">Career Crawled</span>
             <Bot className="w-3.5 h-3.5 text-fuchsia-400" />
@@ -754,13 +754,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-fuchsia-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-fuchsia-400">{(stats.career_crawled_jobs || 0).toLocaleString()}</p>
+            <p className="text-2xl font-black text-fuchsia-400" suppressHydrationWarning>{(stats.career_crawled_jobs || 0).toLocaleString()}</p>
           )}
           <span className="text-[10px] text-fuchsia-400/80 font-medium">AI Browser Agent</span>
         </motion.div>
 
         {/* Career ATS */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-2xl p-3.5 border-emerald-500/20">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="glass rounded-2xl p-3.5 border-emerald-500/20" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Career ATS</span>
             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -768,13 +768,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-emerald-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-emerald-400">{(stats.career_jobs || 0).toLocaleString()}</p>
+            <p className="text-2xl font-black text-emerald-400" suppressHydrationWarning>{(stats.career_jobs || 0).toLocaleString()}</p>
           )}
           <span className="text-[10px] text-emerald-500/80 font-medium">Portals & ATS</span>
         </motion.div>
 
         {/* LinkedIn */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="glass rounded-2xl p-3.5 border-sky-500/20">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }} className="glass rounded-2xl p-3.5 border-sky-500/20" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">LinkedIn</span>
             <Briefcase className="w-3.5 h-3.5 text-sky-400" />
@@ -782,13 +782,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-sky-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-sky-400">{(stats.linkedin_jobs || 0).toLocaleString()}</p>
+            <p className="text-2xl font-black text-sky-400" suppressHydrationWarning>{(stats.linkedin_jobs || 0).toLocaleString()}</p>
           )}
           <span className="text-[10px] text-sky-500/80 font-medium">LinkedIn India</span>
         </motion.div>
 
         {/* Naukri */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-2xl p-3.5 border-amber-500/20">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-2xl p-3.5 border-amber-500/20" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Naukri</span>
             <Globe className="w-3.5 h-3.5 text-amber-400" />
@@ -796,13 +796,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-amber-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-amber-400">{(stats.naukri_jobs || 0).toLocaleString()}</p>
+            <p className="text-2xl font-black text-amber-400" suppressHydrationWarning>{(stats.naukri_jobs || 0).toLocaleString()}</p>
           )}
           <span className="text-[10px] text-amber-500/80 font-medium">Naukri India</span>
         </motion.div>
 
         {/* Remote Positions */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass rounded-2xl p-3.5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass rounded-2xl p-3.5" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider">Remote</span>
             <Globe className="w-3.5 h-3.5 text-indigo-400" />
@@ -810,13 +810,13 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-indigo-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-white">{stats.remote_jobs.toLocaleString()}</p>
+            <p className="text-2xl font-black text-white" suppressHydrationWarning>{stats.remote_jobs.toLocaleString()}</p>
           )}
           <span className="text-[10px] text-indigo-400 font-semibold">Remote-friendly</span>
         </motion.div>
 
         {/* Companies */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="glass rounded-2xl p-3.5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }} className="glass rounded-2xl p-3.5" suppressHydrationWarning>
           <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider">Companies</span>
             <Building2 className="w-3.5 h-3.5 text-cyan-400" />
@@ -824,7 +824,7 @@ export default function AdminAllJobsPage() {
           {isStatsLoading ? (
             <div className="h-8 w-16 bg-cyan-500/20 rounded-lg animate-pulse my-0.5" />
           ) : (
-            <p className="text-2xl font-black text-white">{stats.companies_count.toLocaleString()}</p>
+            <p className="text-2xl font-black text-white" suppressHydrationWarning>{stats.companies_count.toLocaleString()}</p>
           )}
           <span className="text-[10px] text-cyan-400 font-semibold">Distinct Orgs</span>
         </motion.div>
@@ -868,7 +868,7 @@ export default function AdminAllJobsPage() {
         </form>
 
         {/* Source Filter Tabs */}
-        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap">
+        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap" suppressHydrationWarning>
           {[
             { id: "all", label: `All (${isStatsLoading ? "…" : stats.total_jobs.toLocaleString()})` },
             { id: "career-crawled", label: `Career Crawled (${isStatsLoading ? "…" : (stats.career_crawled_jobs || 0).toLocaleString()})` },
@@ -882,6 +882,7 @@ export default function AdminAllJobsPage() {
                 setSelectedSource(s.id);
                 setPage(1);
               }}
+              suppressHydrationWarning
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedSource === s.id
                   ? s.id === "career-crawled"

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Request, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel
 from bson import ObjectId
 from app.db.client import get_db
+from app.core.background import spawn_background_task
 from app.security.jwt import get_current_user_id
 import structlog
 
@@ -10,7 +11,7 @@ logger = structlog.get_logger()
 
 
 @router.post("/fetch-now")
-async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks):
+async def trigger_fetch_now(request: Request):
     """Trigger job discovery and matching pipeline for current user."""
     user_id = get_current_user_id(request)
     from app.graphs.job_pipeline_graph import job_pipeline
@@ -44,7 +45,7 @@ async def trigger_fetch_now(request: Request, background_tasks: BackgroundTasks)
         except Exception as e:
             logger.error("On-demand job pipeline failed", user_id=user_id, error=str(e))
 
-    background_tasks.add_task(run_pipeline)
+    spawn_background_task(f"user_fetch_now:{user_id}", run_pipeline())
     return {"ok": True, "message": "Jobs matched and discovery running in background"}
 
 
@@ -57,7 +58,6 @@ class CrawlDelhiNCRRequest(BaseModel):
 @router.post("/crawl-delhi-ncr")
 async def trigger_crawl_delhi_ncr(
     request: Request,
-    background_tasks: BackgroundTasks,
     body: CrawlDelhiNCRRequest | None = None,
 ):
     """Trigger resumable Delhi NCR career crawler for current candidate."""
@@ -80,7 +80,7 @@ async def trigger_crawl_delhi_ncr(
             concurrency=req.concurrency,
         )
 
-    background_tasks.add_task(_runner)
+    spawn_background_task(f"user_crawl_delhi_ncr:{user_id}", _runner())
     return {
         "ok": True,
         "message": f"AI Browser Crawler started across top Delhi NCR tech companies ({req.concurrency}x parallel). Postings will appear under 'Career Crawled'.",

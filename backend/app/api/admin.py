@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
 from datetime import datetime, timezone
 import asyncio
@@ -6,6 +6,7 @@ from bson import ObjectId
 from app.db.client import get_db
 from app.security.jwt import get_current_user_id
 from app.core.config import get_settings
+from app.core.background import spawn_background_task
 from app.db.seed_jobs import seed_jobs_collection
 from app.agents.job_fetcher import JobFetcherAgent
 from app.core.system_logger import get_system_logs, clear_system_logs, log_system_event
@@ -119,7 +120,6 @@ async def update_user(
 
 @router.post("/trigger-discovery")
 async def trigger_platform_discovery(
-    background_tasks: BackgroundTasks,
     admin_id: str = Depends(require_admin),
 ):
     """Trigger job ingestion and matching across all active users."""
@@ -132,7 +132,7 @@ async def trigger_platform_discovery(
         except Exception as e:
             logger.error("Platform job discovery failed", error=str(e))
 
-    background_tasks.add_task(run)
+    spawn_background_task("admin_platform_discovery", run())
     return {"ok": True, "message": "Platform job discovery triggered in background"}
 
 
@@ -405,7 +405,6 @@ async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
 
 @router.post("/jobs/fetch-live")
 async def admin_fetch_live_jobs(
-    background_tasks: BackgroundTasks,
     source: str = Query("all", description="Source to fetch: 'all', 'career', 'linkedin', 'naukri', or 'indeed'"),
     delhi_ncr_only: bool = Query(True, description="Filter specifically for Delhi NCR tech positions"),
     admin_id: str = Depends(require_admin),
@@ -456,7 +455,7 @@ async def admin_fetch_live_jobs(
         except Exception as e:
             logger.error("Live job fetcher failed", source=source, error=str(e))
 
-    background_tasks.add_task(run)
+    spawn_background_task(f"admin_fetch_live:{source}", run())
     source_labels = {
         "all": "all sources (ATS APIs, AI Browser Crawler, LinkedIn, Naukri, Indeed, Custom)",
         "career": "Company Career Portals (Greenhouse, Lever, Ashby, Workday, Darwinbox, SmartRecruiters, Keka)",
@@ -480,7 +479,6 @@ class StartCrawlerRequest(BaseModel):
 @router.post("/crawler/start")
 async def start_crawler_batch(
     body: StartCrawlerRequest | None = None,
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     admin_id: str = Depends(require_admin),
 ):
     """Trigger background batch crawling of top target company career portals."""
@@ -502,7 +500,7 @@ async def start_crawler_batch(
             concurrency=req.concurrency,
         )
 
-    background_tasks.add_task(_runner)
+    spawn_background_task("admin_crawler_batch", _runner())
     return {
         "ok": True,
         "message": "AI Browser Crawler started across Delhi NCR target companies.",

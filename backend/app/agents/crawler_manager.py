@@ -84,6 +84,13 @@ class CrawlerManager:
     def get_status(self) -> dict[str, Any]:
         return dict(self.state)
 
+    def request_shutdown(self) -> None:
+        """Signal any active crawler run to stop promptly during server shutdown/reload."""
+        self._pause_requested = True
+        self.state["is_running"] = False
+        self.state["active_companies"] = []
+        self.state["current_company"] = None
+
     async def pause(self) -> dict[str, Any]:
         """Request active crawler to pause and record breakpoint with exploration summary."""
         if not self.state.get("is_running"):
@@ -182,7 +189,10 @@ class CrawlerManager:
                 logger.info("All target companies already completed in checkpoint; auto-resetting for a fresh run.")
                 await checkpoint.reset()
 
-            concurrency = max(1, min(concurrency, 6))
+            is_in_docker = os.path.exists('/.dockerenv') or not os.environ.get('DISPLAY')
+            # Cap parallel Playwright Chromium instances to prevent CPU/RAM/PID starvation inside container
+            max_conc = 3 if is_in_docker else 6
+            concurrency = max(1, min(concurrency, max_conc))
 
             now_iso = datetime.now(timezone.utc).isoformat()
             already_done = len(checkpoint.data.get("completed_ranks", [])) if not companies else 0
@@ -278,14 +288,17 @@ class CrawlerManager:
                     run_headless = True if is_in_docker else headless
 
                     worker_agent = AICareerCrawlerAgent()
-                    jobs = await worker_agent.crawl_career_portal(
-                        company=comp_name,
-                        start_url=career_url,
-                        target_query=query_role,
-                        headless=run_headless,
-                        slow_mo=0 if run_headless else slow_mo,
-                        delhi_ncr_only=True,
-                        limit=limit_per_company,
+                    jobs = await asyncio.wait_for(
+                        worker_agent.crawl_career_portal(
+                            company=comp_name,
+                            start_url=career_url,
+                            target_query=query_role,
+                            headless=run_headless,
+                            slow_mo=0 if run_headless else slow_mo,
+                            delhi_ncr_only=True,
+                            limit=limit_per_company,
+                        ),
+                        timeout=120.0,
                     )
 
                     for raw_job in jobs:
@@ -376,6 +389,16 @@ class CrawlerManager:
                     async with state_lock:
                         self.state["captchas_encountered"] += 1
                     logger.warning("Crawler hit CAPTCHA", company=comp_name, captcha=ce.captcha_type)
+
+                except asyncio.TimeoutError:
+                    status_str = "ERROR: Timed out after 120s"
+                    err_msg = "Company crawl exceeded 120s timeout"
+                    logger.warning("Crawler timed out on company", company=comp_name, url=career_url)
+
+                except asyncio.CancelledError:
+                    status_str = "CANCELLED"
+                    err_msg = "Cancelled due to server reload/shutdown"
+                    raise
 
                 except Exception as e:
                     status_str = f"ERROR: {str(e)[:30]}"

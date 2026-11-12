@@ -62,7 +62,20 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     watcher_task.cancel()
-    await stop_discord_bot()
+    try:
+        from app.agents.crawler_manager import crawler_manager
+        crawler_manager.request_shutdown()
+    except Exception:
+        pass
+    try:
+        from app.core.background import cancel_all_background_tasks
+        await cancel_all_background_tasks(timeout=4.0)
+    except Exception:
+        pass
+    try:
+        await asyncio.wait_for(stop_discord_bot(), timeout=3.0)
+    except Exception:
+        pass
     await close_db()
     logger.info("Sleepy Apply backend stopped")
 

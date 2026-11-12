@@ -310,6 +310,11 @@ class CrawlerManager:
                             logger.debug("Skipping non-Delhi-NCR job", company=comp_name, title=raw_job.title, loc=raw_job.location)
                             continue
 
+                        from app.core.retention import is_older_than_retention
+                        if is_older_than_retention(getattr(raw_job, "posted_at", None)):
+                            logger.debug("Skipping crawled job older than 2 months", company=comp_name, title=raw_job.title)
+                            continue
+
                         raw_job.source = "career-crawled"
                         content_hash = JobDeduplicator.compute_raw_hash(raw_job)
                         exists_query = (

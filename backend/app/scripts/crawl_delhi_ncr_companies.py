@@ -382,6 +382,11 @@ async def save_and_match_job(raw_job: Any, db: Any, users: list[dict], matcher: 
         logger.debug("Skipping non-Delhi-NCR non-Remote job", company=raw_job.company, title=raw_job.title, location=raw_job.location)
         return False, None
 
+    from app.core.retention import is_older_than_retention
+    if is_older_than_retention(getattr(raw_job, "posted_at", None)):
+        logger.debug("Skipping job older than 2 months", company=raw_job.company, title=raw_job.title)
+        return False, None
+
     content_hash = JobDeduplicator.compute_raw_hash(raw_job)
 
     # Check deduplication

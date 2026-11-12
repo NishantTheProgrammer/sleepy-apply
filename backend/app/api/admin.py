@@ -387,6 +387,28 @@ async def admin_purge_crawled_jobs(admin_id: str = Depends(require_admin)):
     }
 
 
+@router.post("/jobs/purge-old")
+async def admin_purge_old_entries(
+    days: int = Query(60, ge=1, le=365, description="Remove entries older than N days (default: 60 / 2 months)"),
+    admin_id: str = Depends(require_admin),
+):
+    """Remove MongoDB jobs, job matches, system logs, and workflow runs older than N days (default 60)."""
+    from app.core.retention import cleanup_old_entries
+
+    db = get_db()
+    summary = await cleanup_old_entries(db, days=days)
+    remaining_jobs = await db.jobs.count_documents({})
+    return {
+        "ok": True,
+        "message": (
+            f"Purged {summary['jobs_removed']} jobs, {summary['job_matches_removed']} matches, "
+            f"{summary['system_logs_removed']} logs, and {summary['workflow_runs_removed']} workflow runs older than {days} days."
+        ),
+        **summary,
+        "remaining_jobs": remaining_jobs,
+    }
+
+
 @router.post("/jobs/seed")
 async def admin_seed_jobs(admin_id: str = Depends(require_admin)):
     """Purge static jobs and sync 100% real live job postings in MongoDB from active sources."""

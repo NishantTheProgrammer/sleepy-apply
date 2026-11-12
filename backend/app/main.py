@@ -42,6 +42,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Daily checkpoint verification on startup failed", error=str(e))
 
+    # Remove stale MongoDB entries older than 2 months (60 days) on startup
+    try:
+        from app.core.retention import cleanup_old_entries
+        await cleanup_old_entries(db)
+    except Exception as e:
+        logger.warning("Startup retention cleanup failed", error=str(e))
+
     import asyncio
 
     async def _daily_checkpoint_watcher():
@@ -49,8 +56,10 @@ async def lifespan(app: FastAPI):
             try:
                 await asyncio.sleep(1800)  # check every 30 minutes
                 from app.scripts.crawl_delhi_ncr_companies import CrawlCheckpoint
+                from app.core.retention import cleanup_old_entries
                 cp = CrawlCheckpoint()
                 await cp.load()
+                await cleanup_old_entries(db)
             except asyncio.CancelledError:
                 break
             except Exception as e:

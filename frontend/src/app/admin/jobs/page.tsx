@@ -258,6 +258,23 @@ export default function AdminAllJobsPage() {
 
   const [purging, setPurging] = useState(false);
   const [purgingCrawled, setPurgingCrawled] = useState(false);
+  const [purgingOld, setPurgingOld] = useState(false);
+
+  const handlePurgeOld = async () => {
+    if (!confirm("Remove all jobs, matches, logs, and workflow runs older than 2 months (60 days) from MongoDB?")) return;
+    setPurgingOld(true);
+    try {
+      const res = await adminApi.purgeOldEntries(60);
+      setActionMsg(res.message);
+      setTimeout(() => setActionMsg(""), 6000);
+      loadJobs(1, search, selectedCompany, selectedSource, remoteFilter);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to purge entries older than 2 months";
+      alert(msg);
+    } finally {
+      setPurgingOld(false);
+    }
+  };
 
   const handlePurgeCrawled = async () => {
     if (!confirm("Delete all 'career-crawled' jobs from MongoDB so you can re-trigger a fresh crawl?")) return;
@@ -487,6 +504,16 @@ export default function AdminAllJobsPage() {
           >
             {purgingCrawled ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-rose-400" />}
             {purgingCrawled ? "Purging Crawled..." : "Purge Crawled"}
+          </button>
+
+          <button
+            onClick={handlePurgeOld}
+            disabled={purgingOld}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 text-xs font-bold border border-orange-500/30 transition-all cursor-pointer disabled:opacity-50"
+            title="Remove all jobs, matches, logs, and workflow runs older than 2 months (60 days)"
+          >
+            {purgingOld ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-orange-400" />}
+            {purgingOld ? "Purging >2 Months..." : "Purge >2 Months"}
           </button>
 
           {/* Fetch Career ATS Button */}

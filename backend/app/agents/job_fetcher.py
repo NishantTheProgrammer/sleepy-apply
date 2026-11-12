@@ -11,6 +11,7 @@ from app.sources.base import RawJobData
 from app.pipeline.deduplicator import JobDeduplicator
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.role_search import get_unique_user_selected_roles, format_roles_for_search_query
+from app.core.retention import is_older_than_retention
 
 logger = structlog.get_logger()
 
@@ -166,6 +167,10 @@ class JobFetcherAgent:
         now = datetime.now(timezone.utc)
 
         for raw in all_raw_jobs:
+            if is_older_than_retention(getattr(raw, "posted_at", None)):
+                logger.debug("Skipping job older than 2 months", title=raw.title, company=raw.company, posted_at=str(raw.posted_at))
+                continue
+
             # Cross-Source Deduplication Key
             content_hash = JobDeduplicator.compute_raw_hash(raw)
 

@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase, Building2, Search, Filter, Globe, ArrowUpRight,
   RefreshCw, Sparkles, Loader2, CheckCircle, ShieldCheck,
-  ChevronLeft, ChevronRight, X, ExternalLink, MapPin, DollarSign,
+  ChevronLeft, ChevronRight, ChevronDown, X, ExternalLink, MapPin, DollarSign,
   Calendar, Layers, Check, Trash2, Zap, Bot, AlertTriangle, ScrollText,
-  Pause, Play, RotateCcw
+  Pause, Play, RotateCcw, SlidersHorizontal
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -259,6 +259,18 @@ export default function AdminAllJobsPage() {
   const [purging, setPurging] = useState(false);
   const [purgingCrawled, setPurgingCrawled] = useState(false);
   const [purgingOld, setPurgingOld] = useState(false);
+  const [openMenu, setOpenMenu] = useState<"fetch" | "manage" | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const handlePurgeOld = async () => {
     if (!confirm("Remove all jobs, matches, logs, and workflow runs older than 2 months (60 days) from MongoDB?")) return;
@@ -409,155 +421,171 @@ export default function AdminAllJobsPage() {
           </p>
         </div>
 
-        {/* Global Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => loadJobs(page, search, selectedCompany, selectedSource, remoteFilter)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer"
-            title="Refresh current view"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
+        {/* Simplified Single-Row Action Toolbar */}
+        <div ref={menuContainerRef} className="flex flex-wrap items-center gap-2 relative">
+          {/* 1. Primary Split Action: Fetch All Jobs + Per-Source Dropdown */}
+          <div className="relative flex items-center">
+            <button
+              onClick={() => {
+                setOpenMenu(null);
+                handleFetchSource("all");
+              }}
+              disabled={Boolean(fetchingSource)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-l-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition-all disabled:opacity-50 cursor-pointer"
+              title="Fetch live jobs from all sources (Career ATS, LinkedIn, Naukri, AI Crawler)"
+            >
+              {fetchingSource ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {fetchingSource === "all"
+                ? "Fetching All..."
+                : fetchingSource
+                ? `Fetching ${fetchingSource}...`
+                : "Fetch All Jobs"}
+            </button>
+            <button
+              onClick={() => setOpenMenu((m) => (m === "fetch" ? null : "fetch"))}
+              disabled={Boolean(fetchingSource)}
+              className="px-2 py-2 rounded-r-xl bg-indigo-600 hover:bg-indigo-500 text-white border-l border-white/15 transition-all disabled:opacity-50 cursor-pointer"
+              title="Choose a specific job source"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openMenu === "fetch" ? "rotate-180" : ""}`} />
+            </button>
 
-          {/* Crawl Delhi NCR Portals (Resumable) */}
-          <button
-            onClick={() => handleStartCrawler(false)}
-            disabled={crawlerStatus?.is_running}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600/30 to-purple-600/30 hover:from-fuchsia-600/40 hover:to-purple-600/40 text-fuchsia-200 font-bold text-xs border border-fuchsia-500/40 shadow-lg shadow-fuchsia-600/20 transition-all disabled:opacity-50 cursor-pointer"
-            title="Crawl top Delhi NCR tech portals (resumable from checkpoint)"
-          >
-            {crawlerStatus?.is_running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-fuchsia-400" />}
-            {crawlerStatus?.is_running ? "Crawling Portals…" : "Crawl Delhi NCR (Resumable)"}
-          </button>
+            {openMenu === "fetch" && (
+              <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-white/15 shadow-2xl p-1.5 z-50">
+                <button
+                  onClick={() => { setOpenMenu(null); handleFetchSource("all"); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-purple-200 hover:bg-purple-500/15 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" /> All Sources (Full Sync)
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handleFetchSource("career"); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-emerald-200 hover:bg-emerald-500/15 transition-colors cursor-pointer"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Career ATS Only
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handleFetchSource("linkedin"); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-sky-200 hover:bg-sky-500/15 transition-colors cursor-pointer"
+                >
+                  <Briefcase className="w-3.5 h-3.5 text-sky-400" /> LinkedIn Only
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handleFetchSource("naukri"); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-amber-200 hover:bg-amber-500/15 transition-colors cursor-pointer"
+                >
+                  <Globe className="w-3.5 h-3.5 text-amber-400" /> Naukri Only
+                </button>
+                <div className="my-1 border-t border-white/10" />
+                <button
+                  onClick={() => { setOpenMenu(null); handleSyncRealJobs(); }}
+                  disabled={seeding}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" /> : <Zap className="w-3.5 h-3.5 text-purple-400" />}
+                  {seeding ? "Syncing Real..." : "Purge Static & Sync"}
+                </button>
+              </div>
+            )}
+          </div>
 
-          {/* Pause Button if crawler is active */}
-          {crawlerStatus?.is_running && (
+          {/* 2. Smart Crawl Control (Adapts automatically: Crawl -> Pause -> Resume) */}
+          {crawlerStatus?.is_running ? (
             <button
               onClick={handlePauseCrawler}
               disabled={pausingCrawler}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-xs border border-amber-500/40 shadow-lg shadow-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
-              title="Pause crawler and save checkpoint breakpoint"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-xs border border-amber-500/40 shadow-md shadow-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+              title="Pause active crawler and save breakpoint"
             >
               {pausingCrawler ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
-              <span>Pause</span>
+              Pause Crawl
             </button>
-          )}
-
-          {/* Resume Button if crawler is paused */}
-          {crawlerStatus?.is_paused && !crawlerStatus?.is_running && (
+          ) : crawlerStatus?.is_paused ? (
             <button
               onClick={handleResumeCrawler}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 font-bold text-xs border border-emerald-500/40 shadow-lg shadow-emerald-500/10 transition-all cursor-pointer"
-              title="Resume crawling from saved breakpoint"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 font-bold text-xs border border-emerald-500/40 shadow-md shadow-emerald-500/10 transition-all cursor-pointer"
+              title="Resume Delhi NCR crawl from saved breakpoint"
             >
               <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
-              <span>Resume Crawl</span>
+              Resume Crawl
+            </button>
+          ) : (
+            <button
+              onClick={() => handleStartCrawler(false)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-fuchsia-600/20 hover:bg-fuchsia-600/30 text-fuchsia-200 font-bold text-xs border border-fuchsia-500/40 shadow-md shadow-fuchsia-600/15 transition-all cursor-pointer"
+              title="Run resumable AI browser crawler across Delhi NCR career portals"
+            >
+              <Bot className="w-3.5 h-3.5 text-fuchsia-400" />
+              Crawl Portals
             </button>
           )}
 
-          {/* Reset Checkpoint Button */}
-          <button
-            onClick={handleResetCheckpoint}
-            disabled={crawlerStatus?.is_running || resettingCheckpoint}
-            className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 text-xs font-semibold border border-white/10 transition-all cursor-pointer disabled:opacity-50"
-            title="Reset crawl checkpoint to start fresh from Rank 1"
-          >
-            {resettingCheckpoint ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 text-slate-400" />}
-            Reset Checkpoint
-          </button>
+          {/* 3. Manage Dropdown (Cleanup, Reset, Logs) */}
+          <div className="relative">
+            <button
+              onClick={() => setOpenMenu((m) => (m === "manage" ? null : "manage"))}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold border border-white/10 transition-all cursor-pointer"
+              title="Cleanup, checkpoint reset, and system logs"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+              Manage
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openMenu === "manage" ? "rotate-180" : ""}`} />
+            </button>
 
-          {/* System Logs Link */}
-          <Link
-            href="/admin?tab=logs"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer"
-            title="View system logs and CAPTCHA event history"
-          >
-            <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-            System Logs
-          </Link>
+            {openMenu === "manage" && (
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-white/15 shadow-2xl p-1.5 z-50">
+                <button
+                  onClick={() => { setOpenMenu(null); handlePurgeOld(); }}
+                  disabled={purgingOld}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-orange-200 hover:bg-orange-500/15 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {purgingOld ? <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" /> : <Trash2 className="w-3.5 h-3.5 text-orange-400" />}
+                  Purge &gt;2 Months (60d)
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handlePurgeStatic(); }}
+                  disabled={purging}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-red-200 hover:bg-red-500/15 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" /> : <Trash2 className="w-3.5 h-3.5 text-red-400" />}
+                  Purge Static Jobs
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handlePurgeCrawled(); }}
+                  disabled={purgingCrawled}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-rose-200 hover:bg-rose-500/15 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {purgingCrawled ? <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" /> : <Trash2 className="w-3.5 h-3.5 text-rose-400" />}
+                  Purge AI Crawled Jobs
+                </button>
+                <button
+                  onClick={() => { setOpenMenu(null); handleResetCheckpoint(); }}
+                  disabled={crawlerStatus?.is_running || resettingCheckpoint}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-slate-200 hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                  Reset Crawl Checkpoint
+                </button>
+                <div className="my-1 border-t border-white/10" />
+                <Link
+                  href="/admin?tab=logs"
+                  onClick={() => setOpenMenu(null)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-amber-300 hover:bg-amber-500/15 transition-colors"
+                >
+                  <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+                  View System Logs
+                </Link>
+              </div>
+            )}
+          </div>
 
+          {/* 4. Compact Refresh Icon Button */}
           <button
-            onClick={handleSyncRealJobs}
-            disabled={seeding}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-bold border border-purple-500/30 transition-all cursor-pointer disabled:opacity-50"
-            title="Sync 100% real live postings from active sources"
+            onClick={() => loadJobs(page, search, selectedCompany, selectedSource, remoteFilter)}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all cursor-pointer"
+            title="Refresh job list"
           >
-            {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-purple-400" />}
-            {seeding ? "Syncing Real..." : "Sync Real Jobs"}
-          </button>
-
-          <button
-            onClick={handlePurgeStatic}
-            disabled={purging}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
-            title="Purge static & placeholder jobs"
-          >
-            {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-red-400" />}
-            {purging ? "Purging..." : "Purge Static"}
-          </button>
-
-          <button
-            onClick={handlePurgeCrawled}
-            disabled={purgingCrawled}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-bold border border-rose-500/30 transition-all cursor-pointer disabled:opacity-50"
-            title="Delete all career-crawled jobs so you can re-trigger a fresh crawl"
-          >
-            {purgingCrawled ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-rose-400" />}
-            {purgingCrawled ? "Purging Crawled..." : "Purge Crawled"}
-          </button>
-
-          <button
-            onClick={handlePurgeOld}
-            disabled={purgingOld}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 text-xs font-bold border border-orange-500/30 transition-all cursor-pointer disabled:opacity-50"
-            title="Remove all jobs, matches, logs, and workflow runs older than 2 months (60 days)"
-          >
-            {purgingOld ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-orange-400" />}
-            {purgingOld ? "Purging >2 Months..." : "Purge >2 Months"}
-          </button>
-
-          {/* Fetch Career ATS Button */}
-          <button
-            onClick={() => handleFetchSource("career")}
-            disabled={Boolean(fetchingSource)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs border border-emerald-500/30 shadow-md shadow-emerald-600/10 transition-all disabled:opacity-50 cursor-pointer"
-            title="Fetch live postings from Target Company ATS (Greenhouse, Lever, Ashby)"
-          >
-            {fetchingSource === "career" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Building2 className="w-3.5 h-3.5 text-emerald-400" />}
-            {fetchingSource === "career" ? "Fetching ATS..." : "Fetch Career ATS"}
-          </button>
-
-          {/* Fetch LinkedIn Button */}
-          <button
-            onClick={() => handleFetchSource("linkedin")}
-            disabled={Boolean(fetchingSource)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 font-bold text-xs border border-sky-500/30 shadow-md shadow-sky-600/10 transition-all disabled:opacity-50 cursor-pointer"
-            title="Fetch live tech jobs from LinkedIn India"
-          >
-            {fetchingSource === "linkedin" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Briefcase className="w-3.5 h-3.5 text-sky-400" />}
-            {fetchingSource === "linkedin" ? "Fetching LinkedIn..." : "Fetch LinkedIn"}
-          </button>
-
-          {/* Fetch Naukri Button */}
-          <button
-            onClick={() => handleFetchSource("naukri")}
-            disabled={Boolean(fetchingSource)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 font-bold text-xs border border-amber-500/30 shadow-md shadow-amber-600/10 transition-all disabled:opacity-50 cursor-pointer"
-            title="Fetch live tech postings from Naukri India"
-          >
-            {fetchingSource === "naukri" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5 text-amber-400" />}
-            {fetchingSource === "naukri" ? "Fetching Naukri..." : "Fetch Naukri"}
-          </button>
-
-          {/* Fetch All Sources Button */}
-          <button
-            onClick={() => handleFetchSource("all")}
-            disabled={Boolean(fetchingSource)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all disabled:opacity-50 cursor-pointer"
-            title="Fetch all sources concurrently"
-          >
-            {fetchingSource === "all" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {fetchingSource === "all" ? "Fetching All..." : "Fetch All Sources"}
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
@@ -858,44 +886,105 @@ export default function AdminAllJobsPage() {
       </div>
 
       {/* ── Search & Multi-Source Filter Toolbar ── */}
-      <div className="glass rounded-2xl p-4 mb-6 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search Input */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value);
-              if (e.target.value === "" && search !== "") {
-                handleClearSearch();
-              }
-            }}
-            placeholder="Search title, company, skills, or location..."
-            className="w-full pl-9 pr-24 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
-          />
-          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            {searchInput && (
+      <div className="glass rounded-2xl p-4 mb-6 flex flex-col gap-3">
+        {/* Top Row: Search + Company + Remote */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 min-w-0">
+          {/* Search Input */}
+          <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0 relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                if (e.target.value === "" && search !== "") {
+                  handleClearSearch();
+                }
+              }}
+              placeholder="Search title, company, skills, or location..."
+              className="w-full pl-9 pr-24 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50"
+            />
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
               <button
-                type="button"
-                onClick={handleClearSearch}
-                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Clear search"
+                type="submit"
+                className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold transition-all cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                Search
+              </button>
+            </div>
+          </form>
+
+          {/* Company & Remote Filters */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 min-w-0">
+            <select
+              value={selectedCompany}
+              onChange={(e) => {
+                setSelectedCompany(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-52 max-w-full sm:max-w-[210px] truncate px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50"
+            >
+              <option value="all">
+                All Companies ({isStatsLoading || companies.length === 0 ? "…" : companies.length.toLocaleString()})
+              </option>
+              {companies.map((c, i) => (
+                <option key={`${c}-${i}`} value={c}>{c}</option>
+              ))}
+            </select>
+
+            {/* Remote Toggle */}
+            <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
+              {[
+                { id: "all", label: "All" },
+                { id: "remote", label: "Remote" },
+                { id: "onsite", label: "Onsite" },
+              ].map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => {
+                    setRemoteFilter(r.id);
+                    setPage(1);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    remoteFilter === r.id
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {(search || selectedCompany !== "all" || selectedSource !== "all" || remoteFilter !== "all") && (
+              <button
+                onClick={() => {
+                  handleClearSearch();
+                  setSelectedCompany("all");
+                  setSelectedSource("all");
+                  setRemoteFilter("all");
+                  setPage(1);
+                }}
+                className="text-[11px] text-slate-400 hover:text-rose-400 px-2 py-1 underline transition-colors cursor-pointer shrink-0"
+              >
+                Reset
               </button>
             )}
-            <button
-              type="submit"
-              className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold transition-all cursor-pointer"
-            >
-              Search
-            </button>
           </div>
-        </form>
+        </div>
 
-        {/* Source Filter Tabs */}
-        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0 flex-wrap" suppressHydrationWarning>
+        {/* Bottom Row: Source Filter Tabs */}
+        <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 self-start max-w-full flex-wrap" suppressHydrationWarning>
           {[
             { id: "all", label: `All (${isStatsLoading ? "…" : stats.total_jobs.toLocaleString()})` },
             { id: "career-crawled", label: `Career Crawled (${isStatsLoading ? "…" : (stats.career_crawled_jobs || 0).toLocaleString()})` },
@@ -927,64 +1016,6 @@ export default function AdminAllJobsPage() {
               {s.label}
             </button>
           ))}
-        </div>
-
-        {/* Company & Remote Filters */}
-        <div className="flex items-center gap-2 shrink-0">
-          <select
-            value={selectedCompany}
-            onChange={(e) => {
-              setSelectedCompany(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500/50"
-          >
-            <option value="all">
-              All Companies ({isStatsLoading || companies.length === 0 ? "…" : companies.length.toLocaleString()})
-            </option>
-            {companies.map((c, i) => (
-              <option key={`${c}-${i}`} value={c}>{c}</option>
-            ))}
-          </select>
-
-          {/* Remote Toggle */}
-          <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5">
-            {[
-              { id: "all", label: "All" },
-              { id: "remote", label: "Remote" },
-              { id: "onsite", label: "Onsite" },
-            ].map((r) => (
-              <button
-                key={r.id}
-                onClick={() => {
-                  setRemoteFilter(r.id);
-                  setPage(1);
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  remoteFilter === r.id
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-
-          {(search || selectedCompany !== "all" || selectedSource !== "all" || remoteFilter !== "all") && (
-            <button
-              onClick={() => {
-                handleClearSearch();
-                setSelectedCompany("all");
-                setSelectedSource("all");
-                setRemoteFilter("all");
-                setPage(1);
-              }}
-              className="text-[11px] text-slate-400 hover:text-rose-400 px-2 py-1 underline transition-colors cursor-pointer"
-            >
-              Reset
-            </button>
-          )}
         </div>
       </div>
 

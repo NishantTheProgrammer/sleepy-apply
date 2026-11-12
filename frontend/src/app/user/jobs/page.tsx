@@ -322,10 +322,10 @@ function JobsPageContent() {
   const [launchingVisibleId, setLaunchingVisibleId] = useState<string | null>(null);
   const [visibleToast, setVisibleToast] = useState<{ company: string; message: string } | null>(null);
 
-  const load = async (p = 1) => {
+  const load = async (p = 1, src: string = sourceFilter) => {
     setLoading(true);
     try {
-      const res = await jobsApi.list({ page: p, limit: 30 });
+      const res = await jobsApi.list({ page: p, limit: 30, source: src });
       const items = (res.items || []) as JobItem[];
       setJobs(items);
       setTotal(res.total || items.length);
@@ -336,9 +336,13 @@ function JobsPageContent() {
         if (preselectedId) {
           const found = items.find((j) => j.job._id === preselectedId || j._id === preselectedId);
           setSelectedJobId(found ? found.job._id : items[0].job._id);
-        } else if (!selectedJobId) {
-          setSelectedJobId(items[0].job._id);
+        } else {
+          setSelectedJobId((prev) =>
+            prev && items.some((j) => j.job._id === prev || j._id === prev) ? prev : items[0].job._id
+          );
         }
+      } else {
+        setSelectedJobId(null);
       }
     } catch (err) {
       console.warn("Failed to load user jobs:", err);
@@ -349,8 +353,8 @@ function JobsPageContent() {
 
   useEffect(() => {
     setSelectedJobId(null);
-    load(1);
-  }, [user?.id]);
+    load(1, sourceFilter);
+  }, [user?.id, sourceFilter]);
 
   const handleDiscoverJobs = async () => {
     setDiscovering(true);

@@ -468,10 +468,12 @@ class BrowserFormFillerAgent:
                     except Exception:
                         continue
 
-                # Inject Sleepy Apply Form Review Banner right above submit button
+                # Inject Sleepy Apply Form Review / Warning Banner
                 try:
-                    await page.evaluate("""
-                        () => {
+                    has_filled = len(fields_filled) > 0
+                    await page.evaluate(
+                        """
+                        (hasFilled) => {
                             const submitBtns = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], #btn-submit, #submit-app, button'));
                             const submitBtn = submitBtns.find(b => {
                                 const t = (b.innerText || b.value || '').toLowerCase();
@@ -480,20 +482,33 @@ class BrowserFormFillerAgent:
 
                             const banner = document.createElement("div");
                             banner.id = "sleepy-apply-review-banner";
-                            banner.style.cssText = "margin: 24px 0; padding: 18px; border-radius: 14px; background: rgba(16, 185, 129, 0.12); border: 2px dashed #10b981; color: #10b981; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);";
-                            banner.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                                    <span style="font-size: 18px;">⚡</span>
-                                    <strong style="font-size: 15px; color: #34d399;">Sleepy Apply AI: Application Form Autofilled</strong>
-                                    <span style="margin-left: auto; background: #064e3b; color: #6ee7b7; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: bold;">Review Mode</span>
-                                </div>
-                                <div style="color: #cbd5e1; font-size: 12px;">
-                                    All candidate contact details, links, and profile questions have been filled.
-                                    <strong style="color: #fbbf24;">The final submit button was intentionally NOT pressed</strong> so you can inspect and verify before final submission.
-                                </div>
-                            `;
+                            if (hasFilled) {
+                                banner.style.cssText = "margin: 24px 0; padding: 18px; border-radius: 14px; background: rgba(16, 185, 129, 0.12); border: 2px dashed #10b981; color: #10b981; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.5; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);";
+                                banner.innerHTML = `
+                                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                                        <span style="font-size: 18px;">⚡</span>
+                                        <strong style="font-size: 15px; color: #34d399;">Sleepy Apply AI: Application Form Autofilled</strong>
+                                        <span style="margin-left: auto; background: #064e3b; color: #6ee7b7; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: bold;">Review Mode</span>
+                                    </div>
+                                    <div style="color: #cbd5e1; font-size: 12px;">
+                                        All candidate contact details, links, and profile questions have been filled.
+                                        <strong style="color: #fbbf24;">The final submit button was intentionally NOT pressed</strong> so you can inspect and verify before final submission.
+                                    </div>
+                                `;
+                            } else {
+                                banner.style.cssText = "position: fixed; bottom: 20px; right: 20px; z-index: 999999; max-width: 440px; padding: 16px; border-radius: 14px; background: rgba(15, 23, 42, 0.96); border: 2px solid #f59e0b; color: #fef3c7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.5; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);";
+                                banner.innerHTML = `
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                        <span style="font-size: 16px;">⚠️</span>
+                                        <strong style="color: #fbbf24;">Sleepy Apply AI: No Application Form Found</strong>
+                                    </div>
+                                    <div style="color: #cbd5e1; font-size: 12px;">
+                                        This URL appears to be a career search/landing page or behind login rather than a direct application form. Select the specific role / click Apply manually in this window.
+                                    </div>
+                                `;
+                            }
 
-                            if (submitBtn && submitBtn.parentNode) {
+                            if (hasFilled && submitBtn && submitBtn.parentNode) {
                                 submitBtn.parentNode.insertBefore(banner, submitBtn);
                                 submitBtn.style.outline = "3px solid #f59e0b";
                                 submitBtn.style.outlineOffset = "4px";
@@ -502,7 +517,9 @@ class BrowserFormFillerAgent:
                                 document.body.appendChild(banner);
                             }
                         }
-                    """)
+                        """,
+                        has_filled,
+                    )
                     await page.wait_for_timeout(1000)
                 except Exception as ie:
                     logger.debug("Banner injection skipped", error=str(ie))
@@ -549,6 +566,48 @@ class BrowserFormFillerAgent:
                     screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot_bytes).decode('utf-8')}"
                 except Exception:
                     pass
+
+                if len(fields_filled) == 0:
+                    warn_msg = (
+                        f"⚠️ No fillable application form detected for {company} ({title}) at {page.url}. "
+                        f"This link may be a career search/landing page or require login."
+                    )
+                    if not captcha_detected:
+                        try:
+                            from app.agents.discord_bot import DiscordAgent
+                            discord = DiscordAgent()
+                            await discord.notify_apply_issue(
+                                job_title=title,
+                                company=company,
+                                issue_message=warn_msg,
+                                target_url=page.url,
+                                discord_user_id=user.get("discord_id") if user else None,
+                            )
+                        except Exception as de:
+                            logger.debug("Discord no-form alert skipped", error=str(de))
+
+                    await log_system_event(
+                        level="WARNING",
+                        category="auto_apply",
+                        message=warn_msg,
+                        details={
+                            "company": company,
+                            "title": title,
+                            "fields_count": 0,
+                            "url": page.url,
+                        },
+                    )
+                    return FormFillResult(
+                        success=False,
+                        status="NO_FORM_DETECTED",
+                        message=warn_msg,
+                        target_url=page.url,
+                        fields_filled=fields_filled,
+                        submit_button_found=submit_btn_detected,
+                        screenshot_path=screenshot_path,
+                        screenshot_base64=screenshot_base64,
+                        questions_answered=questions_answered,
+                    )
 
                 msg = (
                     f"✅ Form successfully autofilled with {len(fields_filled)} fields for {company} ({title}). "
@@ -676,7 +735,7 @@ class BrowserFormFillerAgent:
         # If the page already has application inputs, we are already on the application form!
         try:
             for f in page.frames:
-                form_inputs = f.locator('input[type="email"], input[name*="email" i], input[name*="first" i], #firstName, #email')
+                form_inputs = f.locator('input[type="email"], input[name*="email" i], input[name*="first" i], input[type="file"], #firstName, #email')
                 if await form_inputs.count() > 0:
                     return page
         except Exception:

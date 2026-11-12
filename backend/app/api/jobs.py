@@ -272,13 +272,14 @@ async def auto_apply_form_preview(request: Request, job_id: str):
 
     # Save to application record
     now = datetime.now(timezone.utc)
+    app_status = res.status or ("FORM_FILLED_READY" if res.success else "NO_FORM_DETECTED")
     app_doc = await db.applications.find_one({"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)})
     if not app_doc:
         app_doc = {
             "user_id": ObjectId(user_id),
             "job_id": ObjectId(job_id),
-            "status": "FORM_FILLED_READY",
-            "status_history": [{"status": "FORM_FILLED_READY", "timestamp": now, "reason": res.message}],
+            "status": app_status,
+            "status_history": [{"status": app_status, "timestamp": now, "reason": res.message}],
             "form_fill_details": res.to_dict(),
             "screenshot_path": res.screenshot_path,
             "created_at": now,
@@ -290,29 +291,30 @@ async def auto_apply_form_preview(request: Request, job_id: str):
             {"_id": app_doc["_id"]},
             {
                 "$set": {
-                    "status": "FORM_FILLED_READY",
+                    "status": app_status,
                     "form_fill_details": res.to_dict(),
                     "screenshot_path": res.screenshot_path,
                     "updated_at": now,
                 },
                 "$push": {
-                    "status_history": {"status": "FORM_FILLED_READY", "timestamp": now, "reason": res.message}
+                    "status_history": {"status": app_status, "timestamp": now, "reason": res.message}
                 },
             },
         )
 
-    # Broadcast to Discord #auto-applied
-    try:
-        from app.agents.discord_bot import DiscordAgent
-        discord = DiscordAgent()
-        await discord.notify_application_submitted(
-            job_title=f"[Form Autofilled - Review Ready] {job.get('title', '')}",
-            company=job.get("company", ""),
-            score=95,
-            discord_user_id=user.get("discord_id") if user else None,
-        )
-    except Exception as e:
-        logger.debug("Discord broadcast error", error=str(e))
+    # Broadcast to Discord #auto-applied only when autofill succeeded
+    if res.success:
+        try:
+            from app.agents.discord_bot import DiscordAgent
+            discord = DiscordAgent()
+            await discord.notify_application_submitted(
+                job_title=f"[Form Autofilled - Review Ready] {job.get('title', '')}",
+                company=job.get("company", ""),
+                score=95,
+                discord_user_id=user.get("discord_id") if user else None,
+            )
+        except Exception as e:
+            logger.debug("Discord broadcast error", error=str(e))
 
     return {
         "ok": res.success,

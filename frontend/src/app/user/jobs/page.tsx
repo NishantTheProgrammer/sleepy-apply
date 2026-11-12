@@ -398,18 +398,20 @@ function JobsPageContent() {
     try {
       const targetItem = jobs.find((j) => j.job._id === jobId || j._id === jobId || j.job_id === jobId);
       const res = await jobsApi.autoApplyForm(jobId);
-      if (res.ok) {
-        setFormFillResult({
-          job_id: jobId,
-          job_title: targetItem?.job.title || "Position",
-          company: targetItem?.job.company || "Company",
-          target_url: res.target_url,
-          fields_filled: res.fields_filled || [],
-          submit_button_found: res.submit_button_found,
-          screenshot_base64: res.screenshot_base64,
-          screenshot_path: res.screenshot_path,
-          message: res.message,
-        });
+      setFormFillResult({
+        job_id: jobId,
+        job_title: targetItem?.job.title || "Position",
+        company: targetItem?.job.company || "Company",
+        target_url: res.target_url,
+        fields_filled: res.fields_filled || [],
+        submit_button_found: res.submit_button_found,
+        screenshot_base64: res.screenshot_base64,
+        screenshot_path: res.screenshot_path,
+        message: res.message,
+      });
+      if (!res.ok) {
+        setDiscoverMsg(res.message || "No fillable application form detected on this career portal.");
+        setTimeout(() => setDiscoverMsg(""), 10000);
       }
       await load(page);
     } catch (e: unknown) {

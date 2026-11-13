@@ -113,11 +113,15 @@ async def _run_visible_filler(job_id: str | None, user_id: str | None, url: str 
 
 @app.get("/health")
 async def health():
+    cdp_url = os.environ.get("CHROME_CDP_URL", "http://127.0.0.1:9222")
+    cdp_active = BrowserFormFillerAgent._is_cdp_available(cdp_url)
     return {
         "status": "ok",
         "service": "host_browser_runner",
         "environment": "native_macos",
         "mode": "headless_false",
+        "cdp_active": cdp_active,
+        "profile_mode": "live_chrome_cdp" if cdp_active else "persistent_sleepy_apply_profile",
     }
 
 

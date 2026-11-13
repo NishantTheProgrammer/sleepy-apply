@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import asyncio
 import base64
 import urllib.parse
 from datetime import datetime, timezone
@@ -62,9 +63,196 @@ class BrowserFormFillerAgent:
     Submit / Apply button, injects a review banner, and takes a full preview screenshot.
     """
 
-    def __init__(self, headless: bool = True, slow_mo: int = 0):
+    def __init__(
+        self,
+        headless: bool = True,
+        slow_mo: int = 0,
+        chrome_profile_name: str | None = None,
+    ):
         self.headless = headless
         self.slow_mo = slow_mo
+        self.chrome_profile_name = (
+            chrome_profile_name
+            or os.environ.get("CHROME_PROFILE_NAME")
+            or "NishantTheProgrammer"
+        )
+
+    @staticmethod
+    def _is_cdp_available(cdp_url: str) -> bool:
+        import urllib.request
+
+        try:
+            with urllib.request.urlopen(f"{cdp_url.rstrip('/')}/json/version", timeout=0.6) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    @staticmethod
+    def _resolve_chrome_profile_dir(profile_name: str) -> str | None:
+        local_state = os.path.expanduser("~/Library/Application Support/Google/Chrome/Local State")
+        try:
+            with open(local_state, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            info_cache = data.get("profile", {}).get("info_cache", {})
+            target = profile_name.strip().lower()
+            for folder_name, meta in info_cache.items():
+                if not isinstance(meta, dict):
+                    continue
+                candidates = [
+                    str(folder_name),
+                    str(meta.get("name", "")),
+                    str(meta.get("gaia_name", "")),
+                    str(meta.get("shortcut_name", "")),
+                ]
+                if any(c.strip().lower() == target for c in candidates if c):
+                    return folder_name
+        except Exception:
+            # macOS TCC may deny reading ~/Library/Application Support/Google/Chrome/Local State
+            return None
+        return None
+
+    async def _launch_browser_and_page(
+        self, p: Any, actual_headless: bool, is_in_docker: bool
+    ) -> tuple[Any, Any, Any, bool]:
+        """Launch or attach to a browser context. Returns (browser, context, page, cdp_connected)."""
+        user_agent = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        )
+        viewport = {"width": 1280, "height": 900}
+
+        if not is_in_docker and not actual_headless:
+            cdp_url = os.environ.get("CHROME_CDP_URL", "http://127.0.0.1:9222")
+            if await asyncio.to_thread(self._is_cdp_available, cdp_url):
+                try:
+                    browser = await p.chromium.connect_over_cdp(cdp_url)
+                    context = browser.contexts[0] if browser.contexts else await browser.new_context(viewport=viewport)
+                    page = await context.new_page()
+                    print(
+                        f"🔗 [Auto-Apply] Attached to live Google Chrome via CDP ({cdp_url}) "
+                        f"— using active profile '{self.chrome_profile_name}'."
+                    )
+                    return browser, context, page, True
+                except Exception as e:
+                    logger.warning("CDP connection failed, falling back to persistent Chrome profile", error=str(e))
+
+            # Persistent real Google Chrome profile so logins & Google SSO persist across runs
+            persistent_dir = os.environ.get("CHROME_USER_DATA_DIR") or os.path.expanduser(
+                "~/.sleepy_apply/chrome_profile"
+            )
+            os.makedirs(persistent_dir, exist_ok=True)
+            launch_args = ["--disable-blink-features=AutomationControlled"]
+            profile_dir = self._resolve_chrome_profile_dir(self.chrome_profile_name)
+            if profile_dir and persistent_dir == os.path.expanduser("~/Library/Application Support/Google/Chrome"):
+                launch_args.append(f"--profile-directory={profile_dir}")
+
+            for use_chrome_channel in (True, False):
+                try:
+                    kwargs: dict[str, Any] = {
+                        "user_data_dir": persistent_dir,
+                        "headless": False,
+                        "slow_mo": self.slow_mo,
+                        "viewport": viewport,
+                        "user_agent": user_agent,
+                        "args": launch_args,
+                    }
+                    if use_chrome_channel:
+                        kwargs["channel"] = "chrome"
+                        kwargs["ignore_default_args"] = ["--use-mock-keychain", "--password-store=basic"]
+                    context = await p.chromium.launch_persistent_context(**kwargs)
+                    page = context.pages[0] if context.pages else await context.new_page()
+                    mode_label = "Google Chrome" if use_chrome_channel else "Chromium"
+                    print(
+                        f"🌐 [Auto-Apply] Launched persistent {mode_label} profile at {persistent_dir} "
+                        f"(sign-ins will be remembered)."
+                    )
+                    return None, context, page, False
+                except Exception as e:
+                    logger.warning(
+                        "Persistent browser launch attempt failed",
+                        use_chrome_channel=use_chrome_channel,
+                        error=str(e),
+                    )
+
+        browser = await p.chromium.launch(
+            headless=actual_headless,
+            slow_mo=self.slow_mo if not actual_headless else 0,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_in_docker else [],
+        )
+        context = await browser.new_context(user_agent=user_agent, viewport=viewport)
+        page = await context.new_page()
+        return browser, context, page, False
+
+    async def _wait_for_login_if_needed(self, page: Any, actual_headless: bool) -> None:
+        """In visible mode, pause and wait for the user if the portal presents a login wall."""
+        if actual_headless:
+            return
+
+        async def _detect_login_wall() -> bool:
+            try:
+                return await page.evaluate(
+                    """() => {
+                        const isVisible = (el) => {
+                            if (!el) return false;
+                            const s = window.getComputedStyle(el);
+                            const r = el.getBoundingClientRect();
+                            return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+                        };
+                        const pwdInputs = Array.from(document.querySelectorAll('input[type="password"]')).filter(isVisible);
+                        const nonAuthInputs = Array.from(
+                            document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="submit"]):not([type="button"]), textarea, select')
+                        ).filter(isVisible);
+                        if (pwdInputs.length > 0 && nonAuthInputs.length <= 2) return true;
+
+                        const url = (window.location.href || '').toLowerCase();
+                        const looksLikeLoginUrl = /\\b(login|signin|sign-in|auth|sso|account)\\b/.test(url);
+                        if (looksLikeLoginUrl && nonAuthInputs.length <= 2) {
+                            const text = (document.body?.innerText || '').toLowerCase();
+                            if (/sign in|log in|create account|continue with google/.test(text)) return true;
+                        }
+                        return false;
+                    }"""
+                )
+            except Exception:
+                return False
+
+        if not await _detect_login_wall():
+            return
+
+        print("🔐 [Auto-Apply] Login wall detected — waiting up to 3 minutes for you to sign in...")
+        try:
+            await page.evaluate(
+                """() => {
+                    if (document.getElementById('sleepy-apply-login-banner')) return;
+                    const div = document.createElement('div');
+                    div.id = 'sleepy-apply-login-banner';
+                    div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:linear-gradient(90deg,#1e3a8a,#4338ca);color:#fff;padding:12px 20px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                    div.textContent = '🔐 Login Required — Please sign in (or click Sign in with Google) in this window. Auto-Apply will resume automatically once the form loads...';
+                    document.body.appendChild(div);
+                }"""
+            )
+        except Exception:
+            pass
+
+        for _ in range(90):  # 90 * 2s = 180s
+            await asyncio.sleep(2)
+            if page.is_closed():
+                return
+            if not await _detect_login_wall():
+                print("✅ [Auto-Apply] Login completed! Resuming form autofill...")
+                try:
+                    await page.evaluate(
+                        """() => {
+                            const b = document.getElementById('sleepy-apply-login-banner');
+                            if (b) b.remove();
+                        }"""
+                    )
+                except Exception:
+                    pass
+                await page.wait_for_timeout(1500)
+                return
+
+        print("⏱️ [Auto-Apply] Login wait timed out after 3 minutes; attempting to inspect current page anyway.")
 
     async def fill_application_form(
         self,
@@ -391,22 +579,10 @@ class BrowserFormFillerAgent:
         actual_headless = True if (is_in_docker and not os.environ.get("DISPLAY")) else self.headless
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=actual_headless,
-                slow_mo=self.slow_mo if not actual_headless else 0,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_in_docker else [],
+            browser, context, page, cdp_connected = await self._launch_browser_and_page(
+                p, actual_headless, is_in_docker
             )
-            context = None
             try:
-                context = await browser.new_context(
-                    user_agent=(
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-                    ),
-                    viewport={"width": 1280, "height": 900},
-                )
-                page = await context.new_page()
-
                 # Navigate
                 print(f"🌐 [Auto-Apply] Navigating to: {target_url}")
                 try:
@@ -423,6 +599,9 @@ class BrowserFormFillerAgent:
 
                 # Dismiss popups again if opened during Apply click
                 await self._dismiss_overlays_and_popups(page)
+
+                # Pause for manual sign-in if the portal requires an account first (visible mode only)
+                await self._wait_for_login_if_needed(page, actual_headless)
 
                 # ── 2a. Specialized ATS Handlers (e.g. Keka) ──
                 is_keka = "keka" in page.url or await page.locator("#educationDetails, #skills-container").count() > 0
@@ -640,21 +819,29 @@ class BrowserFormFillerAgent:
                 )
 
             finally:
-                if not actual_headless and keep_open and page:
-                    print("👀 Visible browser is active for user inspection. Window will stay open for human review (close window when done)...")
-                    try:
-                        await page.wait_for_event("close", timeout=600000)
-                    except Exception:
-                        pass
-                if context:
-                    try:
-                        await context.close()
-                    except Exception:
-                        pass
-                try:
-                    await browser.close()
-                except Exception:
-                    pass
+                if cdp_connected:
+                    if not keep_open and page and not page.is_closed():
+                        try:
+                            await page.close()
+                        except Exception:
+                            pass
+                else:
+                    if not actual_headless and keep_open and page:
+                        print("👀 Visible browser is active for user inspection. Window will stay open for human review (close window when done)...")
+                        try:
+                            await page.wait_for_event("close", timeout=600000)
+                        except Exception:
+                            pass
+                    if context:
+                        try:
+                            await context.close()
+                        except Exception:
+                            pass
+                    if browser:
+                        try:
+                            await browser.close()
+                        except Exception:
+                            pass
 
     async def _dismiss_overlays_and_popups(self, page: Any) -> None:
         """Intelligently detects and dismisses cookie banners, tracking popups, and dialog overlays."""
@@ -732,11 +919,19 @@ class BrowserFormFillerAgent:
         """
         await self._dismiss_overlays_and_popups(page)
 
-        # If the page already has application inputs, we are already on the application form!
+        # Only treat the page as already on the application form if it has real application fields
+        # (file upload or name/phone fields), NOT just a single job-alert/newsletter email input!
         try:
             for f in page.frames:
-                form_inputs = f.locator('input[type="email"], input[name*="email" i], input[name*="first" i], input[type="file"], #firstName, #email')
-                if await form_inputs.count() > 0:
+                has_resume_upload = await f.locator('input[type="file"]').count() > 0
+                has_name_field = (
+                    await f.locator(
+                        'input[name*="first" i], input[name*="last" i], input[name*="full" i], '
+                        'input[id*="first" i], input[id*="last" i], #firstName, #lastName'
+                    ).count()
+                    > 0
+                )
+                if has_resume_upload or has_name_field:
                     return page
         except Exception:
             pass
@@ -744,10 +939,10 @@ class BrowserFormFillerAgent:
         apply_triggers = [
             'a[href*="#apply"]',
             'a:has-text("Apply for this job")',
-            'a:has-text("Apply Now")',
-            'a:has-text("Apply")',
             'button:has-text("Apply for this job")',
+            'a:has-text("Apply Now")',
             'button:has-text("Apply Now")',
+            'a:has-text("Apply")',
             'button:has-text("Apply")',
             'a[href*="/apply"]',
             '[data-qa="btn-apply"]',
@@ -766,23 +961,41 @@ class BrowserFormFillerAgent:
                     except Exception:
                         pass
 
+                    url_before = page.url
+                    href_attr = None
+                    try:
+                        href_attr = await loc.get_attribute("href")
+                    except Exception:
+                        pass
+
+                    pages_before = len(context.pages) if context else 0
                     if is_blank and context:
                         async with context.expect_page(timeout=7000) as new_page_info:
                             await loc.click(timeout=5000)
                         new_page = await new_page_info.value
                         await new_page.wait_for_load_state("domcontentloaded")
+                        await new_page.wait_for_timeout(2000)
                         await self._dismiss_overlays_and_popups(new_page)
                         return new_page
                     else:
                         await loc.click(timeout=5000)
-                        await page.wait_for_timeout(1500)
-                        # Check if a new tab opened in context anyway
-                        if context and len(context.pages) > 1:
+                        try:
+                            await page.wait_for_load_state("domcontentloaded", timeout=8000)
+                        except Exception:
+                            pass
+                        await page.wait_for_timeout(3000)
+                        # Check if clicking actually opened a new tab
+                        if context and len(context.pages) > pages_before:
                             new_p = context.pages[-1]
                             await new_p.bring_to_front()
                             await new_p.wait_for_load_state("domcontentloaded")
+                            await new_p.wait_for_timeout(2000)
                             await self._dismiss_overlays_and_popups(new_p)
                             return new_p
+                        # If a JS overlay blocked the click on an <a> with an http href, follow it directly
+                        if page.url == url_before and href_attr and href_attr.startswith("http"):
+                            await page.goto(href_attr, wait_until="domcontentloaded", timeout=20000)
+                            await page.wait_for_timeout(2500)
                         await self._dismiss_overlays_and_popups(page)
                         break
             except Exception:

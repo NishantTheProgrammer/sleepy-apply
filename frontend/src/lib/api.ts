@@ -236,12 +236,13 @@ export const templatesApi = {
 
 // ── Jobs ──────────────────────────────────────────────────
 export const jobsApi = {
-  list: (params?: { page?: number; limit?: number; min_score?: number; source?: string }) => {
+  list: (params?: { page?: number; limit?: number; min_score?: number; source?: string; search?: string }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set("page", String(params.page));
     if (params?.limit) q.set("limit", String(params.limit));
     if (params?.min_score) q.set("min_score", String(params.min_score));
     if (params?.source && params.source !== "all") q.set("source", params.source);
+    if (params?.search) q.set("search", params.search);
     return request<{ items: unknown[]; total: number }>(`/api/jobs?${q}`);
   },
   get: (id: string) => request(`/api/jobs/${id}`),

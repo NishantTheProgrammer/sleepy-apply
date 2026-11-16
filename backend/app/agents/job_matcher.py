@@ -436,6 +436,8 @@ class JobMatcherAgent:
         # 10. Total Score with Experience Penalty Capping
         raw_total = skills_score + title_score + experience_score + location_score
         total_score = min(penalty_cap, min(98, max(15, raw_total)))
+        if job.get("source") in ["discord_community", "community"]:
+            total_score = max(total_score, 90)
 
         # 6. AI Match Reasoning
         reasoning = default_reason

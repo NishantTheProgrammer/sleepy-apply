@@ -111,10 +111,11 @@ async def get_user_crawler_status(request: Request):
 async def list_jobs(
     request: Request,
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
-    min_score: int = Query(0, ge=0, le=100),
+    limit: int = Query(500, ge=1, le=1000),
+    min_score: int = Query(50, ge=0, le=100),
     source: str | None = None,
     status: str | None = None,
+    search: str | None = None,
 ):
     """Return jobs matched to the user, sorted by compatibility score and optionally filtered by source."""
     user_id = get_current_user_id(request)
@@ -125,13 +126,33 @@ async def list_jobs(
     if min_score > 0:
         match_filter["compatibility_score"] = {"$gte": min_score}
     if source and source != "all":
-        source_job_ids = await db.jobs.distinct("_id", {"source": source})
+        if source in ["discord_community", "community"]:
+            source_job_ids = await db.jobs.distinct("_id", {"source": {"$in": ["discord_community", "community"]}})
+        else:
+            source_job_ids = await db.jobs.distinct("_id", {"source": source})
         match_filter["job_id"] = {"$in": source_job_ids}
+
+    if search:
+        search_job_ids = await db.jobs.distinct(
+            "_id",
+            {
+                "$or": [
+                    {"title": {"$regex": search, "$options": "i"}},
+                    {"company": {"$regex": search, "$options": "i"}},
+                    {"location": {"$regex": search, "$options": "i"}},
+                    {"description": {"$regex": search, "$options": "i"}},
+                ]
+            }
+        )
+        if "job_id" in match_filter:
+            match_filter["job_id"]["$in"] = list(set(match_filter["job_id"]["$in"]).intersection(set(search_job_ids)))
+        else:
+            match_filter["job_id"] = {"$in": search_job_ids}
 
     # Join matches with jobs and applications
     pipeline = [
         {"$match": match_filter},
-        {"$sort": {"compatibility_score": -1}},
+        {"$sort": {"compatibility_score": -1, "matched_at": -1}},
         {"$skip": skip},
         {"$limit": limit},
         {

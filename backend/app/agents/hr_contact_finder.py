@@ -72,21 +72,28 @@ class HRContactFinderAgent:
         }
 
     def clean_phone(self, raw_phone: str) -> str | None:
-        """Standardize phone numbers, especially Indian mobile numbers."""
+        """Standardize phone numbers, strictly enforcing Indian mobile numbers with +91 prefix."""
         if not raw_phone:
             return None
         cleaned = re.sub(r"[^\d+]", "", raw_phone.strip())
-        # If 10 digits starting with 6, 7, 8, 9 (Indian mobile)
-        if re.match(r"^[6-9]\d{9}$", cleaned):
-            return f"+91 {cleaned}"
-        if cleaned.startswith("+91") and len(cleaned) == 13:
-            return f"+91 {cleaned[3:]}"
-        if cleaned.startswith("91") and len(cleaned) == 12:
-            return f"+91 {cleaned[2:]}"
-        if cleaned.startswith("0") and len(cleaned) == 11 and cleaned[1] in "6789":
-            return f"+91 {cleaned[1:]}"
-        if len(cleaned) >= 10:
-            return raw_phone.strip()
+        digits = cleaned.lstrip("+")
+
+        # Strip 91 prefix if 12 digits
+        if digits.startswith("91") and len(digits) == 12:
+            digits = digits[2:]
+        # Strip leading 0 if 11 digits
+        elif digits.startswith("0") and len(digits) == 11:
+            digits = digits[1:]
+
+        # Valid Indian mobile number: EXACTLY 10 digits starting with 6, 7, 8, or 9
+        if len(digits) == 10 and digits[0] in "6789":
+            return f"+91 {digits}"
+
+        # Indian landlines with standard STD code (Delhi 011, Gurgaon 0124, Noida 0120, Bangalore 080, Mumbai 022)
+        if len(digits) in [10, 11] and any(digits.startswith(code) for code in ["011", "0124", "0120", "080", "022", "11", "124", "120", "80", "22"]):
+            local = digits.lstrip("0")
+            return f"+91 {local}"
+
         return None
 
     def clean_email(self, email: str) -> str | None:

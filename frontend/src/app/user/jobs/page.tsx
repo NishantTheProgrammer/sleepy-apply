@@ -216,8 +216,42 @@ function MarkdownRenderer({
   );
 }
 
+function formatPhoneNumber(phone?: string | null): string {
+  if (!phone) return "";
+  const clean = phone.replace(/[^0-9]/g, "");
+  if (clean.length === 10 && ["6", "7", "8", "9"].includes(clean[0])) {
+    return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`;
+  }
+  if (clean.startsWith("91") && clean.length === 12) {
+    const local = clean.slice(2);
+    return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
+  }
+  if (phone.startsWith("+91")) return phone;
+  return `+91 ${phone.trim()}`;
+}
+
+function getWhatsAppUrl(phone: string, text: string): string {
+  let clean = phone.replace(/[^0-9]/g, "");
+  if (clean.length === 10 && ["6", "7", "8", "9"].includes(clean[0])) {
+    clean = "91" + clean;
+  } else if (clean.startsWith("0") && clean.length === 11) {
+    clean = "91" + clean.slice(1);
+  } else if (!clean.startsWith("91") && clean.length === 10) {
+    clean = "91" + clean;
+  }
+  return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+}
+
 function renderSourceBadge(source?: string) {
   const s = (source || "career").toLowerCase();
+  if (s === "discord_community" || s === "community") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#5865F2]/20 text-[#818cf8] border border-[#5865F2]/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#5865F2]"></span>
+        📌 Community Shared
+      </span>
+    );
+  }
   if (s === "career-crawled") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
@@ -296,7 +330,7 @@ function JobsPageContent() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "delhi_ncr" | "high" | "remote" | "bengaluru" | "whatsapp">("all");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "career-crawled" | "career" | "linkedin" | "naukri">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "discord_community" | "career-crawled" | "career" | "linkedin" | "naukri">("all");
   const [descExpanded, setDescExpanded] = useState(false);
 
   // Tailored Resume State & Modal
@@ -412,10 +446,16 @@ function JobsPageContent() {
     }
   };
 
-  const load = async (p = 1, src: string = sourceFilter) => {
+  const load = async (p = 1, src: string = sourceFilter, query: string = searchQuery) => {
     setLoading(true);
     try {
-      const res = await jobsApi.list({ page: p, limit: 30, source: src });
+      const res = await jobsApi.list({
+        page: p,
+        limit: 1000,
+        min_score: 50,
+        source: src,
+        search: query.trim() || undefined,
+      });
       const items = (res.items || []) as JobItem[];
       setJobs(items);
       setTotal(res.total || items.length);
@@ -443,8 +483,11 @@ function JobsPageContent() {
 
   useEffect(() => {
     setSelectedJobId(null);
-    load(1, sourceFilter);
-  }, [user?.id, sourceFilter]);
+    const timer = setTimeout(() => {
+      load(1, sourceFilter, searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [user?.id, sourceFilter, searchQuery]);
 
   const handleDiscoverJobs = async () => {
     setDiscovering(true);
@@ -695,7 +738,7 @@ function JobsPageContent() {
               🇮🇳 India Tech Openings Only
             </span>
             <span className="text-xs text-slate-400">
-              {total} Verified Indian Positions
+              {filteredJobs.length} Verified Positions (≥50% Match)
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black gradient-text">Matched Jobs</h1>
@@ -770,6 +813,7 @@ function JobsPageContent() {
           <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-0.5 shrink-0">
             {[
               { id: "all", label: "All Sources" },
+              { id: "discord_community", label: "📌 Community Shared" },
               { id: "career-crawled", label: "🤖 Career Crawled" },
               { id: "career", label: "Career ATS" },
               { id: "linkedin", label: "LinkedIn" },
@@ -777,10 +821,12 @@ function JobsPageContent() {
             ].map((s) => (
               <button
                 key={s.id}
-                onClick={() => setSourceFilter(s.id as "all" | "career-crawled" | "career" | "linkedin" | "naukri")}
+                onClick={() => setSourceFilter(s.id as "all" | "discord_community" | "career-crawled" | "career" | "linkedin" | "naukri")}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   sourceFilter === s.id
-                    ? s.id === "career-crawled"
+                    ? s.id === "discord_community"
+                      ? "bg-[#5865F2] text-white shadow-sm"
+                      : s.id === "career-crawled"
                       ? "bg-purple-600 text-white shadow-sm"
                       : s.id === "linkedin"
                       ? "bg-sky-600 text-white shadow-sm"
@@ -908,7 +954,7 @@ function JobsPageContent() {
                   key={item._id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.02 }}
+                  transition={{ delay: Math.min(i * 0.01, 0.2) }}
                   onClick={() => setSelectedJobId(item.job._id)}
                   className={`p-4 rounded-2xl cursor-pointer transition-all relative overflow-hidden ${
                     isSelected
@@ -1026,15 +1072,15 @@ function JobsPageContent() {
 
                             {item.job.hr_contact.phone && (
                               <a
-                                href={`https://wa.me/${item.job.hr_contact.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi, I am interested in the ${item.job.title} role at ${item.job.company}.`)}`}
+                                href={getWhatsAppUrl(item.job.hr_contact.phone, `Hi, I am interested in the ${item.job.title} role at ${item.job.company}.`)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium transition-colors"
-                                title={`WhatsApp / Phone: ${item.job.hr_contact.phone}`}
+                                title={`WhatsApp: ${formatPhoneNumber(item.job.hr_contact.phone)}`}
                               >
                                 <Phone className="w-2.5 h-2.5 text-emerald-400" />
-                                <span className="font-mono">{item.job.hr_contact.phone}</span>
+                                <span className="font-mono">{formatPhoneNumber(item.job.hr_contact.phone)}</span>
                               </a>
                             )}
                           </div>
@@ -1409,13 +1455,13 @@ function JobsPageContent() {
                             <div className="p-2.5 rounded-lg bg-white/5 border border-white/5 flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-[10px] text-slate-400">Phone / WhatsApp</p>
-                                <p className="text-xs font-bold text-emerald-300 font-mono truncate">{selectedItem.job.hr_contact.phone}</p>
+                                <p className="text-xs font-bold text-emerald-300 font-mono truncate">{formatPhoneNumber(selectedItem.job.hr_contact.phone)}</p>
                               </div>
                               <a
-                                href={`https://wa.me/${selectedItem.job.hr_contact.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi, I am reaching out regarding the ${selectedItem.job.title} opening at ${selectedItem.job.company}.`)}`}
+                                href={getWhatsAppUrl(selectedItem.job.hr_contact.phone, `Hi, I am reaching out regarding the ${selectedItem.job.title} opening at ${selectedItem.job.company}.`)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 shrink-0"
+                                className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 shrink-0 cursor-pointer"
                               >
                                 <Phone className="w-3 h-3" /> WhatsApp
                               </a>

@@ -1097,7 +1097,7 @@ function JobsPageContent() {
                             }}
                             disabled={sharingDiscordId === item.job._id}
                             className="p-1.5 rounded-lg bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#818cf8] border border-[#5865F2]/20 text-[10px] transition-all cursor-pointer disabled:opacity-50"
-                            title="Share to Discord Community Thread (#📌-community-found-jobs)"
+                            title="Share to Discord Channel (#community-found-jobs)"
                           >
                             {sharingDiscordId === item.job._id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -1268,7 +1268,7 @@ function JobsPageContent() {
                         onClick={() => handleShareToDiscord(selectedItem.job._id)}
                         disabled={sharingDiscordId === selectedItem.job._id}
                         className="px-3 py-2.5 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#818cf8] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                        title="Share this job to Discord Community Thread (#📌-community-found-jobs)"
+                        title="Share this job to Discord Channel (#community-found-jobs)"
                       >
                         {sharingDiscordId === selectedItem.job._id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1323,10 +1323,10 @@ function JobsPageContent() {
                     >
                       <span className="flex items-center gap-1.5 truncate">
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="truncate">Shared to <strong>#📌-community-found-jobs</strong> thread!</span>
+                        <span className="truncate">Shared to <strong>#community-found-jobs</strong> channel!</span>
                       </span>
                       <a
-                        href={sharedDiscordSuccess.url || "https://discord.com/channels/1569573880262033499/1571826019860488232"}
+                        href={sharedDiscordSuccess.url || "https://discord.com/channels/1569573880262033499/1571831098860638248"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="underline font-bold text-white hover:text-indigo-300 flex items-center gap-1 shrink-0 ml-2"
@@ -2618,7 +2618,7 @@ function JobsPageContent() {
                     className="rounded border-white/20 bg-white/5 text-[#5865F2] focus:ring-0 cursor-pointer"
                   />
                   <label htmlFor="broadcast-discord" className="text-xs text-slate-300 cursor-pointer flex-1">
-                    Share to Discord community thread (<strong>#📌-community-found-jobs</strong>) with 1-click apply buttons
+                    Share to Discord channel (<strong>#community-found-jobs</strong>) with 1-click apply buttons
                   </label>
                 </div>
 

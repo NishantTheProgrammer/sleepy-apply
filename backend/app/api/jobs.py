@@ -695,14 +695,18 @@ async def share_job_to_discord(
             detail="Failed to broadcast job to Discord thread. Please verify bot configuration."
         )
 
-    thread_id = discord_agent.settings.discord_thread_found_jobs or "1571826019860488232"
+    channel_id = (
+        getattr(discord_agent.settings, "discord_channel_found_jobs", None)
+        or getattr(discord_agent.settings, "discord_thread_found_jobs", None)
+        or "1571831098860638248"
+    )
     guild_id = "1569573880262033499"
-    thread_url = f"https://discord.com/channels/{guild_id}/{thread_id}"
+    channel_url = f"https://discord.com/channels/{guild_id}/{channel_id}"
 
     return {
         "ok": True,
-        "message": f"Successfully shared {job.get('title')} to Discord community thread!",
-        "thread_url": thread_url,
+        "message": f"Successfully shared {job.get('title')} to Discord #community-found-jobs channel!",
+        "thread_url": channel_url,
     }
 
 

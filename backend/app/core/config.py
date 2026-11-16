@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     discord_channel_tailored: str | None = "1569582532444422154"
     discord_channel_auto_applied: str | None = "1569582534227001345"
     discord_channel_question: str | None = "1569582536827478167"
-    discord_thread_found_jobs: str | None = "1571826019860488232"
+    discord_channel_found_jobs: str | None = "1571831098860638248"
+    discord_thread_found_jobs: str | None = "1571831098860638248"
     admin_emails: list[str] = ["knishant113@gmail.com"]
     admin_discord_ids: list[str] = []
 

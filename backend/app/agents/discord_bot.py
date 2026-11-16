@@ -701,9 +701,9 @@ class DiscordAgent:
         with direct HR recruiter contacts and 1-click action buttons (Tailor, Apply, Open).
         """
         thread_id = (
-            getattr(self.settings, "discord_thread_found_jobs", None)
-            or self.settings.discord_channel_match
-            or self.settings.discord_channel_id
+            getattr(self.settings, "discord_channel_found_jobs", None)
+            or getattr(self.settings, "discord_thread_found_jobs", None)
+            or "1571831098860638248"
         )
         if not thread_id:
             return False
@@ -1394,74 +1394,251 @@ def create_bot() -> commands.Bot:
         embed.set_footer(text="Sleepy Apply will reuse this answer automatically for all future applications!")
         await ctx.send(embed=embed)
 
+    class JobActionView(discord.ui.View):
+        def __init__(self, job_id: str, app_url: str = ""):
+            super().__init__(timeout=None)
+            if job_id:
+                self.add_item(
+                    discord.ui.Button(
+                        label="📄 Tailor Resume",
+                        style=discord.ButtonStyle.primary,
+                        custom_id=f"tailor_action:{job_id}",
+                    )
+                )
+                self.add_item(
+                    discord.ui.Button(
+                        label="🚀 Apply Now",
+                        style=discord.ButtonStyle.success,
+                        custom_id=f"apply_action:{job_id}",
+                    )
+                )
+            if app_url:
+                self.add_item(
+                    discord.ui.Button(
+                        label="🔗 View Opening",
+                        style=discord.ButtonStyle.link,
+                        url=app_url,
+                    )
+                )
+
+    async def handle_job_link_reply(
+        target_message: discord.Message,
+        clean_url: str,
+        note_text: str = "",
+        is_command: bool = False,
+    ):
+        """
+        Handle a job link shared in Discord:
+        1. Immediately reply to the user's message: '⏳ 1. Processing...'
+        2. Parse job info, enrich HR recruiter contacts, match with candidate profile on portal.
+        3. Edit the reply: '✅ 1. Processed\n✅ 2. Added on portal!' with rich embed and action buttons.
+        """
+        status_msg = None
+        try:
+            status_msg = await target_message.reply(
+                "⏳ **1. Processing...** Extracting job opening details & discovering HR recruiter contacts."
+            )
+        except Exception as e:
+            logger.warning("Could not reply directly to message, sending to channel", error=str(e))
+            try:
+                status_msg = await target_message.channel.send(
+                    f"⏳ **1. Processing...** <@{target_message.author.id}> Extracting job details."
+                )
+            except Exception:
+                pass
+
+        try:
+            db = get_db()
+            from app.agents.hr_contact_finder import hr_contact_finder
+            from app.agents.job_fetcher import parse_job_details_from_url
+            from app.agents.job_matcher import JobMatcherAgent
+
+            job = await db.jobs.find_one({"$or": [{"source_url": clean_url}, {"application_url": clean_url}]})
+            now = datetime.now(timezone.utc)
+
+            if not job:
+                parsed_info = await parse_job_details_from_url(clean_url)
+                new_job_doc = {
+                    "source": "discord_community",
+                    "source_url": clean_url,
+                    "application_url": clean_url,
+                    "title": parsed_info.get("title", "Software Engineer"),
+                    "company": parsed_info.get("company", "Company"),
+                    "description": parsed_info.get(
+                        "description",
+                        f"Shared via Discord by {target_message.author.name}: {note_text}"
+                    ),
+                    "requirements": [],
+                    "responsibilities": [],
+                    "location": parsed_info.get("location", "India / Remote"),
+                    "is_active": True,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                res = await db.jobs.insert_one(new_job_doc)
+                new_job_doc["_id"] = res.inserted_id
+                try:
+                    await hr_contact_finder.find_and_enrich_job(res.inserted_id, fetch_live=True)
+                    job = await db.jobs.find_one({"_id": res.inserted_id})
+                except Exception:
+                    job = new_job_doc
+            else:
+                if not job.get("hr_contact"):
+                    try:
+                        await hr_contact_finder.find_and_enrich_job(job["_id"], fetch_live=True)
+                        job = await db.jobs.find_one({"_id": job["_id"]})
+                    except Exception:
+                        pass
+
+            # Match across candidate profiles so it immediately shows under Matched Jobs on the portal
+            top_score = 0
+            try:
+                matcher = JobMatcherAgent()
+                cursor = db.users.find({})
+                async for u in cursor:
+                    try:
+                        m = await matcher.match_user_and_job(
+                            user_id=str(u["_id"]),
+                            job_id=str(job["_id"]),
+                            use_ai_reasoning=False,
+                        )
+                        if m and m.get("overall_score", 0) > top_score:
+                            top_score = m.get("overall_score", 0)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            job_id_str = str(job.get("_id") or "")
+            job_title = job.get("title", "Software Engineer")
+            company = job.get("company", "Company")
+            location = job.get("location", "India / Remote")
+            app_url = job.get("application_url") or job.get("source_url") or clean_url
+            hr_contact = job.get("hr_contact") or {}
+
+            embed = discord.Embed(
+                title=f"💼 {job_title} at {company}",
+                url=app_url,
+                description="Live on Sleepy Apply Portal • Ready for 1-click tailored resume & application",
+                color=0x10B981,
+                timestamp=datetime.now(timezone.utc),
+            )
+            embed.add_field(name="🏢 Role", value=f"**{job_title}**", inline=True)
+            embed.add_field(name="🏢 Company", value=company, inline=True)
+            embed.add_field(name="📍 Location", value=location, inline=True)
+
+            if top_score > 0:
+                embed.add_field(name="🎯 Portal Match", value=f"**{top_score}% Compatibility**", inline=True)
+            else:
+                embed.add_field(name="🎯 Portal Status", value="**Active on Matched Jobs**", inline=True)
+
+            if hr_contact.get("email"):
+                embed.add_field(name="✉️ Recruiter Email", value=f"`{hr_contact['email']}`", inline=True)
+            if hr_contact.get("phone"):
+                embed.add_field(name="📞 Recruiter Phone", value=f"`{hr_contact['phone']}`", inline=True)
+
+            if hr_contact.get("recruiters") and len(hr_contact["recruiters"]) > 0:
+                recs = [
+                    f"[{r.get('name')}]({r.get('linkedin')})"
+                    for r in hr_contact["recruiters"][:2]
+                    if r.get("name") and r.get("linkedin")
+                ]
+                if recs:
+                    embed.add_field(name="👥 Recruiter Contacts", value=", ".join(recs), inline=False)
+            elif hr_contact.get("name") and hr_contact.get("linkedin"):
+                embed.add_field(name="👤 Recruiter Profile", value=f"[{hr_contact['name']}]({hr_contact['linkedin']})", inline=True)
+
+            if note_text:
+                embed.add_field(name="💬 Note from Sharer", value=note_text[:200], inline=False)
+
+            embed.set_footer(text="Sleepy Apply • Live on Portal Dashboard")
+
+            view = JobActionView(job_id=job_id_str, app_url=app_url)
+
+            score_str = f" (**{top_score}% Match**)" if top_score > 0 else ""
+            reply_content = (
+                "✅ **1. Processed**\n"
+                f"✅ **2. Added on portal!**{score_str} Matched and available in your portal dashboard."
+            )
+
+            if status_msg:
+                try:
+                    await status_msg.edit(content=reply_content, embed=embed, view=view)
+                except Exception as e:
+                    logger.warning("Could not edit status reply, sending new message", error=str(e))
+                    await target_message.channel.send(content=reply_content, embed=embed, view=view)
+
+            try:
+                await target_message.add_reaction("⭐")
+            except Exception:
+                pass
+
+            # If shared in another channel, also broadcast to the dedicated community channel
+            settings = get_settings()
+            comm_channel_id = str(getattr(settings, "discord_channel_found_jobs", "") or getattr(settings, "discord_thread_found_jobs", "") or "1571831098860638248")
+            community_ids = {comm_channel_id, "1571831098860638248", "1571826019860488232"}
+            if str(target_message.channel.id) not in community_ids:
+                agent = DiscordAgent()
+                await agent.notify_job_shared(
+                    job=job,
+                    user_discord_id=str(target_message.author.id),
+                    user_name=target_message.author.name,
+                    note=note_text,
+                )
+
+        except Exception as e:
+            logger.error("Error processing shared job link", error=str(e), url=clean_url)
+            if status_msg:
+                try:
+                    await status_msg.edit(content=f"⚠️ Failed to process job opening: {str(e)[:150]}")
+                except Exception:
+                    pass
+
     @bot.event
     async def on_message(message: discord.Message):
         if message.author.bot:
             return
 
         settings = get_settings()
-        thread_id = str(getattr(settings, "discord_thread_found_jobs", "") or "1571826019860488232")
+        comm_channel_id = str(getattr(settings, "discord_channel_found_jobs", "") or getattr(settings, "discord_thread_found_jobs", "") or "1571831098860638248")
+        community_ids = {comm_channel_id, "1571831098860638248", "1571826019860488232"}
 
-        # If user posts directly in the community found-jobs thread and contains a link
-        if thread_id and str(message.channel.id) == thread_id:
-            import re
-            urls = re.findall(r"https?://[^\s]+", message.content)
-            if urls and not message.content.startswith("!"):
-                clean_url = urls[0].strip("<>.,;()\"' ")
-                db = get_db()
-                job = await db.jobs.find_one({"$or": [{"source_url": clean_url}, {"application_url": clean_url}]})
-                from app.agents.hr_contact_finder import hr_contact_finder
-                from app.agents.job_fetcher import parse_job_details_from_url
-                from app.agents.job_matcher import JobMatcherAgent
-                now = datetime.now(timezone.utc)
-                if not job:
-                    parsed_info = await parse_job_details_from_url(clean_url)
-                    new_job_doc = {
-                        "source": "discord_community",
-                        "source_url": clean_url,
-                        "application_url": clean_url,
-                        "title": parsed_info.get("title", "Software Engineer"),
-                        "company": parsed_info.get("company", "Company"),
-                        "description": parsed_info.get("description", f"Shared in Discord community by {message.author.name}: {message.content}"),
-                        "requirements": [],
-                        "responsibilities": [],
-                        "location": parsed_info.get("location", "India / Remote"),
-                        "is_active": True,
-                        "created_at": now,
-                        "updated_at": now,
-                    }
-                    res = await db.jobs.insert_one(new_job_doc)
-                    new_job_doc["_id"] = res.inserted_id
-                    try:
-                        await hr_contact_finder.find_and_enrich_job(res.inserted_id, fetch_live=True)
-                        job = await db.jobs.find_one({"_id": res.inserted_id})
-                    except Exception:
-                        job = new_job_doc
+        # Detect URLs in message
+        import re
+        urls = re.findall(r"https?://[^\s]+", message.content)
+        if urls and not message.content.startswith("!"):
+            clean_url = urls[0].strip("<>.,;()\"' ")
+            is_community_channel = (str(message.channel.id) in community_ids)
+            job_domains = [
+                "linkedin.com/jobs",
+                "greenhouse.io",
+                "lever.co",
+                "ashbyhq.com",
+                "naukri.com",
+                "workatastartup.com",
+                "wellfound.com",
+                "smartrecruiters.com",
+                "myworkdayjobs.com",
+                "indeed.com",
+                "glassdoor.com",
+                "/jobs/",
+                "/careers/",
+            ]
+            is_job_url = any(dom in clean_url.lower() for dom in job_domains)
+            has_job_keyword = any(
+                kw in message.content.lower()
+                for kw in ["job", "hiring", "apply", "role", "opening", "vacancy", "found"]
+            )
 
-                    # Add to portal by matching against active candidate profiles
-                    try:
-                        matcher = JobMatcherAgent()
-                        cursor = db.users.find({})
-                        async for u in cursor:
-                            try:
-                                await matcher.match_user_and_job(user_id=str(u["_id"]), job_id=str(job["_id"]), use_ai_reasoning=False)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                agent = DiscordAgent()
-                note_text = message.content.replace(clean_url, "").strip()
-                await agent.notify_job_shared(
-                    job=job,
-                    user_discord_id=str(message.author.id),
-                    user_name=message.author.name,
-                    note=note_text,
+            # In the community channel/thread, ANY link is processed. Outside, any job link or job-related link is processed.
+            if is_community_channel or is_job_url or has_job_keyword:
+                note_text = message.content.replace(urls[0], "").strip()
+                await handle_job_link_reply(
+                    target_message=message,
+                    clean_url=clean_url,
+                    note_text=note_text,
+                    is_command=False,
                 )
-                try:
-                    await message.add_reaction("⭐")
-                except Exception:
-                    pass
                 return
 
         await bot.process_commands(message)
@@ -1474,63 +1651,12 @@ def create_bot() -> commands.Bot:
             await ctx.send("⚠️ Please provide a valid job URL: `!sharejob <url> [optional note]`")
             return
 
-        db = get_db()
-        job = await db.jobs.find_one({"$or": [{"source_url": clean_url}, {"application_url": clean_url}]})
-        from app.agents.hr_contact_finder import hr_contact_finder
-        from app.agents.job_fetcher import parse_job_details_from_url
-        from app.agents.job_matcher import JobMatcherAgent
-        now = datetime.now(timezone.utc)
-
-        if not job:
-            parsed_info = await parse_job_details_from_url(clean_url)
-            new_job_doc = {
-                "source": "discord_community",
-                "source_url": clean_url,
-                "application_url": clean_url,
-                "title": parsed_info.get("title", "Software Engineer"),
-                "company": parsed_info.get("company", "Company"),
-                "description": parsed_info.get("description", f"Shared via Discord by {ctx.author.name}: {notes}"),
-                "requirements": [],
-                "responsibilities": [],
-                "location": parsed_info.get("location", "India / Remote"),
-                "is_active": True,
-                "created_at": now,
-                "updated_at": now,
-            }
-            res = await db.jobs.insert_one(new_job_doc)
-            new_job_doc["_id"] = res.inserted_id
-            try:
-                await hr_contact_finder.find_and_enrich_job(res.inserted_id, fetch_live=True)
-                job = await db.jobs.find_one({"_id": res.inserted_id})
-            except Exception:
-                job = new_job_doc
-
-            # Add to portal for all candidates
-            try:
-                matcher = JobMatcherAgent()
-                cursor = db.users.find({})
-                async for u in cursor:
-                    try:
-                        await matcher.match_user_and_job(user_id=str(u["_id"]), job_id=str(job["_id"]), use_ai_reasoning=False)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-        agent = DiscordAgent()
-        success = await agent.notify_job_shared(
-            job=job,
-            user_discord_id=str(ctx.author.id),
-            user_name=ctx.author.name,
-            note=notes,
+        await handle_job_link_reply(
+            target_message=ctx.message,
+            clean_url=clean_url,
+            note_text=notes,
+            is_command=True,
         )
-
-        if success:
-            thread_id = getattr(agent.settings, "discord_thread_found_jobs", "1571826019860488232")
-            ref = f"<#{thread_id}>" if thread_id else "the community thread"
-            await ctx.send(f"✅ <@{ctx.author.id}> Job added to Sleepy Apply portal and shared to {ref}!")
-        else:
-            await ctx.send("❌ Failed to broadcast job to the community thread. Please verify bot configuration.")
 
     return bot
 

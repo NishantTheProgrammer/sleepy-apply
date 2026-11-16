@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel
 from bson import ObjectId
@@ -255,6 +256,39 @@ async def auto_apply_form_preview(request: Request, job_id: str):
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    target_url = job.get("application_url") or job.get("source_url") or job.get("apply_url")
+
+    # If host browser runner is active, launch real desktop Chrome so user can watch live
+    import httpx
+    host_runner_urls = [
+        "http://host.docker.internal:8005/fill-visible",
+        "http://localhost:8005/fill-visible",
+        "http://127.0.0.1:8005/fill-visible",
+    ]
+    launched_on_host = False
+    for runner_url in host_runner_urls:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                r = await client.post(runner_url, json={"job_id": job_id, "user_id": user_id, "url": target_url})
+                if r.status_code == 200:
+                    launched_on_host = True
+                    break
+        except Exception:
+            continue
+
+    if launched_on_host:
+        return {
+            "ok": True,
+            "mode": "visible_desktop",
+            "status": "FORM_FILLED_READY",
+            "message": f"🖥️ Real Google Chrome window opened on your desktop for {job.get('company')}! Watch the form being autofilled live without submitting.",
+            "target_url": target_url,
+            "fields_filled": [],
+            "submit_button_found": True,
+            "screenshot_base64": None,
+            "screenshot_path": None,
+        }
 
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}

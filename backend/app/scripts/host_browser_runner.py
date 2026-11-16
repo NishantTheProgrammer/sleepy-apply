@@ -82,7 +82,10 @@ async def _run_visible_filler(job_id: str | None, user_id: str | None, url: str 
             }
 
         if not job:
-            job = await db.jobs.find_one({"source": "career-crawled", "application_url": {"$regex": "^http"}})
+            job = await db.jobs.find_one({
+                "source": {"$in": ["naukri", "career-crawled", "career"]},
+                "application_url": {"$regex": "^http"},
+            })
 
         if not job:
             logger.error("No valid job found for visible autofill")

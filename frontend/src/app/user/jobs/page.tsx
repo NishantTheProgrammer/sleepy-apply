@@ -6,7 +6,7 @@ import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
-  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot
+  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot, Monitor
 } from "lucide-react";
 import { jobsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -398,6 +398,15 @@ function JobsPageContent() {
     try {
       const targetItem = jobs.find((j) => j.job._id === jobId || j._id === jobId || j.job_id === jobId);
       const res = await jobsApi.autoApplyForm(jobId);
+      if ((res as any)?.mode === "visible_desktop") {
+        setVisibleToast({
+          company: targetItem?.job.company || "Target Company",
+          message: res.message || "Visible Chrome window opened on your desktop! Watch the form being autofilled live without submitting.",
+        });
+        setTimeout(() => setVisibleToast(null), 12000);
+        await load(page);
+        return;
+      }
       setFormFillResult({
         job_id: jobId,
         job_title: targetItem?.job.title || "Position",
@@ -968,26 +977,38 @@ function JobsPageContent() {
                   {/* Primary Action Row */}
                   <div className="flex items-center gap-2 pt-2 border-t border-white/10">
                     <button
-                      onClick={() => handleApply(selectedItem.job._id)}
-                      disabled={applying === selectedItem.job._id}
+                      onClick={() => handleApplyVisible(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
+                      disabled={launchingVisibleId === selectedItem.job._id || applying === selectedItem.job._id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-60"
+                      title="Opens real Google Chrome window on your desktop to autofill the form live without submitting"
                     >
-                      {applying === selectedItem.job._id ? (
+                      {launchingVisibleId === selectedItem.job._id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : selectedItem.application?.status === "FORM_FILLED_READY" ? (
                         <CheckCircle className="w-3.5 h-3.5 text-amber-300" />
                       ) : selectedItem.application?.status === "APPLIED" || selectedItem.application?.status === "VERIFIED_SUCCESS" ? (
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
                       ) : (
-                        <Zap className="w-3.5 h-3.5" />
+                        <Monitor className="w-3.5 h-3.5 text-amber-300" />
                       )}
-                      {applying === selectedItem.job._id
-                        ? "Autofilling Form (No-Submit Review Mode)…"
-                        : selectedItem.application?.status === "FORM_FILLED_READY"
-                        ? "Form Autofilled (Ready to Review)"
-                        : selectedItem.application?.status === "APPLIED"
-                        ? "Applied with AI"
-                        : "One-Click Auto-Apply with AI"}
+                      {launchingVisibleId === selectedItem.job._id
+                        ? "Opening Chrome on Desktop…"
+                        : "One-Click Auto-Apply (Watch Live in Chrome)"}
+                    </button>
+
+                    {/* Headless Snapshot Preview Button */}
+                    <button
+                      onClick={() => handleApply(selectedItem.job._id)}
+                      disabled={applying === selectedItem.job._id}
+                      className="px-3 py-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                      title="Run quick headless background preview snapshot"
+                    >
+                      {applying === selectedItem.job._id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                      ) : (
+                        <Bot className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span className="hidden sm:inline">Snapshot</span>
                     </button>
 
                     {selectedItem.tailored_resume ? (
@@ -997,7 +1018,7 @@ function JobsPageContent() {
                         title="Preview tailored resume & JSON"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Preview</span>
+                        <span className="hidden sm:inline">Resume</span>
                       </button>
                     ) : (
                       <button
@@ -1016,9 +1037,10 @@ function JobsPageContent() {
                     )}
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => handleApplyVisible(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
-                        disabled={launchingVisibleId === selectedItem.job._id}
+                      <a
+                        href={getValidJobUrl(selectedItem.job)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                           selectedItem.job.source === "career-crawled"
                             ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
@@ -1028,34 +1050,18 @@ function JobsPageContent() {
                             ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
                             : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
                         }`}
-                        title="Opens a visible browser window (headless: false) to autofill the form live step-by-step without submitting"
-                      >
-                        {launchingVisibleId === selectedItem.job._id ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                        ) : (
-                          <ExternalLink className="w-4 h-4" />
-                        )}
-                        <span className="hidden sm:inline">
-                          {launchingVisibleId === selectedItem.job._id
-                            ? "Opening Visible Chrome..."
-                            : selectedItem.job.source === "career-crawled"
-                            ? "Apply on Career Portal"
-                            : selectedItem.job.source === "linkedin"
-                            ? "Apply on LinkedIn"
-                            : selectedItem.job.source === "naukri"
-                            ? "Apply on Naukri"
-                            : "Apply on Career Portal"}
-                        </span>
-                      </button>
-
-                      <a
-                        href={getValidJobUrl(selectedItem.job)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-400 hover:text-white hover:bg-white/5 transition-all"
-                        title="Open direct job URL in a new browser tab"
+                        title="Direct link to original posting"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">
+                          {selectedItem.job.source === "career-crawled"
+                            ? "Career Portal"
+                            : selectedItem.job.source === "linkedin"
+                            ? "LinkedIn"
+                            : selectedItem.job.source === "naukri"
+                            ? "Naukri"
+                            : "Portal"}
+                        </span>
                       </a>
                     </div>
                   </div>
@@ -2021,7 +2027,17 @@ function JobsPageContent() {
                 <span className="text-[11px] text-slate-400">
                   Ready to submit? Open the portal and click the final submit button.
                 </span>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                  <button
+                    onClick={() => {
+                      handleApplyVisible(formFillResult.job_id, formFillResult.target_url);
+                      setFormFillResult(null);
+                    }}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    <span>Watch Live in Desktop Chrome</span>
+                  </button>
                   <button
                     onClick={() => setFormFillResult(null)}
                     className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold border border-white/10 transition-colors cursor-pointer"

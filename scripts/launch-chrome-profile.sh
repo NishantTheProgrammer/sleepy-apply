@@ -42,12 +42,17 @@ if pgrep -x "Google Chrome" >/dev/null 2>&1; then
   if [[ "$RESTART" == "true" ]]; then
     echo "Quitting existing Google Chrome so remote debugging (port ${CDP_PORT}) can be enabled..."
     osascript -e 'tell application "Google Chrome" to quit' >/dev/null 2>&1 || true
-    for _ in $(seq 1 20); do
+    for _ in $(seq 1 10); do
       if ! pgrep -x "Google Chrome" >/dev/null 2>&1; then
         break
       fi
       sleep 0.5
     done
+    if pgrep -x "Google Chrome" >/dev/null 2>&1; then
+      echo "Closing remaining Chrome process..."
+      pkill -x "Google Chrome" >/dev/null 2>&1 || true
+      sleep 1.5
+    fi
   else
     echo "Google Chrome is currently running without remote debugging (port ${CDP_PORT})."
     echo "Run with --restart to relaunch your '${PROFILE_NAME}' profile with CDP enabled:"
@@ -64,8 +69,8 @@ else
   echo "Launching Google Chrome with CDP on port ${CDP_PORT}..."
 fi
 
-open -a "Google Chrome" --args "${ARGS[@]}"
-for _ in $(seq 1 15); do
+nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" "${ARGS[@]}" >/dev/null 2>&1 &
+for _ in $(seq 1 20); do
   if curl -fsS "http://127.0.0.1:${CDP_PORT}/json/version" >/dev/null 2>&1; then
     echo "CDP is active on http://127.0.0.1:${CDP_PORT} — Auto-Apply will now use your '${PROFILE_NAME}' profile!"
     exit 0

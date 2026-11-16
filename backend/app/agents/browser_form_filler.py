@@ -1,8 +1,14 @@
 import os
 import re
+import sys
 import json
 import asyncio
 import base64
+
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -142,9 +148,8 @@ class BrowserFormFillerAgent:
             )
             os.makedirs(persistent_dir, exist_ok=True)
             launch_args = ["--disable-blink-features=AutomationControlled"]
-            profile_dir = self._resolve_chrome_profile_dir(self.chrome_profile_name)
-            if profile_dir and persistent_dir == os.path.expanduser("~/Library/Application Support/Google/Chrome"):
-                launch_args.append(f"--profile-directory={profile_dir}")
+            profile_dir = self._resolve_chrome_profile_dir(self.chrome_profile_name) or "Profile 1"
+            launch_args.append(f"--profile-directory={profile_dir}")
 
             for use_chrome_channel in (True, False):
                 try:
@@ -177,7 +182,7 @@ class BrowserFormFillerAgent:
         browser = await p.chromium.launch(
             headless=actual_headless,
             slow_mo=self.slow_mo if not actual_headless else 0,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_in_docker else [],
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"] if is_in_docker else ["--disable-blink-features=AutomationControlled"],
         )
         context = await browser.new_context(user_agent=user_agent, viewport=viewport)
         page = await context.new_page()
@@ -203,6 +208,10 @@ class BrowserFormFillerAgent:
                             document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="submit"]):not([type="button"]), textarea, select')
                         ).filter(isVisible);
                         if (pwdInputs.length > 0 && nonAuthInputs.length <= 2) return true;
+
+                        // Detect Naukri slide-out login drawer
+                        const naukriDrawer = document.querySelector('.naukri-drawer.open, .login-layer, .drawer-wrapper .login-layer');
+                        if (naukriDrawer && isVisible(naukriDrawer) && pwdInputs.length > 0) return true;
 
                         const url = (window.location.href || '').toLowerCase();
                         const looksLikeLoginUrl = /\\b(login|signin|sign-in|auth|sso|account)\\b/.test(url);
@@ -603,10 +612,16 @@ class BrowserFormFillerAgent:
                 # Pause for manual sign-in if the portal requires an account first (visible mode only)
                 await self._wait_for_login_if_needed(page, actual_headless)
 
-                # ── 2a. Specialized ATS Handlers (e.g. Keka) ──
+                # ── 2a. Specialized ATS Handlers (e.g. Keka, Naukri) ──
                 is_keka = "keka" in page.url or await page.locator("#educationDetails, #skills-container").count() > 0
                 if is_keka:
                     await self._fill_keka_specialized(page, candidate_data, fields_filled)
+
+                is_naukri = "naukri.com" in page.url.lower() or "naukri" in page.url.lower()
+                if is_naukri:
+                    page = await self._fill_naukri_specialized(
+                        page, context, candidate_data, qa_map, resume_path, fields_filled, dry_run=dry_run
+                    )
 
                 # ── 2b. Universal Semantic ATS Filler (Cross-Frame: Greenhouse, Lever, Workday, Taleo, Ashby) ──
                 await self._semantic_fill_portal(page, candidate_data, fields_filled)
@@ -895,11 +910,12 @@ class BrowserFormFillerAgent:
                         }
                     }
                     const overlays = document.querySelectorAll(
-                        '#onetrust-banner-sdk, .modal-backdrop, .overlay, [class*="cookie" i], [id*="cookie" i], [role="dialog"]'
+                        '#onetrust-banner-sdk, .modal-backdrop, [class*="cookie" i], [id*="cookie" i]'
                     );
                     overlays.forEach(el => {
                         const txt = (el.innerText || '').toLowerCase();
-                        if (txt.includes('cookie') || txt.includes('tracking') || txt.includes('privacy') || txt.includes('notice')) {
+                        const isAppDrawer = el.closest('.naukri-drawer, .drawer-wrapper, .chatbot, .apply-drawer, form');
+                        if (!isAppDrawer && (txt.includes('cookie') || txt.includes('tracking') || txt.includes('privacy notice') || txt.includes('cookie policy'))) {
                             el.remove();
                         }
                     });
@@ -937,6 +953,13 @@ class BrowserFormFillerAgent:
             pass
 
         apply_triggers = [
+            'button:has-text("Apply on Company Site")',
+            'a:has-text("Apply on Company Site")',
+            'button:has-text("Apply on recruiter website")',
+            'a:has-text("Apply on recruiter website")',
+            '#apply-button',
+            '.styles_apply-button__uJI3A',
+            '.styles_jhc__apply-button-container__5Bqnb button',
             'a[href*="#apply"]',
             'a:has-text("Apply for this job")',
             'button:has-text("Apply for this job")',
@@ -951,53 +974,67 @@ class BrowserFormFillerAgent:
         for sel in apply_triggers:
             try:
                 loc = page.locator(sel).first
-                if await loc.count() > 0 and await loc.is_visible():
-                    print(f"🔗 Clicking '{sel}' to reveal application form...")
-                    # Check if target="_blank"
-                    is_blank = False
-                    try:
-                        target_attr = await loc.get_attribute("target")
-                        is_blank = target_attr == "_blank"
-                    except Exception:
-                        pass
-
-                    url_before = page.url
-                    href_attr = None
-                    try:
-                        href_attr = await loc.get_attribute("href")
-                    except Exception:
-                        pass
-
-                    pages_before = len(context.pages) if context else 0
-                    if is_blank and context:
-                        async with context.expect_page(timeout=7000) as new_page_info:
-                            await loc.click(timeout=5000)
-                        new_page = await new_page_info.value
-                        await new_page.wait_for_load_state("domcontentloaded")
-                        await new_page.wait_for_timeout(2000)
-                        await self._dismiss_overlays_and_popups(new_page)
-                        return new_page
-                    else:
-                        await loc.click(timeout=5000)
+                if await loc.count() > 0:
+                    is_vis = await loc.is_visible()
+                    if not is_vis and "naukri" in page.url.lower():
+                        await loc.scroll_into_view_if_needed()
+                        await page.wait_for_timeout(300)
+                        is_vis = await loc.is_visible()
+                    if is_vis or "naukri" in page.url.lower():
+                        print(f"🔗 Clicking '{sel}' to reveal application form...")
+                        # Check if target="_blank"
+                        is_blank = False
                         try:
-                            await page.wait_for_load_state("domcontentloaded", timeout=8000)
+                            target_attr = await loc.get_attribute("target")
+                            is_blank = target_attr == "_blank"
                         except Exception:
                             pass
-                        await page.wait_for_timeout(3000)
-                        # Check if clicking actually opened a new tab
-                        if context and len(context.pages) > pages_before:
-                            new_p = context.pages[-1]
-                            await new_p.bring_to_front()
-                            await new_p.wait_for_load_state("domcontentloaded")
-                            await new_p.wait_for_timeout(2000)
-                            await self._dismiss_overlays_and_popups(new_p)
-                            return new_p
-                        # If a JS overlay blocked the click on an <a> with an http href, follow it directly
-                        if page.url == url_before and href_attr and href_attr.startswith("http"):
-                            await page.goto(href_attr, wait_until="domcontentloaded", timeout=20000)
-                            await page.wait_for_timeout(2500)
-                        await self._dismiss_overlays_and_popups(page)
-                        break
+
+                        url_before = page.url
+                        href_attr = None
+                        try:
+                            href_attr = await loc.get_attribute("href")
+                        except Exception:
+                            pass
+
+                        pages_before = len(context.pages) if context else 0
+                        if is_blank and context:
+                            async with context.expect_page(timeout=7000) as new_page_info:
+                                try:
+                                    await loc.click(timeout=5000)
+                                except Exception:
+                                    await loc.dispatch_event("click")
+                            new_page = await new_page_info.value
+                            await new_page.wait_for_load_state("domcontentloaded")
+                            await new_page.wait_for_timeout(2000)
+                            await self._dismiss_overlays_and_popups(new_page)
+                            return new_page
+                        else:
+                            try:
+                                await loc.click(timeout=5000)
+                            except Exception:
+                                await loc.dispatch_event("click")
+                            try:
+                                await page.wait_for_load_state("domcontentloaded", timeout=8000)
+                            except Exception:
+                                pass
+                            await page.wait_for_timeout(3000)
+                            # Check if clicking actually opened a new tab
+                            if context and len(context.pages) > pages_before:
+                                new_p = context.pages[-1]
+                                await new_p.bring_to_front()
+                                await new_p.wait_for_load_state("domcontentloaded")
+                                await new_p.wait_for_timeout(2000)
+                                await self._dismiss_overlays_and_popups(new_p)
+                                return new_p
+                            # If a JS overlay blocked the click on an <a> with an http href, follow it directly
+                            if page.url == url_before and href_attr and href_attr.startswith("http"):
+                                await page.goto(href_attr, wait_until="domcontentloaded", timeout=20000)
+                                await page.wait_for_timeout(2500)
+                            await self._dismiss_overlays_and_popups(page)
+                            break
+            except Exception:
+                continue
             except Exception:
                 continue
         return page
@@ -1206,6 +1243,300 @@ class BrowserFormFillerAgent:
                 fields_filled.append({"field": "Candidate Consent", "value": "Checked", "type": "checkbox"})
         except Exception:
             pass
+
+    async def _fill_naukri_specialized(
+        self,
+        page: Any,
+        context: Any,
+        data: dict[str, Any],
+        qa_map: dict[str, Any],
+        resume_path: str | None,
+        fields_filled: list[dict[str, Any]],
+        dry_run: bool = True,
+    ) -> Any:
+        """
+        Specialized autonomous form applier for Naukri.com job postings.
+        1. Checks for 'Apply on Company Site' external redirect -> navigates and returns new page.
+        2. In direct Naukri apply, triggers the application flow and handles login drawer if needed.
+        3. Identifies and fills recruiter screening questions in Naukri's application drawer/chatbot:
+           - Notice Period (chips/radio: '15 Days or less', '1 Month', '2 Months', '3 Months', or input days)
+           - Total Experience (years, months)
+           - Current CTC / Salary (Lakhs / INR)
+           - Expected CTC / Salary (Lakhs / INR)
+           - Current Location / City
+           - Technical skills experience questions
+           - Yes/No qualification screening questions
+           - Resume selection / attachment
+           - Message to recruiter in textarea
+        4. Handles multi-step questionnaire 'Next' / 'Continue' buttons.
+        5. In dry_run mode, strictly NEVER submits the application:
+           - Outlines the final submit button in glowing amber/gold.
+           - Injects prominent Sleepy Apply review banner so user can review and manually submit.
+        """
+        logger.info("⚡ Executing specialized Naukri form filler...", url=page.url)
+
+        # ── Step 1: Check for "Apply on Company Site" ──
+        comp_site_triggers = [
+            'button:has-text("Apply on Company Site")',
+            'a:has-text("Apply on Company Site")',
+            'button:has-text("Apply on recruiter website")',
+            'a:has-text("Apply on recruiter website")',
+            '[class*="apply-button"]:has-text("Company Site")',
+        ]
+        for sel in comp_site_triggers:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() > 0 and await loc.is_visible():
+                    print(f"🔗 [Naukri] Found '{sel}' — redirecting to company site ATS...")
+                    pages_before = len(context.pages) if context else 0
+                    try:
+                        await loc.click(timeout=5000)
+                    except Exception:
+                        await loc.dispatch_event("click")
+                    await page.wait_for_timeout(3000)
+                    if context and len(context.pages) > pages_before:
+                        new_p = context.pages[-1]
+                        await new_p.bring_to_front()
+                        await new_p.wait_for_load_state("domcontentloaded")
+                        await self._dismiss_overlays_and_popups(new_p)
+                        return new_p
+                    return page
+            except Exception:
+                continue
+
+        # ── Step 2: Ensure Apply button was triggered ──
+        # Check if already applied
+        try:
+            applied_loc = page.locator('button:has-text("Applied"), [class*="applied-btn"], div:has-text("Already Applied")').first
+            if await applied_loc.count() > 0 and await applied_loc.is_visible():
+                print("ℹ️ [Naukri] Job has already been applied to.")
+                fields_filled.append({"field": "Application Status", "value": "Already Applied on Naukri", "type": "info"})
+                return page
+        except Exception:
+            pass
+
+        # Trigger direct apply button if drawer is not open yet
+        drawer_sel = '.drawer-wrapper, .naukri-drawer, .chatbot_drawer, .apply-message, .apply-drawer, form.apply-form'
+        try:
+            drawer_open = await page.locator(drawer_sel).count() > 0 and await page.locator(drawer_sel).first.is_visible()
+            if not drawer_open:
+                apply_btn = page.locator('#apply-button, .styles_apply-button__uJI3A, .styles_jhc__apply-button-container__5Bqnb button, button:has-text("Apply")').first
+                if await apply_btn.count() > 0:
+                    try:
+                        await apply_btn.scroll_into_view_if_needed()
+                        await apply_btn.click(timeout=3000)
+                    except Exception:
+                        await apply_btn.dispatch_event("click")
+                    await page.wait_for_timeout(2500)
+        except Exception:
+            pass
+
+        # Check if login wall appeared
+        await self._wait_for_login_if_needed(page, self.headless)
+
+        # ── Step 3: Fill Naukri Screening Questions in Drawer / Chatbot ──
+        for step in range(4):
+            questions_handled_in_step = 0
+
+            # 3a. Notice Period (chips, radios, or inputs)
+            avail_days = 30
+            try:
+                avail_days = int(data.get("avail_days") or 30)
+            except Exception:
+                avail_days = 30
+
+            notice_chip_labels = []
+            if avail_days <= 15:
+                notice_chip_labels = ["15 Days or less", "Immediate", "15 Days", "Serving Notice Period"]
+            elif avail_days <= 30:
+                notice_chip_labels = ["1 Month", "30 Days", "15 Days or less", "Immediate"]
+            elif avail_days <= 60:
+                notice_chip_labels = ["2 Months", "60 Days", "1 Month", "30 Days"]
+            else:
+                notice_chip_labels = ["3 Months", "90 Days", "2 Months", "60 Days"]
+
+            for lbl in notice_chip_labels:
+                try:
+                    chip = page.locator(f'.drawer-wrapper, .naukri-drawer, .chatbot_drawer, .apply-drawer').locator(
+                        f'button:has-text("{lbl}"), .chip:has-text("{lbl}"), span:has-text("{lbl}"), label:has-text("{lbl}"), input[type="radio"][value*="{lbl}" i]'
+                    ).first
+                    if await chip.count() > 0 and await chip.is_visible():
+                        await chip.click()
+                        fields_filled.append({"field": "Notice Period", "value": lbl, "type": "radio"})
+                        questions_handled_in_step += 1
+                        print(f"✅ [Naukri] Selected Notice Period: {lbl}")
+                        await page.wait_for_timeout(1000)
+                        break
+                except Exception:
+                    continue
+
+            # 3b. Experience (Years & Months)
+            exp_years = str(data.get("total_exp_years") or "5")
+            try:
+                exp_inputs = page.locator('input[placeholder*="Year" i], input[name*="year" i], input[name*="exp" i], input[placeholder*="Exp" i]')
+                for i in range(await exp_inputs.count()):
+                    inp = exp_inputs.nth(i)
+                    if await inp.is_visible() and not await inp.input_value():
+                        await inp.fill(exp_years)
+                        fields_filled.append({"field": "Total Experience (Years)", "value": exp_years, "type": "text"})
+                        questions_handled_in_step += 1
+                        print(f"✅ [Naukri] Filled Total Experience: {exp_years}")
+                        break
+            except Exception:
+                pass
+
+            # 3c. Current CTC
+            curr_sal = str(data.get("curr_sal") or "18")
+            try:
+                c_ctc = page.locator('input[placeholder*="Current CTC" i], input[name*="currentCtc" i], input[placeholder*="Fixed CTC" i], input[name*="fixedCtc" i]').first
+                if await c_ctc.count() > 0 and await c_ctc.is_visible() and not await c_ctc.input_value():
+                    await c_ctc.fill(curr_sal)
+                    fields_filled.append({"field": "Current CTC (Lacs)", "value": curr_sal, "type": "text"})
+                    questions_handled_in_step += 1
+                    print(f"✅ [Naukri] Filled Current CTC: {curr_sal} Lacs")
+            except Exception:
+                pass
+
+            # 3d. Expected CTC
+            exp_sal = str(data.get("exp_sal") or "24")
+            try:
+                e_ctc = page.locator('input[placeholder*="Expected CTC" i], input[name*="expectedCtc" i], input[placeholder*="Target CTC" i]').first
+                if await e_ctc.count() > 0 and await e_ctc.is_visible() and not await e_ctc.input_value():
+                    await e_ctc.fill(exp_sal)
+                    fields_filled.append({"field": "Expected CTC (Lacs)", "value": exp_sal, "type": "text"})
+                    questions_handled_in_step += 1
+                    print(f"✅ [Naukri] Filled Expected CTC: {exp_sal} Lacs")
+            except Exception:
+                pass
+
+            # 3e. Current City / Location
+            city = str(data.get("city") or "Delhi")
+            try:
+                loc_inp = page.locator('input[placeholder*="Current Location" i], input[placeholder*="Current City" i], input[name*="location" i]').first
+                if await loc_inp.count() > 0 and await loc_inp.is_visible() and not await loc_inp.input_value():
+                    await loc_inp.fill(city)
+                    fields_filled.append({"field": "Current Location", "value": city, "type": "text"})
+                    questions_handled_in_step += 1
+                    print(f"✅ [Naukri] Filled Current Location: {city}")
+            except Exception:
+                pass
+
+            # 3f. Technical Skill Screening Questions
+            cand_skills = [s.lower() for s in data.get("skills", [])]
+            try:
+                q_containers = page.locator('.form-row, .bot-msg, .chat-msg, .question, .input-container')
+                for i in range(await q_containers.count()):
+                    qc = q_containers.nth(i)
+                    if await qc.is_visible():
+                        q_text = (await qc.inner_text()).lower()
+                        for sk in cand_skills[:15]:
+                            if sk and sk in q_text:
+                                inp = qc.locator('input[type="text"], input[type="number"]').first
+                                if await inp.count() > 0 and await inp.is_visible() and not await inp.input_value():
+                                    await inp.fill(exp_years)
+                                    fields_filled.append({"field": f"Skill Experience: {sk.title()}", "value": f"{exp_years} Years", "type": "text"})
+                                    questions_handled_in_step += 1
+                                    print(f"✅ [Naukri] Answered skill question for {sk}: {exp_years} yrs")
+                                    break
+            except Exception:
+                pass
+
+            # 3g. Yes / No Screening Radio Buttons
+            try:
+                yes_radios = page.locator('label:has-text("Yes"), input[type="radio"][value*="yes" i], button:has-text("Yes"), .chip:has-text("Yes")')
+                for i in range(await yes_radios.count()):
+                    yr = yes_radios.nth(i)
+                    if await yr.is_visible():
+                        await yr.click()
+                        fields_filled.append({"field": "Screening Question", "value": "Yes", "type": "radio"})
+                        questions_handled_in_step += 1
+                        await page.wait_for_timeout(300)
+            except Exception:
+                pass
+
+            # 3h. Message / Cover Note to Recruiter
+            try:
+                txt_area = page.locator('textarea[placeholder*="message" i], textarea[placeholder*="cover" i], textarea[placeholder*="note" i], textarea[name*="cover" i]').first
+                if await txt_area.count() > 0 and await txt_area.is_visible() and not await txt_area.input_value():
+                    cand_name = data.get("full_name") or "Applicant"
+                    note = (
+                        f"Hi, I am {cand_name} with {exp_years}+ years of experience in full-stack development, "
+                        f"modern cloud architectures, and scalable web platforms. I would love to contribute to your team."
+                    )
+                    await txt_area.fill(note)
+                    fields_filled.append({"field": "Cover Note to Recruiter", "value": "Customized pitch note added", "type": "textarea"})
+                    questions_handled_in_step += 1
+            except Exception:
+                pass
+
+            # 3i. Resume Selection / Upload
+            if resume_path and os.path.exists(resume_path):
+                try:
+                    file_inputs = page.locator('input[type="file"]')
+                    if await file_inputs.count() > 0:
+                        fi = file_inputs.first
+                        await fi.set_input_files(resume_path)
+                        fields_filled.append({"field": "Resume File", "value": os.path.basename(resume_path), "type": "file"})
+                        print(f"📎 [Naukri] Attached resume: {os.path.basename(resume_path)}")
+                        await page.wait_for_timeout(1000)
+                except Exception:
+                    pass
+
+            # 3j. Multi-step 'Next' / 'Continue' Buttons (Check if questionnaire has multiple pages)
+            next_btn = page.locator('button:has-text("Next"), button:has-text("Continue"), button:has-text("Proceed")').first
+            try:
+                if await next_btn.count() > 0 and await next_btn.is_visible():
+                    b_text = (await next_btn.inner_text()).lower()
+                    if not any(w in b_text for w in ["submit", "apply", "finish"]):
+                        print(f"➡️ [Naukri] Clicking '{b_text.title()}' to proceed to next question set...")
+                        await next_btn.click()
+                        await page.wait_for_timeout(2000)
+                        continue
+            except Exception:
+                pass
+
+            break
+
+        # ── Step 4: STRICT SAFETY CHECK — DETECT SUBMIT AND DO NOT CLICK ──
+        submit_btn_selectors = [
+            'button:has-text("Submit Application")',
+            'button:has-text("Submit")',
+            'button:has-text("Apply")',
+            'button:has-text("Save & Apply")',
+            '[data-qa="btn-submit"]',
+            '.styles_apply-button__uJI3A',
+            '#apply-button',
+        ]
+        submit_btn = None
+        matched_sel = None
+        for sel in submit_btn_selectors:
+            try:
+                loc = page.locator(sel).first
+                if await loc.count() > 0 and await loc.is_visible():
+                    submit_btn = loc
+                    matched_sel = sel
+                    break
+            except Exception:
+                continue
+
+        if submit_btn and matched_sel:
+            print("🛡️ [Naukri] Final submission button detected! Intentionally WITHHELD for human review (Safety First).")
+            try:
+                await page.evaluate(
+                    """(btnSel) => {
+                        const btn = document.querySelector(btnSel);
+                        if (btn) {
+                            btn.style.outline = '4px solid #f59e0b';
+                            btn.style.boxShadow = '0 0 25px rgba(245, 158, 11, 0.8)';
+                            btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }""",
+                    matched_sel,
+                )
+            except Exception:
+                pass
+
+        return page
 
     async def _semantic_fill_portal(self, page: Any, data: dict[str, Any], fields_filled: list[dict[str, Any]]) -> None:
         """

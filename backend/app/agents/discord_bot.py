@@ -1457,20 +1457,27 @@ def create_bot() -> commands.Bot:
             now = datetime.now(timezone.utc)
 
             if not job:
+                import hashlib
                 parsed_info = await parse_job_details_from_url(clean_url)
+                title_clean = parsed_info.get("title", "Software Engineer")
+                company_clean = parsed_info.get("company", "Company")
+                chash = hashlib.sha256(f"{clean_url}:{title_clean}:{company_clean}".encode()).hexdigest()
+
                 new_job_doc = {
                     "source": "discord_community",
                     "source_url": clean_url,
                     "application_url": clean_url,
-                    "title": parsed_info.get("title", "Software Engineer"),
-                    "company": parsed_info.get("company", "Company"),
-                    "description": parsed_info.get(
-                        "description",
-                        f"Shared via Discord by {target_message.author.name}: {note_text}"
-                    ),
-                    "requirements": [],
-                    "responsibilities": [],
-                    "location": parsed_info.get("location", "India / Remote"),
+                    "content_hash": chash,
+                    "external_id": f"discord_{chash[:16]}",
+                    "title": title_clean,
+                    "company": company_clean,
+                    "description": parsed_info.get("description") or f"Position for {title_clean} at {company_clean}. Direct link: {clean_url}",
+                    "requirements": parsed_info.get("requirements") or [],
+                    "responsibilities": parsed_info.get("responsibilities") or [],
+                    "required_skills": parsed_info.get("required_skills") or [],
+                    "location": parsed_info.get("location") or "India / Remote",
+                    "work_model": parsed_info.get("work_model") or "On-site",
+                    "employment_type": parsed_info.get("employment_type") or "full-time",
                     "is_active": True,
                     "created_at": now,
                     "updated_at": now,

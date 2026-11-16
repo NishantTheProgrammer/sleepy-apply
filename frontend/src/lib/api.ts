@@ -246,6 +246,7 @@ export const jobsApi = {
     return request<{ items: unknown[]; total: number }>(`/api/jobs?${q}`);
   },
   get: (id: string) => request(`/api/jobs/${id}`),
+  delete: (id: string) => request<{ ok: boolean; message: string }>(`/api/jobs/${id}`, { method: "DELETE" }),
   apply: (id: string) => request(`/api/jobs/${id}/apply`, { method: "POST" }),
   autoApplyForm: (id: string) =>
     request<{
@@ -402,6 +403,8 @@ export const adminApi = {
     request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number }>("/api/admin/jobs/purge-static", { method: "POST" }),
   purgeCrawledJobs: () =>
     request<{ ok: boolean; message: string; purged_count: number; remaining_jobs: number; crawled_jobs: number }>("/api/admin/jobs/purge-crawled", { method: "POST" }),
+  deleteJob: (jobId: string) =>
+    request<{ ok: boolean; message: string }>(`/api/jobs/${jobId}`, { method: "DELETE" }),
   purgeOldEntries: (days: number = 60) =>
     request<{
       ok: boolean;

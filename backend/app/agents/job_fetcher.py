@@ -247,14 +247,83 @@ class JobFetcherAgent:
 
 
 async def parse_job_details_from_url(url: str) -> dict:
-    """Parse real title, company, and location from any job URL (LinkedIn, Greenhouse, Lever, Ashby, or HTML page)."""
+    """Parse real title, company, full description, requirements, responsibilities, and skills from any job URL."""
     import re
+    import json
     import html as html_lib
     import httpx
+    import urllib.parse
+
     clean_url = url.strip("<>.,;()\"' ")
+
+    # Unwrap LinkedIn safety/go redirect URLs (e.g. to SmartRecruiters, Lever, etc.)
+    if "linkedin.com/safety/go" in clean_url:
+        m_redirect = re.search(r"url=([^&]+)", clean_url)
+        if m_redirect:
+            clean_url = urllib.parse.unquote(m_redirect.group(1))
+
     title = "Software Engineer"
     company = "Company"
     location = "India / Remote"
+    work_model = "On-site"
+    seniority = "Mid-Level"
+    employment_type = "full-time"
+    full_description = ""
+    requirements: list[str] = []
+    responsibilities: list[str] = []
+    skills: list[str] = []
+
+    def clean_html_to_markdown(raw_html: str) -> str:
+        """Convert HTML tags into clean, human-readable markdown with preserved paragraphs and bullets."""
+        if not raw_html:
+            return ""
+        text = re.sub(r"<br\s*/?>", "\n", raw_html, flags=re.IGNORECASE)
+        text = re.sub(r"</?(p|div|section|h[1-6])[^>]*>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<li[^>]*>", "\n• ", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"<strong[^>]*>(.*?)</strong>", r"**\1**", text, flags=re.IGNORECASE)
+        text = re.sub(r"<b[^>]*>(.*?)</b>", r"**\1**", text, flags=re.IGNORECASE)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = html_lib.unescape(text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    def extract_bullets_and_skills(text: str):
+        nonlocal requirements, responsibilities, skills
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        current_sec = None
+        for line in lines:
+            lower = line.lower()
+            if any(h in lower for h in ["requirement", "what you bring", "what we look for", "qualification", "skills", "who you are", "must have", "what we need"]):
+                current_sec = "req"
+                continue
+            elif any(h in lower for h in ["responsibilit", "what you'll do", "the role", "what you will do", "you will", "key tasks", "about the role", "overview"]):
+                current_sec = "resp"
+                continue
+
+            if line.startswith("•") or line.startswith("-") or line.startswith("*"):
+                clean_bullet = line.lstrip("•-* ").strip()
+                if len(clean_bullet) > 5:
+                    if current_sec == "req":
+                        requirements.append(clean_bullet)
+                    elif current_sec == "resp":
+                        responsibilities.append(clean_bullet)
+                    else:
+                        if len(responsibilities) < 5:
+                            responsibilities.append(clean_bullet)
+                        else:
+                            requirements.append(clean_bullet)
+
+        KNOWN_SKILLS = [
+            "React", "Node.js", "Python", "TypeScript", "JavaScript", "Next.js", "Vue.js", "Angular",
+            "PostgreSQL", "MongoDB", "Redis", "SQL", "MySQL", "Docker", "Kubernetes", "AWS",
+            "Azure", "GCP", "FastAPI", "Django", "Flask", "GraphQL", "REST API",
+            "AI", "LLM", "LLMs", "OpenAI", "LangChain", "Prompt Engineering",
+            "Vector DB", "CI/CD", "Git", "Kafka", "Microservices", "Tailwind",
+            "Express", "Java", "Spring Boot", "C++", "Go", "Golang", "Rust", "Flutter", "Android", "iOS"
+        ]
+        skills = [s for s in KNOWN_SKILLS if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
 
     # 1. Parse LinkedIn Job view URL slug
     li_match = re.search(r"/jobs/view/([a-zA-Z0-9\-]+)(?:-\d+)?", clean_url)
@@ -283,42 +352,131 @@ async def parse_job_details_from_url(url: str) -> dict:
     if ashby_match:
         company = ashby_match.group(1).replace("-", " ").title()
 
-    # 5. Live HTML fetch attempt
+    # 5. Live HTML fetch attempt to extract full JD content
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-        async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=5.0) as client:
+        async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=8.0) as client:
             resp = await client.get(clean_url)
             if resp.status_code == 200:
                 html_text = resp.text
+
+                # Check for Schema.org JSON-LD JobPosting first
+                json_lds = re.findall(r'<script[^>]*type=[\'"]application/ld\+json[\'"][^>]*>(.*?)</script>', html_text, re.DOTALL | re.IGNORECASE)
+                for j in json_lds:
+                    try:
+                        data = json.loads(j.strip())
+                        if isinstance(data, dict) and data.get("@type") == "JobPosting":
+                            if data.get("title"):
+                                title = data["title"].strip()
+                            if data.get("hiringOrganization", {}).get("name"):
+                                company = data["hiringOrganization"]["name"].strip()
+                            if data.get("description"):
+                                full_description = clean_html_to_markdown(data["description"])
+                            addr = data.get("jobLocation", {}).get("address", {})
+                            if isinstance(addr, dict) and addr.get("addressLocality"):
+                                location = f"{addr['addressLocality']}, India"
+                            break
+                    except Exception:
+                        pass
+
+                # If description not found in JSON-LD, extract from HTML containers
+                if not full_description:
+                    # Target known JD containers across LinkedIn, Greenhouse, Lever, Ashby, Naukri
+                    containers = [
+                        r'<div[^>]*class=[\'"][^\'\"]*(?:show-more-less-html__markup|description__text|job-details)[^\'\"]*[\'\"][^>]*>(.*?)</div>',
+                        r'itemprop=[\'"]description[\'"][^>]*>(.*?)(?:<div[^>]*class=[\'"][^\'\"]*(?:job-actions|similar-jobs|app-footer)|</main>|<footer)',
+                        r'<section[^>]*itemprop=[\'"]description[\'"][^>]*>(.*?)</section>',
+                        r'<div[^>]*id=[\'"](?:content|job-details|job-description)[\'"][^>]*>(.*?)</div>',
+                        r'<section[^>]*class=[\'"][^\'\"]*(?:description|job-desc|section-wrapper)[^\'\"]*[\'\"][^>]*>(.*?)</section>',
+                        r'<div[^>]*class=[\'"][^\'\"]*(?:ashby-job-posting-description|dang-inner-html|posting-page)[^\'\"]*[\'\"][^>]*>(.*?)</div>',
+                    ]
+                    for pattern in containers:
+                        match = re.search(pattern, html_text, re.DOTALL | re.IGNORECASE)
+                        if match and len(match.group(1)) > 100:
+                            full_description = clean_html_to_markdown(match.group(1))
+                            break
+
+                # Parse OpenGraph, title, and h1 tags for authentic job title and company
                 og_t = re.search(r'<meta[^>]+property=[\'"]og:title[\'"][^>]+content=[\'"](.*?)[\'"]', html_text, re.IGNORECASE)
                 og_c = re.search(r'<meta[^>]+property=[\'"]og:site_name[\'"][^>]+content=[\'"](.*?)[\'"]', html_text, re.IGNORECASE)
                 page_t = re.search(r"<title>(.*?)</title>", html_text, re.IGNORECASE)
                 raw_title = (og_t.group(1) if og_t else "") or (page_t.group(1) if page_t else "")
                 if raw_title:
                     clean_t = html_lib.unescape(raw_title).strip()
+                    clean_t = re.sub(r"\s*[|•].*$", "", clean_t).strip()
                     if " at " in clean_t:
                         parts = clean_t.split(" at ", 1)
                         title = parts[0].strip()
-                        comp_candidate = re.split(r"[|\-–]", parts[1])[0].strip()
-                        if comp_candidate and len(comp_candidate) < 40:
-                            company = comp_candidate
+                        comp_part = parts[1].strip()
+                        if " — " in comp_part or " - " in comp_part:
+                            cp = re.split(r"\s*[—–-]\s*", comp_part)
+                            company = cp[0].strip()
+                            if len(cp) > 1 and any(loc in cp[1].lower() for loc in ["gurugram", "noida", "delhi", "bengaluru", "india"]):
+                                location = cp[1].strip()
+                        else:
+                            company = comp_part
                     elif " | " in clean_t or " - " in clean_t:
                         parts = re.split(r"\s*[|\-–]\s*", clean_t)
                         if len(parts) >= 2:
                             title = parts[0].strip()
                             company = parts[1].strip()
+
+                # Also check <h1> tag for exact role title
+                h1_m = re.search(r'<h1[^>]*>(.*?)</h1>', html_text, re.DOTALL | re.IGNORECASE)
+                if h1_m:
+                    h1_clean = clean_html_to_markdown(h1_m.group(1)).strip()
+                    if h1_clean and len(h1_clean) < 80 and not h1_clean.isdigit():
+                        title = h1_clean
+
                 if og_c and (not company or company == "Company"):
                     company = og_c.group(1).strip()
+
+                # Clean up company name if it contains location suffix (e.g. "Meritto — Gurugram")
+                if " — " in company or " - " in company:
+                    comp_parts = re.split(r"\s*[—–-]\s*", company)
+                    company = comp_parts[0].strip()
+                    if len(comp_parts) > 1 and ("gurugram" in comp_parts[1].lower() or "noida" in comp_parts[1].lower() or "delhi" in comp_parts[1].lower()):
+                        location = comp_parts[1].strip()
+                    comp_parts = re.split(r"\s*[—–-]\s*", company)
+                    company = comp_parts[0].strip()
+                    if len(comp_parts) > 1 and ("gurugram" in comp_parts[1].lower() or "noida" in comp_parts[1].lower() or "delhi" in comp_parts[1].lower()):
+                        location = comp_parts[1].strip()
+
+                # Extract location from page if available
+                if "gurugram" in html_text.lower():
+                    location = "Gurugram, India"
+                elif "noida" in html_text.lower():
+                    location = "Noida, India"
+                elif "bengaluru" in html_text.lower() or "bangalore" in html_text.lower():
+                    location = "Bengaluru, India"
+                elif "remote" in html_text.lower():
+                    location = "Remote, India"
+                    work_model = "Remote"
+
+                # Extract bullets & tech stack skills
+                if full_description:
+                    extract_bullets_and_skills(full_description)
+
     except Exception:
         pass
+
+    if not full_description:
+        full_description = f"Position for {title} at {company}. Direct application link: {clean_url}"
 
     return {
         "title": title,
         "company": company,
         "source_url": clean_url,
         "application_url": clean_url,
-        "description": f"Position for {title} at {company}. Direct application link: {clean_url}",
+        "description": full_description,
+        "requirements": requirements,
+        "responsibilities": responsibilities,
+        "required_skills": skills,
         "location": location,
+        "work_model": work_model,
+        "seniority": seniority,
+        "employment_type": employment_type,
     }

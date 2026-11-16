@@ -570,6 +570,39 @@ async def delete_tailored_resume(request: Request, job_id: str):
     return {"ok": True, "message": "Tailored resume deleted successfully", "job_id": job_id}
 
 
+@router.delete("/{job_id}")
+async def delete_job_manually(request: Request, job_id: str):
+    """
+    Manually delete a job from the repository.
+    Cleans up all associated matches, applications, and tailored resumes.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    if not ObjectId.is_valid(job_id):
+        raise HTTPException(status_code=400, detail="Invalid job ID format.")
+
+    job_oid = ObjectId(job_id)
+    job = await db.jobs.find_one({"_id": job_oid})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job opening not found.")
+
+    title = job.get("title", "Position")
+    company = job.get("company", "Company")
+
+    # Clean up associated matches, applications, and resumes
+    await db.job_matches.delete_many({"job_id": job_oid})
+    await db.applications.delete_many({"job_id": job_oid})
+    await db.resumes.delete_many({"job_id": job_oid})
+    await db.jobs.delete_one({"_id": job_oid})
+
+    logger.info("Job deleted manually", job_id=job_id, title=title, company=company, user_id=user_id)
+    return {
+        "ok": True,
+        "message": f"Successfully deleted '{title}' at '{company}'.",
+        "job_id": job_id,
+    }
+
+
 @router.get("/{job_id}/resume/download")
 async def download_tailored_resume_docx(request: Request, job_id: str, template: str | None = None):
     """Download the tailored .docx resume for this job and user."""
@@ -770,22 +803,27 @@ async def add_job_by_url(
         job_id = existing_job["_id"]
     else:
         # Extract title & company from slug or live page
+        import hashlib
         parsed_info = await parse_job_details_from_url(clean_url)
         title_final = body.title or parsed_info.get("title", "Software Engineer")
         company_final = body.company or parsed_info.get("company", "Company")
+        chash = hashlib.sha256(f"{clean_url}:{title_final}:{company_final}".encode()).hexdigest()
 
         new_doc = {
             "source": "user_added",
             "source_url": clean_url,
             "application_url": clean_url,
+            "content_hash": chash,
+            "external_id": f"user_{chash[:16]}",
             "title": title_final,
             "company": company_final,
-            "description": parsed_info.get("description", f"{title_final} at {company_final}"),
-            "requirements": [],
-            "responsibilities": [],
-            "location": parsed_info.get("location", "India / Remote"),
-            "work_model": "On-site",
-            "employment_type": "full-time",
+            "description": parsed_info.get("description") or f"{title_final} at {company_final}",
+            "requirements": parsed_info.get("requirements") or [],
+            "responsibilities": parsed_info.get("responsibilities") or [],
+            "required_skills": parsed_info.get("required_skills") or [],
+            "location": parsed_info.get("location") or "India / Remote",
+            "work_model": parsed_info.get("work_model") or "On-site",
+            "employment_type": parsed_info.get("employment_type") or "full-time",
             "is_active": True,
             "created_at": now,
             "updated_at": now,

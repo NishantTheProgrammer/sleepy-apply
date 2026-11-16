@@ -359,6 +359,33 @@ function JobsPageContent() {
   const [launchingVisibleId, setLaunchingVisibleId] = useState<string | null>(null);
   const [visibleToast, setVisibleToast] = useState<{ company: string; message: string } | null>(null);
 
+  // Manual Delete State
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+  const handleDeleteJob = async (jobId: string) => {
+    const target = jobs.find((j) => j.job._id === jobId || j._id === jobId);
+    const title = target?.job.title || "this job";
+    const comp = target?.job.company || "";
+    if (!confirm(`Are you sure you want to delete "${title}${comp ? ` at ${comp}` : ""}" manually from your portal?`)) {
+      return;
+    }
+    setDeletingJobId(jobId);
+    try {
+      await jobsApi.delete(jobId);
+      const remaining = jobs.filter((j) => j.job._id !== jobId && j._id !== jobId);
+      setJobs(remaining);
+      setTotal((prev) => Math.max(0, prev - 1));
+      if (selectedJobId === jobId) {
+        setSelectedJobId(remaining[0]?.job._id || null);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete job.";
+      alert(msg);
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
+
   // HR Contact Finder Agent State
   const [findingHRId, setFindingHRId] = useState<string | null>(null);
 
@@ -1139,6 +1166,22 @@ function JobsPageContent() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              handleDeleteJob(item.job._id);
+                            }}
+                            disabled={deletingJobId === item.job._id}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                            title="Delete this job manually"
+                          >
+                            {deletingJobId === item.job._id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3" />
+                            )}
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleShareToDiscord(item.job._id);
                             }}
                             disabled={sharingDiscordId === item.job._id}
@@ -1358,6 +1401,20 @@ function JobsPageContent() {
                             : "Portal"}
                         </span>
                       </a>
+
+                      <button
+                        onClick={() => handleDeleteJob(selectedItem.job._id)}
+                        disabled={deletingJobId === selectedItem.job._id}
+                        className="px-2.5 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                        title="Delete job manually from portal"
+                      >
+                        {deletingJobId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        <span className="hidden sm:inline">Delete</span>
+                      </button>
                     </div>
                   </div>
 

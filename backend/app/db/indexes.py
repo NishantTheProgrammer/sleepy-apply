@@ -19,7 +19,7 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
         db.user_settings.create_index("user_id", unique=True),
 
         # jobs
-        db.jobs.create_index("content_hash", unique=True),
+        db.jobs.create_index("content_hash", unique=True, sparse=True),
         db.jobs.create_index("is_active"),
         db.jobs.create_index("source"),
         db.jobs.create_index("is_remote"),

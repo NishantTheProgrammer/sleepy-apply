@@ -258,6 +258,26 @@ export default function AdminAllJobsPage() {
 
   const [purging, setPurging] = useState(false);
   const [purgingCrawled, setPurgingCrawled] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+  const handleDeleteJob = async (jobId: string, title?: string, company?: string) => {
+    if (!confirm(`Are you sure you want to permanently delete "${title || "this job"}"${company ? ` at ${company}` : ""}?`)) {
+      return;
+    }
+    setDeletingJobId(jobId);
+    try {
+      await adminApi.deleteJob(jobId);
+      setActionMsg(`Successfully deleted ${title || "job"}.`);
+      setJobs((prev) => prev.filter((j) => j._id !== jobId));
+      setTotal((prev) => Math.max(0, prev - 1));
+      setTimeout(() => setActionMsg(""), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete job.";
+      alert(msg);
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
   const [purgingOld, setPurgingOld] = useState(false);
   const [openMenu, setOpenMenu] = useState<"fetch" | "manage" | null>(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -1191,6 +1211,14 @@ export default function AdminAllJobsPage() {
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
+                        <button
+                          onClick={() => handleDeleteJob(j._id, j.title, j.company)}
+                          disabled={deletingJobId === j._id}
+                          className="p-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+                          title="Delete job permanently"
+                        >
+                          {deletingJobId === j._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1326,6 +1354,19 @@ export default function AdminAllJobsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const id = selectedJob._id;
+                      const title = selectedJob.title;
+                      const comp = selectedJob.company;
+                      setSelectedJob(null);
+                      handleDeleteJob(id, title, comp);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-white border border-red-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
                   <button
                     onClick={() => setSelectedJob(null)}
                     className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-all cursor-pointer"

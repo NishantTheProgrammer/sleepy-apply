@@ -363,10 +363,23 @@ class HRContactFinderAgent:
         results: list[dict[str, Any]] = []
         seen_urls: set[str] = set()
 
+        # Build targeted queries: try with location first, then pan-India if needed
+        queries = [query]
+        if loc != "India":
+            queries.append(f'site:linkedin.com/in "{clean_co}" ("Talent Acquisition" OR "Recruiter") India')
+
+        co_escaped = re.escape(clean_co.lower())
+        co_pattern = re.compile(rf"\b{co_escaped}\b", re.IGNORECASE)
+
         try:
             async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=5.0) as client:
-                resp = await client.get(f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(query)}")
-                if resp.status_code == 200:
+                for q in queries:
+                    if len(results) >= 4:
+                        break
+                    resp = await client.get(f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(q)}")
+                    if resp.status_code != 200:
+                        continue
+
                     blocks = resp.text.split("<li")
                     for b in blocks:
                         ru = re.search(r"\/RU=([^/]+)\/", b)
@@ -376,9 +389,31 @@ class HRContactFinderAgent:
                         if "linkedin.com/in/" not in url or url in seen_urls:
                             continue
 
+                        # Extract title and snippet text
                         t_match = re.search(r"<h3[^>]*>(.*?)</h3>", b, re.DOTALL)
                         raw_t = re.sub(r"<[^>]+>", "", t_match.group(1)).strip() if t_match else ""
                         clean_t = html.unescape(raw_t)
+
+                        snip_match = re.search(r"<(?:div|p)[^>]*class=\"[^\"]*compText[^\"]*\"[^>]*>(.*?)</(?:div|p)>", b, re.DOTALL)
+                        raw_snip = re.sub(r"<[^>]+>", "", snip_match.group(1)).strip() if snip_match else ""
+                        clean_snip = html.unescape(raw_snip)
+
+                        full_text = f"{clean_t} {clean_snip}".lower()
+
+                        # STRICT VALIDATION: Person MUST work at the targeted company!
+                        # Do not accept generic search engine padding (e.g. Amazon, 3rd party recruiters)
+                        if not co_pattern.search(full_text) and clean_co.lower() not in full_text:
+                            continue
+
+                        # Must have recruiting / HR / talent role or keywords
+                        recruiter_keywords = [
+                            "talent", "recruit", "hiring", "human resources", "hr",
+                            "people", "staffing", "sourcing", "headhunter", "acquisition",
+                            "campus", "ta partner", "ta lead", "co-founder", "founder"
+                        ]
+                        if not any(k in full_text for k in recruiter_keywords):
+                            continue
+
                         parts = re.split(r"\s*[-–|—]\s*", clean_t)
                         name = parts[0].strip() if parts else None
                         if not name or len(name.split()) > 4:
@@ -389,16 +424,17 @@ class HRContactFinderAgent:
                         if clean_co.lower() in name.lower() or name.lower() in clean_co.lower():
                             continue
 
+                        # Clean role / designation
                         role = "Talent Acquisition"
                         if len(parts) > 1:
                             raw_role = parts[1].strip()
+                            # If second part is just company name, try third part
+                            if clean_co.lower() in raw_role.lower() and len(parts) > 2:
+                                raw_role = parts[2].strip()
                             raw_role = re.sub(r"\s*(?:at|@)\s+.*$", "", raw_role, flags=re.IGNORECASE)
                             raw_role = re.sub(r"\s*LinkedIn.*$", "", raw_role, flags=re.IGNORECASE).strip(" .–-|")
-                            if len(raw_role) > 2 and not any(w in raw_role.lower() for w in ["linkedin", "india", "profile"]):
+                            if len(raw_role) > 2 and not any(w in raw_role.lower() for w in ["linkedin", "india", "profile"]) and clean_co.lower() not in raw_role.lower():
                                 role = raw_role
-
-                        if clean_co.lower() in role.lower():
-                            role = "Talent Acquisition"
 
                         seen_urls.add(url)
                         results.append({

@@ -20,7 +20,11 @@ class SalaryRange(MongoBaseModel):
 class HRContact(MongoBaseModel):
     name: str | None = None
     email: str | None = None
+    phone: str | None = None
     linkedin: str | None = None
+    designation: str | None = None
+    source: str | None = None
+    confidence: str | None = None  # "high" | "medium" | "inferred"
 
 
 class Job(MongoBaseModel):

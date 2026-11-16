@@ -6,9 +6,10 @@ import {
   Briefcase, MapPin, Building2, Zap, CheckCircle, Loader2, Sparkles,
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
-  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot, Monitor
+  Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot, Monitor,
+  Mail, Phone, UserCheck, Contact
 } from "lucide-react";
-import { jobsApi } from "@/lib/api";
+import { jobsApi, type HRContactInfo } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ReactMarkdown from "react-markdown";
 
@@ -98,6 +99,7 @@ interface JobItem {
     discovered_at?: string;
     posted_at?: string;
     posted_at_raw?: string;
+    hr_contact?: HRContactInfo;
   };
   application?: {
     _id?: string;
@@ -321,6 +323,36 @@ function JobsPageContent() {
   // Visible Browser (Headless: False) State
   const [launchingVisibleId, setLaunchingVisibleId] = useState<string | null>(null);
   const [visibleToast, setVisibleToast] = useState<{ company: string; message: string } | null>(null);
+
+  // HR Contact Finder Agent State
+  const [findingHRId, setFindingHRId] = useState<string | null>(null);
+
+  const handleFindHRContact = async (jobId: string) => {
+    setFindingHRId(jobId);
+    try {
+      const res = await jobsApi.findHRContact(jobId);
+      if (res.ok && res.hr_contact) {
+        setJobs((prev) =>
+          prev.map((item) => {
+            if (item.job._id === jobId) {
+              return {
+                ...item,
+                job: {
+                  ...item.job,
+                  hr_contact: res.hr_contact,
+                },
+              };
+            }
+            return item;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Failed to find HR contact:", err);
+    } finally {
+      setFindingHRId(null);
+    }
+  };
 
   const load = async (p = 1, src: string = sourceFilter) => {
     setLoading(true);
@@ -867,6 +899,69 @@ function JobsPageContent() {
                         ))}
                       </div>
 
+                      {/* HR Contact Discovery Bar */}
+                      <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between gap-1.5 flex-wrap">
+                        {item.job.hr_contact?.email || item.job.hr_contact?.phone ? (
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20 text-[10px] font-semibold">
+                              <UserCheck className="w-2.5 h-2.5 text-sky-400" />
+                              <span className="truncate max-w-[110px]">{item.job.hr_contact.name || "HR Recruiter"}</span>
+                              {item.job.hr_contact.confidence === "high" && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Direct Recruiter Contact" />
+                              )}
+                            </span>
+
+                            {item.job.hr_contact.email && (
+                              <a
+                                href={`mailto:${item.job.hr_contact.email}?subject=${encodeURIComponent(`Application for ${item.job.title}`)}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 text-[10px] font-medium transition-colors"
+                                title={`Email: ${item.job.hr_contact.email}`}
+                              >
+                                <Mail className="w-2.5 h-2.5 text-blue-400" />
+                                <span className="truncate max-w-[130px] font-mono">{item.job.hr_contact.email}</span>
+                              </a>
+                            )}
+
+                            {item.job.hr_contact.phone && (
+                              <a
+                                href={`https://wa.me/${item.job.hr_contact.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi, I am interested in the ${item.job.title} role at ${item.job.company}.`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium transition-colors"
+                                title={`WhatsApp / Phone: ${item.job.hr_contact.phone}`}
+                              >
+                                <Phone className="w-2.5 h-2.5 text-emerald-400" />
+                                <span className="font-mono">{item.job.hr_contact.phone}</span>
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                              <UserCheck className="w-2.5 h-2.5 text-slate-600" /> HR contact
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFindHRContact(item.job._id);
+                              }}
+                              disabled={findingHRId === item.job._id}
+                              className="px-2 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/20 text-[10px] font-medium flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                              title="Run HR contact finder agent on this job"
+                            >
+                              {findingHRId === item.job._id ? (
+                                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              ) : (
+                                <Search className="w-2.5 h-2.5" />
+                              )}
+                              Find HR
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Tailored Resume Status & Quick Action */}
                       <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
                         {item.tailored_resume ? (
@@ -1065,6 +1160,173 @@ function JobsPageContent() {
                       </a>
                     </div>
                   </div>
+                </div>
+
+                {/* 1.5 HR Contact & Recruiter Outreach Card */}
+                <div className="glass rounded-2xl p-5 border border-sky-500/20 bg-sky-950/10 relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-1.5 flex-wrap">
+                          HR & Recruiter Intelligence
+                          {selectedItem.job.hr_contact?.confidence === "high" && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium">
+                              Direct Contact
+                            </span>
+                          )}
+                          {selectedItem.job.hr_contact?.confidence === "inferred" && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-medium">
+                              Talent Team
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          Discovered contact information for direct hiring outreach
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleFindHRContact(selectedItem.job._id)}
+                      disabled={findingHRId === selectedItem.job._id}
+                      className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      title="Re-run HR Discovery Agent on this job"
+                    >
+                      {findingHRId === selectedItem.job._id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3" />
+                      )}
+                      <span>{findingHRId === selectedItem.job._id ? "Scanning..." : "Re-Scan HR"}</span>
+                    </button>
+                  </div>
+
+                  {selectedItem.job.hr_contact?.email || selectedItem.job.hr_contact?.phone ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        {/* Recruiter Name & Title */}
+                        <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-sky-500/15 flex items-center justify-center text-sky-300 shrink-0">
+                            <Contact className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-slate-400 font-medium">Contact Person</p>
+                            <p className="text-xs font-bold text-white truncate">
+                              {selectedItem.job.hr_contact.name || `${selectedItem.job.company} Recruiter`}
+                            </p>
+                            <p className="text-[10px] text-sky-400 font-medium truncate">
+                              {selectedItem.job.hr_contact.designation || "Talent Acquisition"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Direct Email */}
+                        {selectedItem.job.hr_contact.email && (
+                          <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-blue-300 shrink-0">
+                              <Mail className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] text-slate-400 font-medium">Email Address</p>
+                              <p className="text-xs font-bold text-blue-300 truncate font-mono">
+                                {selectedItem.job.hr_contact.email}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Phone / WhatsApp */}
+                        {selectedItem.job.hr_contact.phone && (
+                          <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-300 shrink-0">
+                              <Phone className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] text-slate-400 font-medium">Phone / WhatsApp</p>
+                              <p className="text-xs font-bold text-emerald-300 truncate font-mono">
+                                {selectedItem.job.hr_contact.phone}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* LinkedIn */}
+                        {selectedItem.job.hr_contact.linkedin && (
+                          <div className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-500/15 flex items-center justify-center text-indigo-300 shrink-0">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] text-slate-400 font-medium">Recruiter Profile</p>
+                              <a
+                                href={selectedItem.job.hr_contact.linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-bold text-indigo-300 hover:text-indigo-200 underline truncate block"
+                              >
+                                View on LinkedIn
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Quick Action Buttons */}
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        {selectedItem.job.hr_contact.email && (
+                          <a
+                            href={`mailto:${selectedItem.job.hr_contact.email}?subject=${encodeURIComponent(`Application for ${selectedItem.job.title} - ${user?.discord_username || "Candidate"}`)}&body=${encodeURIComponent(`Dear ${selectedItem.job.hr_contact.name || "Hiring Team"},\n\nI am writing to express my strong interest in the ${selectedItem.job.title} role at ${selectedItem.job.company}.\n\nLooking forward to hearing from you.\n\nBest regards,\n${user?.discord_username || "Candidate"}`)}`}
+                            className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> Email Recruiter Directly
+                          </a>
+                        )}
+
+                        {selectedItem.job.hr_contact.phone && (
+                          <a
+                            href={`https://wa.me/${selectedItem.job.hr_contact.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi ${selectedItem.job.hr_contact.name || "there"}, I am reaching out regarding the ${selectedItem.job.title} opening at ${selectedItem.job.company}.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                          >
+                            <Phone className="w-3.5 h-3.5" /> Message on WhatsApp
+                          </a>
+                        )}
+
+                        {selectedItem.job.hr_contact.linkedin && (
+                          <a
+                            href={selectedItem.job.hr_contact.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> LinkedIn
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/5 text-center space-y-2">
+                      <p className="text-xs text-slate-400">
+                        No direct recruiter email or phone has been discovered yet for this opening.
+                      </p>
+                      <button
+                        onClick={() => handleFindHRContact(selectedItem.job._id)}
+                        disabled={findingHRId === selectedItem.job._id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {findingHRId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>{findingHRId === selectedItem.job._id ? "Discovering Contacts..." : "Find HR Contacts Now"}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. AI Match Compatibility Breakdown */}

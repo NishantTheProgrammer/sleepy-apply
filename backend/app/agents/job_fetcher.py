@@ -12,6 +12,7 @@ from app.pipeline.deduplicator import JobDeduplicator
 from app.pipeline.normalizer import DelhiNCRJobNormalizer
 from app.pipeline.role_search import get_unique_user_selected_roles, format_roles_for_search_query
 from app.core.retention import is_older_than_retention
+from app.agents.hr_contact_finder import hr_contact_finder
 
 logger = structlog.get_logger()
 
@@ -185,6 +186,19 @@ class JobFetcherAgent:
 
             job_source = raw.source if raw.source in ["career", "career-crawled", "linkedin", "naukri", "indeed"] else "career"
 
+            # Extract or synthesize HR contact info for the position
+            hr_contact = hr_contact_finder.extract_from_text(
+                f"{norm['title']}\n{norm['company']}\n{norm['description']}",
+                company=norm["company"],
+                title=norm["title"],
+            )
+            if not hr_contact.get("email") and not hr_contact.get("phone"):
+                hr_contact = hr_contact_finder.synthesize_company_contact(
+                    norm["company"],
+                    website=raw.company_website or raw.source_url,
+                    source_url=norm["source_url"],
+                )
+
             job_doc = {
                 "source": job_source,
                 "source_url": norm["source_url"],
@@ -204,7 +218,7 @@ class JobFetcherAgent:
                 "employment_type": norm["employment_type"],
                 "salary_range": norm["salary_range"],
                 "application_url": norm["application_url"],
-                "hr_contact": {},
+                "hr_contact": hr_contact,
                 "required_skills": norm["required_skills"],
                 "posted_at": norm.get("posted_at") or raw.posted_at or now,
                 "posted_at_raw": norm.get("posted_at_raw") or raw.posted_at_raw,

@@ -6,6 +6,7 @@ import structlog
 from app.db.client import get_db
 from app.agents.job_fetcher import JobFetcherAgent
 from app.agents.job_enrichment import JobEnrichmentAgent
+from app.agents.hr_contact_finder import HRContactFinderAgent
 from app.agents.job_matcher import JobMatcherAgent
 from app.agents.discord_bot import DiscordAgent
 from app.models.settings import UserSettings
@@ -71,6 +72,38 @@ async def enrich_jobs_node(state: JobPipelineState) -> JobPipelineState:
             logger.warning("Failed to enrich job", job_id=str(job["_id"]), error=str(e))
 
     return {"enriched_jobs": enriched}
+
+
+async def find_hr_contacts_node(state: JobPipelineState) -> JobPipelineState:
+    """Enriches newly discovered or existing jobs with verified HR / recruiter contacts."""
+    db = get_db()
+    finder = HRContactFinderAgent()
+    user_settings = None
+    if state.get("user_id"):
+        settings_doc = await db.user_settings.find_one({"user_id": ObjectId(state["user_id"])})
+        if settings_doc:
+            user_settings = UserSettings(**settings_doc)
+
+    cursor = db.jobs.find({
+        "is_active": True,
+        "$or": [
+            {"hr_contact": None},
+            {"hr_contact": {}},
+            {"hr_contact.email": None},
+            {"hr_contact.source": "company_domain_synthesis"},
+        ]
+    }).sort("discovered_at", -1).limit(25)
+
+    enriched_count = 0
+    async for job in cursor:
+        try:
+            await finder.find_and_enrich_job(job["_id"], user_settings=user_settings, fetch_live=False)
+            enriched_count += 1
+        except Exception as e:
+            logger.warning("HR contact pipeline enrichment failed", job_id=str(job["_id"]), error=str(e))
+
+    logger.info("HR contact pipeline node completed", enriched_jobs=enriched_count)
+    return state
 
 
 async def match_jobs_node(state: JobPipelineState) -> JobPipelineState:
@@ -177,12 +210,14 @@ def build_job_pipeline_graph():
     builder = StateGraph(JobPipelineState)
     builder.add_node("fetch_jobs", fetch_jobs_node)
     builder.add_node("enrich_jobs", enrich_jobs_node)
+    builder.add_node("find_hr_contacts", find_hr_contacts_node)
     builder.add_node("match_jobs", match_jobs_node)
     builder.add_node("notify_matches", notify_matches_node)
 
     builder.add_edge(START, "fetch_jobs")
     builder.add_edge("fetch_jobs", "enrich_jobs")
-    builder.add_edge("enrich_jobs", "match_jobs")
+    builder.add_edge("enrich_jobs", "find_hr_contacts")
+    builder.add_edge("find_hr_contacts", "match_jobs")
     builder.add_edge("match_jobs", "notify_matches")
     builder.add_edge("notify_matches", END)
 

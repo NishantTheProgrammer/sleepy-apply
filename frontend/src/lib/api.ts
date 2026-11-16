@@ -205,6 +205,17 @@ export interface ResumeTemplateItem {
   features: string[];
 }
 
+export interface HRContactInfo {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  linkedin?: string | null;
+  designation?: string | null;
+  source?: string | null;
+  confidence?: string | null;
+  discovered_at?: string | null;
+}
+
 export const templatesApi = {
   list: () => request<{ templates: ResumeTemplateItem[] }>("/api/templates"),
   select: (template_id: string) =>
@@ -274,6 +285,26 @@ export const jobsApi = {
     }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/jobs/crawler-status"),
+  findHRContact: (jobId: string) =>
+    request<{
+      ok: boolean;
+      job_id: string;
+      hr_contact: HRContactInfo;
+      message: string;
+    }>(`/api/jobs/${jobId}/find-hr`, { method: "POST" }),
+  batchEnrichHRContacts: (limit = 100, force = false) =>
+    request<{ ok: boolean; processed: number; direct_contacts_found: number }>(
+      "/api/jobs/enrich-hr-contacts",
+      { method: "POST", body: JSON.stringify({ limit, force }) }
+    ),
+  getHRContactsStats: () =>
+    request<{
+      total_active_jobs: number;
+      with_email: number;
+      with_phone: number;
+      with_direct_contact: number;
+      with_inferred_contact: number;
+    }>("/api/jobs/hr-contacts/stats"),
 };
 
 // ── Settings ──────────────────────────────────────────────

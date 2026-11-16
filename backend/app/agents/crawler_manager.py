@@ -14,6 +14,7 @@ from app.pipeline.deduplicator import JobDeduplicator
 from app.agents.job_matcher import JobMatcherAgent
 from app.pipeline.role_search import get_unique_user_selected_roles
 from app.core.system_logger import log_system_event
+from app.agents.hr_contact_finder import hr_contact_finder
 
 from app.scripts.crawl_delhi_ncr_companies import (
     load_companies,
@@ -326,6 +327,19 @@ class CrawlerManager:
 
                         now = datetime.now(timezone.utc)
                         norm = DelhiNCRJobNormalizer.normalize(raw_job)
+                        # Extract or synthesize HR contact info for the position
+                        hr_contact = hr_contact_finder.extract_from_text(
+                            f"{norm['title']}\n{norm['company']}\n{norm['description']}",
+                            company=norm["company"],
+                            title=norm["title"],
+                        )
+                        if not hr_contact.get("email") and not hr_contact.get("phone"):
+                            hr_contact = hr_contact_finder.synthesize_company_contact(
+                                norm["company"],
+                                website=raw_job.company_website or raw_job.source_url,
+                                source_url=norm["source_url"],
+                            )
+
                         job_doc = {
                             "source": "career-crawled",
                             "source_url": norm["source_url"],
@@ -345,7 +359,7 @@ class CrawlerManager:
                             "employment_type": norm["employment_type"],
                             "salary_range": norm["salary_range"],
                             "application_url": norm["application_url"],
-                            "hr_contact": {},
+                            "hr_contact": hr_contact,
                             "required_skills": norm["required_skills"],
                             "posted_at": raw_job.posted_at or now,
                             "is_active": True,

@@ -608,3 +608,94 @@ async def download_tailored_resume_docx(request: Request, job_id: str, template:
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── HR Contact Discovery Endpoints ───────────────────────────────
+
+class BatchEnrichHRRequest(BaseModel):
+    limit: int = 100
+    force: bool = False
+
+
+@router.post("/{job_id}/find-hr")
+async def find_job_hr_contact(request: Request, job_id: str):
+    """
+    Dedicated agent endpoint to discover HR / recruiter contact details
+    (name, email, phone/WhatsApp, LinkedIn profile, designation) for a specific job.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    from app.agents.hr_contact_finder import hr_contact_finder
+    from app.models.settings import UserSettings
+
+    settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    user_settings = UserSettings(**settings_doc) if settings_doc else None
+
+    try:
+        contact = await hr_contact_finder.find_and_enrich_job(
+            job_id=job_id,
+            user_settings=user_settings,
+            fetch_live=True,
+        )
+        return {
+            "ok": True,
+            "job_id": job_id,
+            "hr_contact": contact,
+            "message": f"HR contact discovered ({contact.get('confidence', 'unknown')} confidence)",
+        }
+    except Exception as e:
+        logger.error("Failed to find HR contact", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to find HR contact: {str(e)}")
+
+
+@router.post("/enrich-hr-contacts")
+async def batch_enrich_hr_contacts(request: Request, payload: BatchEnrichHRRequest | None = None):
+    """
+    Batch trigger HR contact discovery agent across all active jobs in repository.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    limit = payload.limit if payload else 100
+    force = payload.force if payload else False
+
+    from app.agents.hr_contact_finder import hr_contact_finder
+    from app.models.settings import UserSettings
+
+    settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+    user_settings = UserSettings(**settings_doc) if settings_doc else None
+
+    result = await hr_contact_finder.enrich_all_jobs(
+        limit=limit,
+        force=force,
+        user_settings=user_settings,
+    )
+    return result
+
+
+@router.get("/hr-contacts/stats")
+async def get_hr_contacts_stats(request: Request):
+    """
+    Return statistics on discovered HR contacts across all jobs.
+    """
+    get_current_user_id(request)
+    db = get_db()
+
+    total_jobs = await db.jobs.count_documents({"is_active": True})
+    with_email = await db.jobs.count_documents({"is_active": True, "hr_contact.email": {"$ne": None}})
+    with_phone = await db.jobs.count_documents({"is_active": True, "hr_contact.phone": {"$ne": None}})
+    with_direct = await db.jobs.count_documents({"is_active": True, "hr_contact.confidence": "high"})
+    with_inferred = await db.jobs.count_documents({"is_active": True, "hr_contact.confidence": "inferred"})
+
+    return {
+        "total_active_jobs": total_jobs,
+        "with_email": with_email,
+        "with_phone": with_phone,
+        "with_direct_contact": with_direct,
+        "with_inferred_contact": with_inferred,
+    }
+

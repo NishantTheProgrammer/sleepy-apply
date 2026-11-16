@@ -205,6 +205,12 @@ export interface ResumeTemplateItem {
   features: string[];
 }
 
+export interface RecruiterPerson {
+  name: string;
+  designation?: string | null;
+  linkedin: string;
+}
+
 export interface HRContactInfo {
   name?: string | null;
   email?: string | null;
@@ -214,6 +220,8 @@ export interface HRContactInfo {
   source?: string | null;
   confidence?: string | null;
   discovered_at?: string | null;
+  google_search_url?: string | null;
+  recruiters?: RecruiterPerson[];
 }
 
 export const templatesApi = {

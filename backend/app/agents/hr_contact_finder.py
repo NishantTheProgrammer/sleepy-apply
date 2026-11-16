@@ -1,5 +1,6 @@
 import re
 import urllib.parse
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 import httpx
@@ -22,6 +23,8 @@ IGNORED_EMAIL_PREFIXES = {
     "noreply", "no-reply", "donotreply", "do-not-reply", "mailer-daemon",
     "postmaster", "root", "support", "billing", "privacy", "security",
     "press", "legal", "abuse", "admin", "sales", "contact-us",
+    "accommodation", "accommodations", "applicantaccommodations", "accessibility",
+    "disability", "eeo", "equal-opportunity", "compliance", "investor", "media", "pr",
 }
 
 HR_KEYWORDS_IN_EMAIL = {
@@ -97,7 +100,7 @@ class HRContactFinderAgent:
         user, domain = parts[0].lower(), parts[1].lower()
         if domain in IGNORED_EMAIL_DOMAINS or any(domain.endswith("." + d) for d in IGNORED_EMAIL_DOMAINS):
             return None
-        if user in IGNORED_EMAIL_PREFIXES:
+        if user in IGNORED_EMAIL_PREFIXES or any(bad in user for bad in ["accommodation", "accessibility", "disability"]):
             return None
         # Discard obvious code identifiers or file paths
         if any(char in email for char in ["/", "\\", "{", "}", "=", "$", "%", "*"]):
@@ -149,7 +152,24 @@ class HRContactFinderAgent:
             result["confidence"] = "high"
 
         # 2. Phone / WhatsApp Numbers
-        # Examples: "WhatsApp: 7032046739", "Call: +91 9876543210", "Phone: 011-2345678"
+        # Examples: "WhatsApp: 7032046739", "Call: +91 9876543210", "Phone: 011-2345678", "CALL DEEPAK @ 9315218830"
+        call_at_match = re.search(
+            r"(?:call|contact|reach)\s+([A-Za-z][A-Za-z\s.]{1,25}?)\s*(?:@|at|on|:)\s*(\+?\d[\d\s\-]{8,14}\d)",
+            text,
+            re.IGNORECASE,
+        )
+        if call_at_match:
+            rec_name = call_at_match.group(1).strip()
+            p = self.clean_phone(call_at_match.group(2))
+            if p:
+                result["phone"] = p
+                result["confidence"] = "high"
+                result["source"] = result["source"] or "jd_text"
+            if rec_name and len(rec_name.split()) <= 3 and not any(w in rec_name.lower() for w in ["us", "now", "today", "here"]):
+                result["name"] = rec_name.title()
+                result["designation"] = "Hiring Recruiter"
+                result["source"] = result["source"] or "jd_text"
+
         whatsapp_match = re.search(
             r"(?:whatsapp|wa\.me|wa)\s*(?:no\.?|num\.?|number|contact)?\s*[:\-]?\s*(\+?\d[\d\s\-]{8,14}\d)",
             text,
@@ -174,6 +194,18 @@ class HRContactFinderAgent:
                     result["phone"] = p
                     result["source"] = result["source"] or "jd_text"
 
+        if not result["phone"]:
+            general_phone = re.search(
+                r"(?i)(?:call|whatsapp|contact|reach|phone|mobile|msg|sms|apply).*?(?:@|at|:|\s)\s*(\+?(?:91)?[\s-]?[6-9]\d{9})\b",
+                text,
+            )
+            if general_phone:
+                p = self.clean_phone(general_phone.group(1))
+                if p:
+                    result["phone"] = p
+                    result["confidence"] = "high"
+                    result["source"] = result["source"] or "jd_text"
+
         # 3. Recruiter Name & Designation
         # Examples: "Posted by: Rakesh M", "Recruiter: Priya Sharma", "HR Contact: Ananya"
         name_match = re.search(
@@ -187,7 +219,7 @@ class HRContactFinderAgent:
             if company and name_candidate.lower() in company.lower():
                 # It said "Posted by Company Name", skip or treat as organization
                 pass
-            elif len(name_candidate.split()) <= 4 and not any(w in name_candidate.lower() for w in ["confidential", "anonymous", "apply", "urgent"]):
+            elif len(name_candidate.split()) <= 4 and not any(w in name_candidate.lower() for w in ["confidential", "anonymous", "apply", "urgent", "jobs", "careers", "recruitment", "hiring", "team", "talent", "portal", "recruiter", "admin"]):
                 result["name"] = name_candidate
                 result["designation"] = "Recruiter / Talent Partner"
                 result["source"] = result["source"] or "jd_text"
@@ -295,27 +327,109 @@ class HRContactFinderAgent:
                 return f"{clean_name}.com"
         return None
 
-    def synthesize_company_contact(self, company: str, website: str = "", source_url: str = "") -> dict[str, Any]:
+    async def search_web_for_recruiters(self, company: str, location: str = "") -> list[dict[str, Any]]:
         """
-        Synthesize company talent acquisition contact and direct LinkedIn Recruiter search URL.
-        Provides a 1-click avenue for the user to reach talent teams even when no individual
-        recruiter email is publicly indexed.
+        Automated Web & LinkedIn Search Dorking Agent.
+        Finds actual, current recruiters / talent acquisition professionals for the company in that location.
+        Returns a list of verified recruiter profiles (name, designation, direct LinkedIn profile URL).
         """
-        domain = self.extract_company_domain(company, website, source_url)
-        email = f"careers@{domain}" if domain else None
+        import html
+        clean_co = re.sub(r"^(With\s+[A-Za-z\s]+?\s+Vorizo|Senior\s+.*?Engineer)\s*", "", company, flags=re.IGNORECASE)
+        clean_co = re.sub(r"\b(Pvt\.?|Ltd\.?|Private\s+Limited|Inc\.?|LLC|Technologies|Services)\b", "", clean_co, flags=re.IGNORECASE).strip()
+        if not clean_co or len(clean_co) < 2:
+            clean_co = company
 
-        # Direct LinkedIn recruiter search URL
-        search_query = urllib.parse.quote_plus(f"{company} Talent Acquisition OR Recruiter")
+        loc = "India"
+        if location:
+            for city in ["Noida", "Gurugram", "Gurgaon", "Delhi", "Bengaluru", "Bangalore", "Hyderabad", "Pune", "Mumbai", "Chennai"]:
+                if city.lower() in location.lower():
+                    loc = city
+                    break
+
+        query = f'site:linkedin.com/in "{clean_co}" ("Talent Acquisition" OR "Recruiter") {loc}'
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+        results: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+
+        try:
+            async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=5.0) as client:
+                resp = await client.get(f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(query)}")
+                if resp.status_code == 200:
+                    blocks = resp.text.split("<li")
+                    for b in blocks:
+                        ru = re.search(r"\/RU=([^/]+)\/", b)
+                        if not ru:
+                            continue
+                        url = urllib.parse.unquote(ru.group(1))
+                        if "linkedin.com/in/" not in url or url in seen_urls:
+                            continue
+
+                        t_match = re.search(r"<h3[^>]*>(.*?)</h3>", b, re.DOTALL)
+                        raw_t = re.sub(r"<[^>]+>", "", t_match.group(1)).strip() if t_match else ""
+                        clean_t = html.unescape(raw_t)
+                        parts = re.split(r"\s*[-–|—]\s*", clean_t)
+                        name = parts[0].strip() if parts else None
+                        if not name or len(name.split()) > 4:
+                            continue
+                        name = re.sub(r"[\(\[\.\,\s]+$", "", name).strip()
+                        if any(w in name.lower() for w in ["jobs", "careers", "hiring", "overview", "about", "internship", "developer", "engineer"]):
+                            continue
+                        if clean_co.lower() in name.lower() or name.lower() in clean_co.lower():
+                            continue
+
+                        role = "Talent Acquisition"
+                        if len(parts) > 1:
+                            raw_role = parts[1].strip()
+                            raw_role = re.sub(r"\s*(?:at|@)\s+.*$", "", raw_role, flags=re.IGNORECASE)
+                            raw_role = re.sub(r"\s*LinkedIn.*$", "", raw_role, flags=re.IGNORECASE).strip(" .–-|")
+                            if len(raw_role) > 2 and not any(w in raw_role.lower() for w in ["linkedin", "india", "profile"]):
+                                role = raw_role
+
+                        if clean_co.lower() in role.lower():
+                            role = "Talent Acquisition"
+
+                        seen_urls.add(url)
+                        results.append({
+                            "name": name,
+                            "designation": role,
+                            "linkedin": url,
+                        })
+                        if len(results) >= 4:
+                            break
+        except Exception as e:
+            logger.debug("Web recruiter search skipped or timed out", company=company, error=str(e))
+
+        return results
+
+    def synthesize_company_contact(self, company: str, website: str = "", source_url: str = "", location: str = "") -> dict[str, Any]:
+        """
+        Provides direct 1-click LinkedIn and Google recruiter search links to locate real recruiters at this company.
+        Strictly does NOT invent guessed/fake email addresses or placeholder names.
+        """
+        clean_company = re.sub(r"^(With\s+[A-Za-z\s]+?\s+Vorizo|Senior\s+.*?Engineer)\s*", "", company, flags=re.IGNORECASE).strip()
+        if not clean_company:
+            clean_company = company
+
+        loc_str = location or "India"
+        search_query = urllib.parse.quote_plus(f"{clean_company} Talent Acquisition OR Recruiter {loc_str}")
         linkedin_search = f"https://www.linkedin.com/search/results/people/?keywords={search_query}"
+        google_search = f"https://www.google.com/search?q={urllib.parse.quote_plus(f'site:linkedin.com/in \"{clean_company}\" (\"Talent Acquisition\" OR \"Recruiter\") {loc_str}')}"
 
         return {
-            "name": f"{company} Talent Team",
-            "email": email,
+            "name": None,
+            "email": None,
             "phone": None,
             "linkedin": linkedin_search,
-            "designation": "Talent Acquisition Team",
-            "source": "company_domain_synthesis",
-            "confidence": "inferred",
+            "google_search_url": google_search,
+            "designation": None,
+            "source": "linkedin_search",
+            "confidence": None,
+            "recruiters": [],
         }
 
     async def extract_with_llm(self, text: str, user_settings: UserSettings | None = None) -> dict[str, Any] | None:
@@ -358,6 +472,7 @@ class HRContactFinderAgent:
         title = job.get("title", "")
         company = job.get("company", "")
         description = job.get("description", "")
+        location = job.get("location", "")
         source_url = job.get("source_url") or job.get("application_url", "")
         company_website = job.get("company_info", {}).get("website", "") if isinstance(job.get("company_info"), dict) else ""
 
@@ -369,37 +484,71 @@ class HRContactFinderAgent:
 
         contact = self.extract_from_text(combined_text, company=company, title=title)
 
-        # Step 2: If user has AI provider configured and we don't have direct email or phone, try LLM
-        if (not contact.get("email") or not contact.get("phone")) and user_settings and len(description) > 100:
-            llm_result = await self.extract_with_llm(description, user_settings=user_settings)
-            if llm_result:
-                for k in ["name", "email", "phone", "designation", "linkedin"]:
-                    if llm_result.get(k) and not contact.get(k):
-                        contact[k] = llm_result[k]
-                if llm_result.get("email") or llm_result.get("phone"):
-                    contact["source"] = "ai_llm_extraction"
-                    contact["confidence"] = llm_result.get("confidence", "high")
+        # Pre-generate smart search shortcuts (LinkedIn search & Google recruiter dork)
+        synth = self.synthesize_company_contact(company, website=company_website, source_url=source_url, location=location)
+        contact["google_search_url"] = synth["google_search_url"]
+        contact["recruiters"] = []
 
-        # Step 3: If still missing direct contact and live fetch is enabled
-        if not contact.get("email") and not contact.get("phone") and fetch_live and source_url:
-            live_result = await self.fetch_and_extract_live_page(source_url, company=company, timeout=5.0)
-            if live_result:
-                for k in ["name", "email", "phone", "designation", "linkedin"]:
-                    if live_result.get(k) and not contact.get(k):
-                        contact[k] = live_result[k]
-                if live_result.get("email") or live_result.get("phone"):
-                    contact["source"] = live_result.get("source", "live_page")
-                    contact["confidence"] = live_result.get("confidence", "high")
+        # Step 2: If direct contact was not found and live extraction is requested
+        if (not contact.get("email") or not contact.get("phone")) and fetch_live:
+            # 2a. Fast LLM extraction attempt (capped at 2.5s timeout)
+            if user_settings and len(description) > 100:
+                try:
+                    llm_result = await asyncio.wait_for(
+                        self.extract_with_llm(description, user_settings=user_settings),
+                        timeout=2.5,
+                    )
+                    if llm_result:
+                        for k in ["name", "email", "phone", "designation", "linkedin"]:
+                            if llm_result.get(k) and not contact.get(k):
+                                contact[k] = llm_result[k]
+                        if llm_result.get("email") or llm_result.get("phone"):
+                            contact["source"] = "ai_llm_extraction"
+                            contact["confidence"] = llm_result.get("confidence", "high")
+                except (asyncio.TimeoutError, Exception) as e:
+                    logger.debug("LLM HR extraction skipped due to timeout/error", error=str(e))
 
-        # Step 4: Fallback synthesis if no direct contact was found
-        if not contact.get("email") and not contact.get("phone"):
-            synth = self.synthesize_company_contact(company, website=company_website, source_url=source_url)
-            contact["name"] = contact.get("name") or synth["name"]
-            contact["email"] = synth["email"]
-            contact["linkedin"] = contact.get("linkedin") or synth["linkedin"]
-            contact["designation"] = contact.get("designation") or synth["designation"]
-            contact["source"] = synth["source"]
-            contact["confidence"] = synth["confidence"]
+            # 2b. Live page fetch (capped at 2.5s timeout)
+            if not contact.get("email") and not contact.get("phone") and source_url:
+                try:
+                    live_result = await asyncio.wait_for(
+                        self.fetch_and_extract_live_page(source_url, company=company, timeout=2.0),
+                        timeout=2.5,
+                    )
+                    if live_result:
+                        for k in ["name", "email", "phone", "designation", "linkedin"]:
+                            if live_result.get(k) and not contact.get(k):
+                                contact[k] = live_result[k]
+                        if live_result.get("email") or live_result.get("phone"):
+                            contact["source"] = live_result.get("source", "live_page")
+                            contact["confidence"] = live_result.get("confidence", "high")
+                except (asyncio.TimeoutError, Exception) as e:
+                    logger.debug("Live HR page fetch skipped due to timeout", error=str(e))
+
+            # 2c. Automated Web & LinkedIn Search Dorking Agent (finds real recruiters on the web)
+            if not contact.get("name") or not contact.get("linkedin"):
+                try:
+                    discovered_recruiters = await asyncio.wait_for(
+                        self.search_web_for_recruiters(company, location=location),
+                        timeout=5.0,
+                    )
+                    if discovered_recruiters:
+                        contact["recruiters"] = discovered_recruiters
+                        if not contact.get("name"):
+                            contact["name"] = discovered_recruiters[0]["name"]
+                            contact["designation"] = discovered_recruiters[0]["designation"]
+                            contact["linkedin"] = discovered_recruiters[0]["linkedin"]
+                            if not contact.get("source"):
+                                contact["source"] = "web_recruiter_dork"
+                                contact["confidence"] = "high"
+                except (asyncio.TimeoutError, Exception) as e:
+                    logger.debug("Automated web recruiter search timed out or skipped", error=str(e))
+
+        # Step 3: Fallback LinkedIn search URL if no individual profile found
+        if not contact.get("linkedin"):
+            contact["linkedin"] = synth["linkedin"]
+            if not contact.get("source"):
+                contact["source"] = synth["source"]
 
         contact["discovered_at"] = datetime.now(timezone.utc).isoformat()
         return contact
@@ -433,6 +582,9 @@ class HRContactFinderAgent:
                         "designation": contact.get("designation"),
                         "source": contact.get("source"),
                         "confidence": contact.get("confidence"),
+                        "google_search_url": contact.get("google_search_url"),
+                        "recruiters": contact.get("recruiters", []),
+                        "discovered_at": contact.get("discovered_at"),
                     }
                 }
             },

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Any
 from pydantic import Field
 from .base import MongoBaseModel, PyObjectId, utcnow
 
@@ -25,6 +25,8 @@ class HRContact(MongoBaseModel):
     designation: str | None = None
     source: str | None = None
     confidence: str | None = None  # "high" | "medium" | "inferred"
+    google_search_url: str | None = None
+    recruiters: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class Job(MongoBaseModel):

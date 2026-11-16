@@ -394,14 +394,27 @@ function JobsPageContent() {
     try {
       const res = await jobsApi.fetchNow();
       setDiscoverMsg(res.message || "Discovery started! Matching jobs to your profile…");
-      // Instant load for existing synced repository jobs
-      await load(1);
-      setTimeout(() => load(1), 2000);
-      setTimeout(() => load(1), 6000);
-      setTimeout(() => {
-        load(1);
-        setDiscovering(false);
-      }, 10000);
+
+      // Poll every 2 seconds until matched jobs arrive
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts += 1;
+        try {
+          const fresh = await jobsApi.list({ page: 1, limit: 30, source: sourceFilter });
+          const items = (fresh.items || []) as JobItem[];
+          if (items.length > 0 || attempts >= 6) {
+            clearInterval(interval);
+            setJobs(items);
+            setTotal(fresh.total || items.length);
+            setDiscovering(false);
+          }
+        } catch {
+          if (attempts >= 6) {
+            clearInterval(interval);
+            setDiscovering(false);
+          }
+        }
+      }, 2000);
     } catch (err: unknown) {
       setDiscoverMsg(err instanceof Error ? err.message : "Failed to trigger discovery");
       setDiscovering(false);
@@ -770,26 +783,30 @@ function JobsPageContent() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* ── LEFT COLUMN: MASTER JOB LIST (Cols 1-7) ── */}
         <div className="xl:col-span-7 space-y-3">
-          {loading ? (
+          {loading || (discovering && filteredJobs.length === 0) ? (
             <div className="glass rounded-2xl p-16 flex flex-col justify-center items-center gap-3 text-slate-400 text-sm">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-              <span>Scoring jobs against candidate profile…</span>
+              <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+              <span className="font-bold text-white text-base">Evaluating & Matching Jobs…</span>
+              <span className="text-xs text-slate-400">Scoring positions against your profile, skills, and HR contacts in real time</span>
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="glass rounded-2xl p-10 text-center">
               <Briefcase className="w-10 h-10 text-slate-600 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-white mb-1">No jobs match your filter</h3>
               <p className="text-slate-400 text-xs max-w-sm mx-auto mb-5 leading-relaxed">
-                Try resetting your search query or running the live AI discovery pipeline to fetch fresh positions.
+                Try resetting your search query or refreshing to load newly scored openings.
               </p>
               <button
                 onClick={() => {
                   setSearchQuery("");
                   setFilterTab("all");
+                  setSourceFilter("all");
+                  load(1, "all");
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 font-semibold cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-semibold cursor-pointer shadow-md transition-all"
               >
-                Reset Filters
+                <RefreshCw className="w-3.5 h-3.5" />
+                Reset Filters & Refresh
               </button>
             </div>
           ) : (

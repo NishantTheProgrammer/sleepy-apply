@@ -244,3 +244,81 @@ class JobFetcherAgent:
 
         logger.info("Job discovery completed", source=source_clean, discovered=len(new_jobs), total_scanned=len(all_raw_jobs), delhi_ncr_only=delhi_ncr_only)
         return new_jobs
+
+
+async def parse_job_details_from_url(url: str) -> dict:
+    """Parse real title, company, and location from any job URL (LinkedIn, Greenhouse, Lever, Ashby, or HTML page)."""
+    import re
+    import html as html_lib
+    import httpx
+    clean_url = url.strip("<>.,;()\"' ")
+    title = "Software Engineer"
+    company = "Company"
+    location = "India / Remote"
+
+    # 1. Parse LinkedIn Job view URL slug
+    li_match = re.search(r"/jobs/view/([a-zA-Z0-9\-]+)(?:-\d+)?", clean_url)
+    if li_match:
+        slug = li_match.group(1)
+        if "-at-" in slug:
+            t_part, c_part = slug.split("-at-", 1)
+            c_part = re.sub(r"-\d+$", "", c_part)
+            title = t_part.replace("-", " ").title()
+            company = c_part.replace("-", " ").title()
+        else:
+            title = slug.replace("-", " ").title()
+
+    # 2. Parse Greenhouse URL
+    gh_match = re.search(r"greenhouse\.io/([^/]+)/jobs/(\d+)", clean_url)
+    if gh_match:
+        company = gh_match.group(1).replace("-", " ").title()
+
+    # 3. Parse Lever URL
+    lever_match = re.search(r"lever\.co/([^/]+)/([a-zA-Z0-9\-]+)", clean_url)
+    if lever_match:
+        company = lever_match.group(1).replace("-", " ").title()
+
+    # 4. Parse Ashby URL
+    ashby_match = re.search(r"jobs\.ashbyhq\.com/([^/]+)/([a-zA-Z0-9\-]+)", clean_url)
+    if ashby_match:
+        company = ashby_match.group(1).replace("-", " ").title()
+
+    # 5. Live HTML fetch attempt
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=5.0) as client:
+            resp = await client.get(clean_url)
+            if resp.status_code == 200:
+                html_text = resp.text
+                og_t = re.search(r'<meta[^>]+property=[\'"]og:title[\'"][^>]+content=[\'"](.*?)[\'"]', html_text, re.IGNORECASE)
+                og_c = re.search(r'<meta[^>]+property=[\'"]og:site_name[\'"][^>]+content=[\'"](.*?)[\'"]', html_text, re.IGNORECASE)
+                page_t = re.search(r"<title>(.*?)</title>", html_text, re.IGNORECASE)
+                raw_title = (og_t.group(1) if og_t else "") or (page_t.group(1) if page_t else "")
+                if raw_title:
+                    clean_t = html_lib.unescape(raw_title).strip()
+                    if " at " in clean_t:
+                        parts = clean_t.split(" at ", 1)
+                        title = parts[0].strip()
+                        comp_candidate = re.split(r"[|\-–]", parts[1])[0].strip()
+                        if comp_candidate and len(comp_candidate) < 40:
+                            company = comp_candidate
+                    elif " | " in clean_t or " - " in clean_t:
+                        parts = re.split(r"\s*[|\-–]\s*", clean_t)
+                        if len(parts) >= 2:
+                            title = parts[0].strip()
+                            company = parts[1].strip()
+                if og_c and (not company or company == "Company"):
+                    company = og_c.group(1).strip()
+    except Exception:
+        pass
+
+    return {
+        "title": title,
+        "company": company,
+        "source_url": clean_url,
+        "application_url": clean_url,
+        "description": f"Position for {title} at {company}. Direct application link: {clean_url}",
+        "location": location,
+    }

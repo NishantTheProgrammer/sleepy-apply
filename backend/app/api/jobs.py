@@ -653,6 +653,165 @@ async def find_job_hr_contact(request: Request, job_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to find HR contact: {str(e)}")
 
 
+class ShareJobToDiscordRequest(BaseModel):
+    note: str | None = None
+
+
+@router.post("/{job_id}/share-to-discord")
+async def share_job_to_discord(
+    request: Request,
+    job_id: str,
+    body: ShareJobToDiscordRequest | None = None,
+):
+    """
+    Share a job opening directly to the #📌-community-found-jobs Discord thread
+    so other candidates can review it, inspect HR contacts, tailor resumes, and apply.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    user_discord_id = (user or {}).get("discord_id")
+    user_discord_username = (user or {}).get("discord_username") or "Community Member"
+
+    from app.agents.discord_bot import DiscordAgent
+    discord_agent = DiscordAgent()
+    note_val = body.note if body else None
+
+    success = await discord_agent.notify_job_shared(
+        job=job,
+        user_discord_id=user_discord_id,
+        user_name=user_discord_username,
+        note=note_val or "",
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to broadcast job to Discord thread. Please verify bot configuration."
+        )
+
+    thread_id = discord_agent.settings.discord_thread_found_jobs or "1571826019860488232"
+    guild_id = "1569573880262033499"
+    thread_url = f"https://discord.com/channels/{guild_id}/{thread_id}"
+
+    return {
+        "ok": True,
+        "message": f"Successfully shared {job.get('title')} to Discord community thread!",
+        "thread_url": thread_url,
+    }
+
+
+class AddJobByUrlRequest(BaseModel):
+    url: str
+    title: str | None = None
+    company: str | None = None
+    notes: str | None = None
+    broadcast_discord: bool = True
+
+
+@router.post("/add-by-url")
+async def add_job_by_url(
+    request: Request,
+    body: AddJobByUrlRequest,
+):
+    """
+    Parse a job opening from any URL (LinkedIn, Naukri, Greenhouse, Lever, etc.),
+    enrich it with HR contacts, compute candidate match compatibility, save it to the portal,
+    and broadcast it to the #📌-community-found-jobs Discord thread.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+    clean_url = body.url.strip("<>.,;()\"' ")
+
+    if not clean_url.startswith("http"):
+        raise HTTPException(status_code=400, detail="Please enter a valid HTTP/HTTPS job URL.")
+
+    from datetime import datetime, timezone
+    from app.agents.job_fetcher import parse_job_details_from_url
+    from app.agents.hr_contact_finder import hr_contact_finder
+    from app.agents.job_matcher import JobMatcherAgent
+    now = datetime.now(timezone.utc)
+
+    # Check if job already exists in DB
+    existing_job = await db.jobs.find_one({"$or": [{"source_url": clean_url}, {"application_url": clean_url}]})
+
+    if existing_job:
+        job = existing_job
+        job_id = existing_job["_id"]
+    else:
+        # Extract title & company from slug or live page
+        parsed_info = await parse_job_details_from_url(clean_url)
+        title_final = body.title or parsed_info.get("title", "Software Engineer")
+        company_final = body.company or parsed_info.get("company", "Company")
+
+        new_doc = {
+            "source": "user_added",
+            "source_url": clean_url,
+            "application_url": clean_url,
+            "title": title_final,
+            "company": company_final,
+            "description": parsed_info.get("description", f"{title_final} at {company_final}"),
+            "requirements": [],
+            "responsibilities": [],
+            "location": parsed_info.get("location", "India / Remote"),
+            "work_model": "On-site",
+            "employment_type": "full-time",
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
+        }
+        res = await db.jobs.insert_one(new_doc)
+        job_id = res.inserted_id
+        new_doc["_id"] = job_id
+        job = new_doc
+
+    # 1. Enrich with HR contacts & real recruiters
+    try:
+        await hr_contact_finder.find_and_enrich_job(job_id, fetch_live=True)
+        job = await db.jobs.find_one({"_id": job_id})
+    except Exception as e:
+        logger.warning("HR enrichment error on user-added job", error=str(e))
+
+    # 2. Compute candidate match and store in db.job_matches so it appears on portal
+    matcher = JobMatcherAgent()
+    match_res = await matcher.match_user_and_job(user_id=str(user_id), job_id=str(job_id), use_ai_reasoning=True)
+    score = match_res.get("compatibility_score", 75)
+
+    # 3. Broadcast to #📌-community-found-jobs Discord thread
+    if body.broadcast_discord:
+        try:
+            from app.agents.discord_bot import DiscordAgent
+            user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+            discord_agent = DiscordAgent()
+            await discord_agent.notify_job_shared(
+                job=job,
+                user_discord_id=user_doc.get("discord_id") if user_doc else None,
+                user_name=user_doc.get("discord_username", "Candidate") if user_doc else "Candidate",
+                note=body.notes or "",
+            )
+        except Exception as e:
+            logger.warning("Discord broadcast error on user-added job", error=str(e))
+
+    return {
+        "ok": True,
+        "job_id": str(job_id),
+        "message": f"Successfully added {job.get('title')} at {job.get('company')} to your portal with {score}% match!",
+        "compatibility_score": score,
+        "job": {
+            "_id": str(job["_id"]),
+            "title": job.get("title"),
+            "company": job.get("company"),
+            "location": job.get("location"),
+            "hr_contact": job.get("hr_contact"),
+        },
+    }
+
+
 @router.post("/enrich-hr-contacts")
 async def batch_enrich_hr_contacts(request: Request, payload: BatchEnrichHRRequest | None = None):
     """

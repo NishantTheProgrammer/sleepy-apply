@@ -7,7 +7,7 @@ import {
   ExternalLink, Search, Check, AlertTriangle, FileText, ChevronRight,
   SlidersHorizontal, ChevronLeft, Award, Globe, ShieldCheck, X,
   Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot, Monitor,
-  Mail, Phone, UserCheck, Contact, AlertCircle
+  Mail, Phone, UserCheck, Contact, AlertCircle, Share2, MessageSquare, Plus, Link
 } from "lucide-react";
 import { jobsApi, type HRContactInfo } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -355,6 +355,63 @@ function JobsPageContent() {
     }
   };
 
+  // Share to Discord Thread State
+  const [sharingDiscordId, setSharingDiscordId] = useState<string | null>(null);
+  const [sharedDiscordSuccess, setSharedDiscordSuccess] = useState<{ id: string; url?: string } | null>(null);
+
+  const handleShareToDiscord = async (jobId: string, note?: string) => {
+    setSharingDiscordId(jobId);
+    try {
+      const res = await jobsApi.shareJobToDiscord(jobId, note);
+      if (res.ok) {
+        setSharedDiscordSuccess({ id: jobId, url: res.thread_url });
+        setTimeout(() => setSharedDiscordSuccess(null), 8000);
+      }
+    } catch (err) {
+      console.error("Failed to share job to Discord:", err);
+    } finally {
+      setSharingDiscordId(null);
+    }
+  };
+
+  // Add Job from URL Modal State
+  const [addJobModalOpen, setAddJobModalOpen] = useState(false);
+  const [addJobUrl, setAddJobUrl] = useState("");
+  const [addJobNotes, setAddJobNotes] = useState("");
+  const [addJobBroadcastDiscord, setAddJobBroadcastDiscord] = useState(true);
+  const [addingJob, setAddingJob] = useState(false);
+  const [addJobError, setAddJobError] = useState<string | null>(null);
+
+  const handleAddJobByUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addJobUrl.trim()) return;
+    setAddingJob(true);
+    setAddJobError(null);
+    try {
+      const res = await jobsApi.addJobByUrl({
+        url: addJobUrl.trim(),
+        notes: addJobNotes.trim() || undefined,
+        broadcast_discord: addJobBroadcastDiscord,
+      });
+      if (res.ok) {
+        setAddJobModalOpen(false);
+        setAddJobUrl("");
+        setAddJobNotes("");
+        await load(1, sourceFilter);
+        if (res.job_id) {
+          setSelectedJobId(res.job_id);
+        }
+      } else {
+        setAddJobError(res.message || "Failed to add job from URL.");
+      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Failed to add job from URL. Please check the link.";
+      setAddJobError(errMsg);
+    } finally {
+      setAddingJob(false);
+    }
+  };
+
   const load = async (p = 1, src: string = sourceFilter) => {
     setLoading(true);
     try {
@@ -648,6 +705,15 @@ function JobsPageContent() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto shrink-0">
+          <button
+            onClick={() => setAddJobModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-200 border border-sky-500/40 font-bold text-xs shadow-lg shadow-sky-600/20 transition-all cursor-pointer"
+            title="Paste any job link (LinkedIn, Naukri, Greenhouse, Lever, etc.) to parse, enrich with HR contacts, match against your profile, and share to Discord"
+          >
+            <Plus className="w-3.5 h-3.5 text-sky-400" />
+            <span>+ Add Job from URL</span>
+          </button>
+
           <button
             onClick={handleCrawlDelhiNcr}
             disabled={crawlingNcr || discovering}
@@ -1024,6 +1090,24 @@ function JobsPageContent() {
                         )}
 
                         <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShareToDiscord(item.job._id);
+                            }}
+                            disabled={sharingDiscordId === item.job._id}
+                            className="p-1.5 rounded-lg bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#818cf8] border border-[#5865F2]/20 text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                            title="Share to Discord Community Thread (#📌-community-found-jobs)"
+                          >
+                            {sharingDiscordId === item.job._id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : sharedDiscordSuccess?.id === item.job._id ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Share2 className="w-3 h-3" />
+                            )}
+                          </button>
+
                           {item.tailored_resume ? (
                             <button
                               onClick={(e) => {
@@ -1180,6 +1264,28 @@ function JobsPageContent() {
                     )}
 
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleShareToDiscord(selectedItem.job._id)}
+                        disabled={sharingDiscordId === selectedItem.job._id}
+                        className="px-3 py-2.5 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#818cf8] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        title="Share this job to Discord Community Thread (#📌-community-found-jobs)"
+                      >
+                        {sharingDiscordId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : sharedDiscordSuccess?.id === selectedItem.job._id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Share2 className="w-3.5 h-3.5" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {sharingDiscordId === selectedItem.job._id
+                            ? "Sharing…"
+                            : sharedDiscordSuccess?.id === selectedItem.job._id
+                            ? "Shared!"
+                            : "Share to Discord"}
+                        </span>
+                      </button>
+
                       <a
                         href={getValidJobUrl(selectedItem.job)}
                         target="_blank"
@@ -1208,6 +1314,27 @@ function JobsPageContent() {
                       </a>
                     </div>
                   </div>
+
+                  {sharedDiscordSuccess?.id === selectedItem.job._id && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-3 p-2.5 rounded-xl bg-[#5865F2]/15 border border-[#5865F2]/30 flex items-center justify-between text-xs text-indigo-200"
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate">Shared to <strong>#📌-community-found-jobs</strong> thread!</span>
+                      </span>
+                      <a
+                        href={sharedDiscordSuccess.url || "https://discord.com/channels/1569573880262033499/1571826019860488232"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-bold text-white hover:text-indigo-300 flex items-center gap-1 shrink-0 ml-2"
+                      >
+                        Open Discord <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </motion.div>
+                  )}
                 </div>
 
                 {/* 1.5 HR Contact & Recruiter Outreach Card */}
@@ -2408,6 +2535,111 @@ function JobsPageContent() {
                   </a>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Job from URL Modal */}
+      <AnimatePresence>
+        {addJobModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-500/30">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Add Job from URL</h3>
+                    <p className="text-xs text-slate-400">Parse, match against your profile, and share to community</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAddJobModalOpen(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddJobByUrl} className="p-5 space-y-4">
+                {addJobError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{addJobError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Job Posting URL <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Link className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://in.linkedin.com/jobs/view/... or Greenhouse / Lever / portal link"
+                      value={addJobUrl}
+                      onChange={(e) => setAddJobUrl(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-all"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Supports LinkedIn, Naukri, Greenhouse, Lever, Ashby, and company career pages.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Notes / Referral Context (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Hiring manager is looking for 3+ yrs React experience; referral available"
+                    value={addJobNotes}
+                    onChange={(e) => setAddJobNotes(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-all resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/20">
+                  <input
+                    type="checkbox"
+                    id="broadcast-discord"
+                    checked={addJobBroadcastDiscord}
+                    onChange={(e) => setAddJobBroadcastDiscord(e.target.checked)}
+                    className="rounded border-white/20 bg-white/5 text-[#5865F2] focus:ring-0 cursor-pointer"
+                  />
+                  <label htmlFor="broadcast-discord" className="text-xs text-slate-300 cursor-pointer flex-1">
+                    Share to Discord community thread (<strong>#📌-community-found-jobs</strong>) with 1-click apply buttons
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setAddJobModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addingJob || !addJobUrl.trim()}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {addingJob ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>{addingJob ? "Parsing & Matching Opening…" : "Add & Match Opening"}</span>
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

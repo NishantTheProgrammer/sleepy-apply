@@ -300,6 +300,25 @@ export const jobsApi = {
       hr_contact: HRContactInfo;
       message: string;
     }>(`/api/jobs/${jobId}/find-hr`, { method: "POST" }),
+  shareJobToDiscord: (jobId: string, note?: string) =>
+    request<{ ok: boolean; message: string; thread_url?: string }>(
+      `/api/jobs/${jobId}/share-to-discord`,
+      {
+        method: "POST",
+        body: JSON.stringify({ note }),
+      }
+    ),
+  addJobByUrl: (payload: { url: string; title?: string; company?: string; notes?: string; broadcast_discord?: boolean }) =>
+    request<{
+      ok: boolean;
+      job_id: string;
+      message: string;
+      compatibility_score: number;
+      job: unknown;
+    }>("/api/jobs/add-by-url", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   batchEnrichHRContacts: (limit = 100, force = false) =>
     request<{ ok: boolean; processed: number; direct_contacts_found: number }>(
       "/api/jobs/enrich-hr-contacts",

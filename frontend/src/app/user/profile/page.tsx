@@ -6,7 +6,7 @@ import {
   Briefcase, GraduationCap, Award, Globe, Save, Sparkles, X, ChevronDown, ChevronUp, MapPin,
   FileText, FileUp, AlertCircle, RefreshCw
 } from "lucide-react";
-import { profileApi, templatesApi, formatSkillCategory, SKILL_CATEGORY_ORDER } from "@/lib/api";
+import { profileApi, templatesApi, jobsApi, formatSkillCategory, SKILL_CATEGORY_ORDER } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ResumeTemplateSelector from "@/components/ResumeTemplateSelector";
 import ResumeScreeningQA from "@/components/ResumeScreeningQA";
@@ -151,6 +151,35 @@ export default function ProfilePage() {
 
   const [rematching, setRematching] = useState(false);
   const [rematchMsg, setRematchMsg] = useState("");
+
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    is_running: boolean;
+    is_matching: boolean;
+    is_discovering: boolean;
+    matching_progress: number;
+    matching_total: number;
+    message: string;
+    completed_at?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const checkStatus = async () => {
+      try {
+        const res = await jobsApi.getPipelineStatus();
+        if (!active) return;
+        setPipelineStatus(res);
+      } catch {
+        // ignore
+      }
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const toggleSection = (s: string) => setExpanded((prev) => ({ ...prev, [s]: !prev[s] }));
 
@@ -647,6 +676,34 @@ const sanitizeStr = (val: unknown): string => {
 
       {/* Save Success Toast */}
       <AnimatePresence>
+        {pipelineStatus?.is_running && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 p-4 rounded-xl bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 border border-indigo-500/40 text-white text-sm flex items-center justify-between shadow-xl backdrop-blur-md animate-pulse"
+          >
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-400 shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-xs sm:text-sm">
+                    Jobs matched and discovery running in background
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  AI matching engine is evaluating positions against your profile
+                  {pipelineStatus.matching_total > 0
+                    ? ` (Processed ${pipelineStatus.matching_progress} / ${pipelineStatus.matching_total} jobs)...`
+                    : "..."}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
         {saveSuccess && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}

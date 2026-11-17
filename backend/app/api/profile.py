@@ -100,10 +100,27 @@ async def rematch_all_active_jobs(user_id: str) -> int:
     """
     db = get_db()
     from app.agents.job_matcher import JobMatcherAgent
+    now = datetime.now(timezone.utc)
+    uid = ObjectId(user_id)
     try:
-        p = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+        p = await db.profiles.find_one({"user_id": uid})
         if not p:
             return 0
+        total_jobs = await db.jobs.count_documents({"is_active": True})
+        await db.user_pipeline_status.update_one(
+            {"user_id": uid},
+            {"$set": {
+                "is_running": True,
+                "is_matching": True,
+                "is_discovering": False,
+                "matching_progress": 0,
+                "matching_total": total_jobs,
+                "message": "Jobs matched and discovery running in background",
+                "started_at": now,
+                "updated_at": now,
+            }},
+            upsert=True,
+        )
         matcher = JobMatcherAgent()
         cursor = db.jobs.find({"is_active": True})
         count = 0
@@ -116,9 +133,44 @@ async def rematch_all_active_jobs(user_id: str) -> int:
                 use_ai_reasoning=False,
             )
             count += 1
+            if count == 1 or count % 25 == 0 or count == total_jobs:
+                await db.user_pipeline_status.update_one(
+                    {"user_id": uid},
+                    {"$set": {
+                        "matching_progress": count,
+                        "updated_at": datetime.now(timezone.utc),
+                    }}
+                )
+        now_done = datetime.now(timezone.utc)
+        await db.user_pipeline_status.update_one(
+            {"user_id": uid},
+            {"$set": {
+                "is_running": False,
+                "is_matching": False,
+                "is_discovering": False,
+                "matching_progress": count,
+                "matching_total": count,
+                "message": f"Successfully rematched {count} jobs against your updated profile.",
+                "completed_at": now_done,
+                "updated_at": now_done,
+            }},
+        )
         logger.info("Successfully rematched all active jobs", user_id=user_id, count=count)
         return count
     except Exception as e:
+        now_err = datetime.now(timezone.utc)
+        await db.user_pipeline_status.update_one(
+            {"user_id": uid},
+            {"$set": {
+                "is_running": False,
+                "is_matching": False,
+                "is_discovering": False,
+                "message": f"Rematch error: {str(e)}",
+                "completed_at": now_err,
+                "updated_at": now_err,
+            }},
+            upsert=True,
+        )
         logger.warning("Rematch all active jobs failed", user_id=user_id, error=str(e))
         return 0
 

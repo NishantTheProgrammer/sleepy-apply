@@ -359,6 +359,18 @@ function JobsPageContent() {
   const [launchingVisibleId, setLaunchingVisibleId] = useState<string | null>(null);
   const [visibleToast, setVisibleToast] = useState<{ company: string; message: string } | null>(null);
 
+  // Background Matching & Discovery Pipeline Status
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    is_running: boolean;
+    is_matching: boolean;
+    is_discovering: boolean;
+    matching_progress: number;
+    matching_total: number;
+    message: string;
+    completed_at?: string;
+  } | null>(null);
+  const [recentlyCompleted, setRecentlyCompleted] = useState(false);
+
   // Manual Delete State
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
@@ -516,11 +528,48 @@ function JobsPageContent() {
     return () => clearTimeout(timer);
   }, [user?.id, sourceFilter, searchQuery]);
 
+  // Poll background pipeline status
+  useEffect(() => {
+    let active = true;
+    const checkStatus = async () => {
+      try {
+        const res = await jobsApi.getPipelineStatus();
+        if (!active) return;
+        setPipelineStatus(res);
+        if (res.is_running) {
+          setRecentlyCompleted(false);
+        } else if (res.completed_at) {
+          const compDate = new Date(res.completed_at).getTime();
+          if (Date.now() - compDate < 20000) {
+            setRecentlyCompleted(true);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 1500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   const handleDiscoverJobs = async () => {
     setDiscovering(true);
     setDiscoverMsg("");
+    setPipelineStatus({
+      is_running: true,
+      is_matching: true,
+      is_discovering: true,
+      matching_progress: 0,
+      matching_total: total || 1216,
+      message: "Jobs matched and discovery running in background",
+    });
     try {
       const res = await jobsApi.fetchNow();
+      setDiscoverMsg(res.message || "Jobs matched and discovery running in background");
       setDiscoverMsg(res.message || "Discovery started! Matching jobs to your profile…");
 
       // Poll every 2 seconds until matched jobs arrive
@@ -805,7 +854,63 @@ function JobsPageContent() {
         </div>
       </div>
 
-      {discoverMsg && (
+      {/* ── Active Background Pipeline Status Banner ── */}
+      {pipelineStatus?.is_running && (
+        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 border border-indigo-500/40 shadow-xl backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 shrink-0">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">
+                  {pipelineStatus.is_discovering && !pipelineStatus.is_matching
+                    ? "AI discovery scanning career portals for fresh openings"
+                    : "Jobs matched and discovery running in background"}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                  Live
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {pipelineStatus.is_discovering && !pipelineStatus.is_matching
+                  ? `Evaluated all active positions against your profile. Now scanning live career sites for new openings...`
+                  : `AI matching engine is evaluating active positions against your profile${
+                      pipelineStatus.matching_total > 0
+                        ? ` (Processed ${pipelineStatus.matching_progress} / ${pipelineStatus.matching_total} jobs)...`
+                        : "..."
+                    }`}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => load(1)}
+            className="self-end sm:self-auto px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh List
+          </button>
+        </div>
+      )}
+
+      {!pipelineStatus?.is_running && recentlyCompleted && (
+        <div className="mb-6 p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-2.5 text-xs font-semibold">
+            <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>✓ Jobs matched and discovery completed! Fresh matching scores updated.</span>
+          </div>
+          <button
+            onClick={() => {
+              setRecentlyCompleted(false);
+              load(1);
+            }}
+            className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {discoverMsg && !pipelineStatus?.is_running && !recentlyCompleted && (
         <div className="mb-6 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2">
           <Sparkles className="w-4 h-4 shrink-0 text-indigo-400" />
           <span>{discoverMsg}</span>

@@ -338,6 +338,16 @@ export const jobsApi = {
       with_direct_contact: number;
       with_inferred_contact: number;
     }>("/api/jobs/hr-contacts/stats"),
+  getPipelineStatus: () =>
+    request<{
+      is_running: boolean;
+      is_matching: boolean;
+      is_discovering: boolean;
+      matching_progress: number;
+      matching_total: number;
+      message: string;
+      completed_at?: string;
+    }>("/api/jobs/pipeline-status"),
 };
 
 // ── Settings ──────────────────────────────────────────────

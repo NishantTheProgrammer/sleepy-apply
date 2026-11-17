@@ -18,36 +18,120 @@ async def trigger_fetch_now(request: Request):
     from app.graphs.job_pipeline_graph import job_pipeline
     from app.agents.job_matcher import JobMatcherAgent
     from app.models.settings import UserSettings
+    from datetime import datetime, timezone
 
-    # Fast-match all existing jobs in the repository for immediate UI response
-    try:
-        db = get_db()
-        matcher = JobMatcherAgent()
-        settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
-        profile_doc = await db.profiles.find_one({"user_id": ObjectId(user_id)})
-        user_settings = UserSettings(**settings_doc) if settings_doc else None
-        cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1).limit(250)
-        async for j in cursor:
-            await matcher.match_user_and_job(
-                user_id,
-                str(j["_id"]),
-                user_settings=user_settings,
-                use_ai_reasoning=False,
-                profile=profile_doc,
-                job=j,
-            )
-    except Exception as e:
-        logger.warning("Fast job matching failed", error=str(e), user_id=user_id)
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    total_active = await db.jobs.count_documents({"is_active": True})
 
-    async def run_pipeline():
+    await db.user_pipeline_status.update_one(
+        {"user_id": ObjectId(user_id)},
+        {"$set": {
+            "is_running": True,
+            "is_matching": True,
+            "is_discovering": True,
+            "matching_progress": 0,
+            "matching_total": total_active,
+            "message": "Jobs matched and discovery running in background",
+            "started_at": now,
+            "updated_at": now,
+        }},
+        upsert=True,
+    )
+
+    async def run_full_sync():
         try:
-            logger.info("Executing on-demand job pipeline for user", user_id=user_id)
+            logger.info("Executing on-demand matching & discovery for user", user_id=user_id)
+            matcher = JobMatcherAgent()
+            settings_doc = await db.user_settings.find_one({"user_id": ObjectId(user_id)})
+            profile_doc = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+            user_settings = UserSettings(**settings_doc) if settings_doc else None
+
+            # Phase 1: Fast match active jobs with live progress updates
+            cursor = db.jobs.find({"is_active": True}).sort("discovered_at", -1)
+            count = 0
+            async for j in cursor:
+                try:
+                    await matcher.match_user_and_job(
+                        user_id,
+                        str(j["_id"]),
+                        user_settings=user_settings,
+                        use_ai_reasoning=False,
+                        profile=profile_doc,
+                        job=j,
+                    )
+                except Exception as match_err:
+                    logger.debug("Job matching error on item", job_id=str(j.get("_id")), error=str(match_err))
+                count += 1
+                if count == 1 or count % 25 == 0 or count == total_active:
+                    await db.user_pipeline_status.update_one(
+                        {"user_id": ObjectId(user_id)},
+                        {"$set": {
+                            "matching_progress": count,
+                            "updated_at": datetime.now(timezone.utc),
+                        }}
+                    )
+
+            # Phase 2: Active discovery phase
+            await db.user_pipeline_status.update_one(
+                {"user_id": ObjectId(user_id)},
+                {"$set": {
+                    "is_matching": False,
+                    "is_discovering": True,
+                    "matching_progress": total_active,
+                    "message": "AI discovery scanning career portals for fresh roles...",
+                    "updated_at": datetime.now(timezone.utc),
+                }}
+            )
+
             await job_pipeline.ainvoke({"user_id": user_id})
         except Exception as e:
             logger.error("On-demand job pipeline failed", user_id=user_id, error=str(e))
+        finally:
+            now_done = datetime.now(timezone.utc)
+            await db.user_pipeline_status.update_one(
+                {"user_id": ObjectId(user_id)},
+                {"$set": {
+                    "is_running": False,
+                    "is_matching": False,
+                    "is_discovering": False,
+                    "matching_progress": total_active,
+                    "matching_total": total_active,
+                    "message": "Jobs matched and discovery complete",
+                    "completed_at": now_done,
+                    "updated_at": now_done,
+                }},
+                upsert=True,
+            )
 
-    spawn_background_task(f"user_fetch_now:{user_id}", run_pipeline())
+    spawn_background_task(f"user_fetch_now:{user_id}", run_full_sync())
     return {"ok": True, "message": "Jobs matched and discovery running in background"}
+
+
+@router.get("/pipeline-status")
+async def get_pipeline_status(request: Request):
+    """Return live status of background job matching and discovery pipeline for current user."""
+    user_id = get_current_user_id(request)
+    db = get_db()
+    status = await db.user_pipeline_status.find_one({"user_id": ObjectId(user_id)})
+    if not status:
+        return {
+            "is_running": False,
+            "is_matching": False,
+            "is_discovering": False,
+            "matching_progress": 0,
+            "matching_total": 0,
+            "message": "",
+        }
+    status["_id"] = str(status["_id"])
+    status["user_id"] = str(status["user_id"])
+    if status.get("started_at") and hasattr(status["started_at"], "isoformat"):
+        status["started_at"] = status["started_at"].isoformat()
+    if status.get("completed_at") and hasattr(status["completed_at"], "isoformat"):
+        status["completed_at"] = status["completed_at"].isoformat()
+    if status.get("updated_at") and hasattr(status["updated_at"], "isoformat"):
+        status["updated_at"] = status["updated_at"].isoformat()
+    return status
 
 
 class CrawlDelhiNCRRequest(BaseModel):
@@ -828,10 +912,28 @@ async def add_job_by_url(
             "created_at": now,
             "updated_at": now,
         }
-        res = await db.jobs.insert_one(new_doc)
-        job_id = res.inserted_id
-        new_doc["_id"] = job_id
-        job = new_doc
+        try:
+            res = await db.jobs.insert_one(new_doc)
+            job_id = res.inserted_id
+            new_doc["_id"] = job_id
+            job = new_doc
+        except Exception as insert_err:
+            if "duplicate" in str(insert_err).lower() or "11000" in str(insert_err):
+                job = await db.jobs.find_one({
+                    "$or": [
+                        {"content_hash": chash},
+                        {"source_url": clean_url},
+                        {"application_url": clean_url},
+                        {"source_url": clean_url.rstrip("/")},
+                        {"application_url": clean_url.rstrip("/")},
+                    ]
+                })
+                if job:
+                    job_id = job["_id"]
+                else:
+                    raise insert_err
+            else:
+                raise insert_err
 
     # 1. Enrich with HR contacts & real recruiters
     try:

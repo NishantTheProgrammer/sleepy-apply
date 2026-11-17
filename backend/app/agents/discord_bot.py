@@ -1453,7 +1453,14 @@ def create_bot() -> commands.Bot:
             from app.agents.job_fetcher import parse_job_details_from_url
             from app.agents.job_matcher import JobMatcherAgent
 
-            job = await db.jobs.find_one({"$or": [{"source_url": clean_url}, {"application_url": clean_url}]})
+            job = await db.jobs.find_one({
+                "$or": [
+                    {"source_url": clean_url},
+                    {"application_url": clean_url},
+                    {"source_url": clean_url.rstrip("/")},
+                    {"application_url": clean_url.rstrip("/")},
+                ]
+            })
             now = datetime.now(timezone.utc)
 
             if not job:
@@ -1482,13 +1489,29 @@ def create_bot() -> commands.Bot:
                     "created_at": now,
                     "updated_at": now,
                 }
-                res = await db.jobs.insert_one(new_job_doc)
-                new_job_doc["_id"] = res.inserted_id
                 try:
-                    await hr_contact_finder.find_and_enrich_job(res.inserted_id, fetch_live=True)
-                    job = await db.jobs.find_one({"_id": res.inserted_id})
-                except Exception:
+                    res = await db.jobs.insert_one(new_job_doc)
+                    new_job_doc["_id"] = res.inserted_id
                     job = new_job_doc
+                except Exception as insert_err:
+                    if "duplicate" in str(insert_err).lower() or "11000" in str(insert_err):
+                        job = await db.jobs.find_one({
+                            "$or": [
+                                {"content_hash": chash},
+                                {"source_url": clean_url},
+                                {"application_url": clean_url},
+                                {"source_url": clean_url.rstrip("/")},
+                                {"application_url": clean_url.rstrip("/")},
+                            ]
+                        })
+                    if not job:
+                        raise insert_err
+
+                try:
+                    await hr_contact_finder.find_and_enrich_job(job["_id"], fetch_live=True)
+                    job = await db.jobs.find_one({"_id": job["_id"]}) or job
+                except Exception:
+                    pass
             else:
                 if not job.get("hr_contact"):
                     try:

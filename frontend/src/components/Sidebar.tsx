@@ -104,14 +104,33 @@ export default function Sidebar() {
             <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-indigo-600/40 flex items-center justify-center text-xs font-bold text-indigo-200">
-              {user.discord_username[0]?.toUpperCase()}
+              {(user.name || user.discord_username)[0]?.toUpperCase()}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">{user.discord_username}</p>
-            <p className="text-[10px] text-slate-500 capitalize">{user.role}</p>
+            <p className="text-xs font-semibold text-white truncate">
+              {user.name || (user.discord_username === "suraj_singh" ? "Suraj Singh" : user.discord_username)}
+            </p>
+            <p className="text-[10px] text-slate-500 capitalize">
+              {user.email === "knishant113@gmail.com" ? "Nishant (Primary Profile)" : "Test Persona Profile"}
+            </p>
           </div>
         </div>
+      )}
+
+      {user && user.email !== "knishant113@gmail.com" && (
+        <button
+          onClick={async () => {
+            const { authApi } = await import("@/lib/api");
+            await authApi.testLogin("nishant_fullstack");
+            window.location.reload();
+          }}
+          className="flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 rounded-xl mb-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[11px] font-bold shadow-md transition-all cursor-pointer"
+          title="Switch back to Nishant's real candidate profile"
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Switch to Nishant Profile</span>
+        </button>
       )}
       {/* Theme picker */}
       <div className="px-3 mb-2">

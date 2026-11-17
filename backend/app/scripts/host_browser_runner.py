@@ -56,7 +56,7 @@ async def _run_visible_filler(job_id: str | None, user_id: str | None, url: str 
         if not user:
             user = await db.users.find_one({"role": "admin"}) or await db.users.find_one({})
 
-        profile = await db.profiles.find_one({"user_id": user["_id"]}) if user else {}
+        profile = await db.profiles.find_one({"$or": [{"user_id": ObjectId(user["_id"])}, {"user_id": str(user["_id"])}]}) if user else {}
         if not profile:
             profile = {
                 "personal": {
@@ -91,10 +91,18 @@ async def _run_visible_filler(job_id: str | None, user_id: str | None, url: str 
             logger.error("No valid job found for visible autofill")
             return
 
-        resume = await db.resumes.find_one({"user_id": user["_id"], "job_id": job["_id"]}) if (user and job) else None
+        resume = await db.resumes.find_one({
+            "$or": [{"user_id": ObjectId(user["_id"])}, {"user_id": str(user["_id"])}],
+            "job_id": ObjectId(job["_id"]) if job.get("_id") else None,
+        }) if (user and job) else None
 
+        cand_name = profile.get("personal", {}).get("full_name") or user.get("name") or user.get("discord_username")
+        cand_email = profile.get("personal", {}).get("email") or user.get("email")
         logger.info(
             "🖥️ Launching VISIBLE Chromium window on macOS (headless=False, slow_mo=250ms)...",
+            candidate_name=cand_name,
+            candidate_email=cand_email,
+            user_id=str(user.get("_id")),
             company=job.get("company"),
             title=job.get("title"),
             url=url or job.get("application_url"),

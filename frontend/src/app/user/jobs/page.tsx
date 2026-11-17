@@ -615,15 +615,16 @@ function JobsPageContent() {
     }
   };
 
-  const handleApply = async (jobId: string) => {
+  const handleApply = async (jobId: string, directUrl?: string) => {
     setApplying(jobId);
     try {
       const targetItem = jobs.find((j) => j.job._id === jobId || j._id === jobId || j.job_id === jobId);
+      const compName = targetItem?.job.company || "Target Company";
       const res = await jobsApi.autoApplyForm(jobId);
       if ((res as any)?.mode === "visible_desktop") {
         setVisibleToast({
-          company: targetItem?.job.company || "Target Company",
-          message: res.message || "Visible Chrome window opened on your desktop! Watch the form being autofilled live without submitting.",
+          company: compName,
+          message: res.message || `🖥️ Real Chrome window opened on your desktop for ${compName}! Form is autofilled live without submitting.`,
         });
         setTimeout(() => setVisibleToast(null), 12000);
         await load(page);
@@ -632,7 +633,7 @@ function JobsPageContent() {
       setFormFillResult({
         job_id: jobId,
         job_title: targetItem?.job.title || "Position",
-        company: targetItem?.job.company || "Company",
+        company: compName,
         target_url: res.target_url,
         fields_filled: res.fields_filled || [],
         submit_button_found: res.submit_button_found,
@@ -647,7 +648,11 @@ function JobsPageContent() {
       await load(page);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Auto-apply form filler failed";
-      alert(msg);
+      setDiscoverMsg(msg);
+      setTimeout(() => setDiscoverMsg(""), 10000);
+      if (directUrl) {
+        window.open(directUrl, "_blank");
+      }
     } finally {
       setApplying(null);
     }
@@ -1398,23 +1403,23 @@ function JobsPageContent() {
                   {/* Primary Action Row */}
                   <div className="flex items-center gap-2.5 pt-3 border-t border-white/10">
                     <button
-                      onClick={() => handleApplyVisible(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
+                      onClick={() => handleApply(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
                       disabled={launchingVisibleId === selectedItem.job._id || applying === selectedItem.job._id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-60 whitespace-nowrap"
-                      title="Opens real Google Chrome window on your desktop to autofill the form live without submitting"
+                      title="Autofills all application form fields with candidate data and strictly pauses before submitting"
                     >
-                      {launchingVisibleId === selectedItem.job._id ? (
+                      {applying === selectedItem.job._id || launchingVisibleId === selectedItem.job._id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : selectedItem.application?.status === "FORM_FILLED_READY" ? (
                         <CheckCircle className="w-3.5 h-3.5 text-amber-300" />
                       ) : selectedItem.application?.status === "APPLIED" || selectedItem.application?.status === "VERIFIED_SUCCESS" ? (
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
                       ) : (
-                        <Monitor className="w-3.5 h-3.5 text-amber-300" />
+                        <Zap className="w-3.5 h-3.5 text-amber-300" />
                       )}
                       <span>
-                        {launchingVisibleId === selectedItem.job._id
-                          ? "Opening Chrome…"
+                        {applying === selectedItem.job._id
+                          ? "Autofilling Form…"
                           : "Auto-Apply"}
                       </span>
                     </button>

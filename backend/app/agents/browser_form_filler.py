@@ -307,6 +307,8 @@ class BrowserFormFillerAgent:
         name_parts = full_name.split() if full_name else []
         first_name = name_parts[0] if name_parts else ""
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else (personal.get("last_name") or personal.get("lastName") or "")
+        if not last_name:
+            last_name = "."
 
         email = (personal.get("email") or user.get("email") or "").strip()
         phone = (personal.get("phone") or "").strip()
@@ -470,15 +472,24 @@ class BrowserFormFillerAgent:
             resume_path = resume["pdf_path"]
 
         user_id_str = str(user.get("_id") or user.get("id") or "")
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         user_storage_dirs = []
         if user_id_str:
             user_storage_dirs.extend([
                 f"/app/storage/resumes/{user_id_str}",
+                os.path.join(repo_root, "storage", "resumes", user_id_str),
+                os.path.join(repo_root, "backend", "storage", "resumes", user_id_str),
                 os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage", "resumes", user_id_str),
+                os.path.join(os.getcwd(), "storage", "resumes", user_id_str),
+                os.path.join(os.getcwd(), "backend", "storage", "resumes", user_id_str),
             ])
         user_storage_dirs.extend([
             "/app/storage/resumes",
+            os.path.join(repo_root, "storage", "resumes"),
+            os.path.join(repo_root, "backend", "storage", "resumes"),
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage", "resumes"),
+            os.path.join(os.getcwd(), "storage", "resumes"),
+            os.path.join(os.getcwd(), "backend", "storage", "resumes"),
         ])
 
         if not resume_path and profile.get("resume_filename"):
@@ -1591,7 +1602,15 @@ class BrowserFormFillerAgent:
                     continue
 
                 sig = f"{item['id']} {item['name']} {item['placeholder']} {item['ariaLabel']} {item['labelText']}".lower()
-                sel = f"#{item['id']}" if item['id'] else (f"[name='{item['name']}']" if item['name'] else None)
+                if item.get("id"):
+                    escaped_id = item["id"].replace('"', '\\"')
+                    sel = f'[id="{escaped_id}"]'
+                elif item.get("name"):
+                    escaped_name = item["name"].replace('"', '\\"')
+                    sel = f'[name="{escaped_name}"]'
+                else:
+                    sel = None
+
                 if not sel:
                     continue
 
@@ -1620,11 +1639,46 @@ class BrowserFormFillerAgent:
                             except Exception:
                                 pass
                     elif any(k in sig for k in ["country", "nationality"]):
-                        matched = next((o for o in valid_opts if "india" in o["text"].lower()), None)
+                        matched = next((o for o in valid_opts if "india" in o["text"].lower() and "ocean" not in o["text"].lower()), None)
                         if matched:
                             try:
                                 await target_loc.select_option(value=matched["value"])
                                 fields_filled.append({"field": "Country", "value": matched["text"], "type": "select"})
+                            except Exception:
+                                pass
+                    elif any(k in sig for k in ["state", "province", "region", "cntryfields.region"]):
+                        cand_state = (data.get("state") or data.get("city") or "Delhi").lower()
+                        matched = next((o for o in valid_opts if cand_state in o["text"].lower() or any(term in o["text"].lower() for term in ["delhi", "nct", "haryana", "karnataka", "maharashtra"] if term in cand_state)), None)
+                        if not matched and valid_opts:
+                            matched = next((o for o in valid_opts if any(w in o["text"].lower() for w in cand_state.split())), None)
+                        if matched:
+                            try:
+                                await target_loc.select_option(value=matched["value"])
+                                fields_filled.append({"field": "State/Region", "value": matched["text"], "type": "select"})
+                            except Exception:
+                                pass
+                    elif any(k in sig for k in ["phone code", "country code", "dial code", "countryphonecode"]):
+                        matched = next((o for o in valid_opts if "+91" in o["text"] or o["value"] in ["IND_91", "91", "+91"] or (o["text"].strip().lower().startswith("india") and "+91" in o["text"])), None)
+                        if matched:
+                            try:
+                                await target_loc.select_option(value=matched["value"])
+                                fields_filled.append({"field": "Country Phone Code", "value": matched["text"], "type": "select"})
+                            except Exception:
+                                pass
+                    elif any(k in sig for k in ["device", "phone type", "devicetype"]):
+                        matched = next((o for o in valid_opts if any(t in o["text"].lower() for t in ["mobile", "cell", "personal"])), None)
+                        if matched:
+                            try:
+                                await target_loc.select_option(value=matched["value"])
+                                fields_filled.append({"field": "Phone Device Type", "value": matched["text"], "type": "select"})
+                            except Exception:
+                                pass
+                    elif any(k in sig for k in ["preferred name", "nickname"]):
+                        matched = next((o for o in valid_opts if o["text"].strip().lower() in ["no", "false"]), None)
+                        if matched:
+                            try:
+                                await target_loc.select_option(value=matched["value"])
+                                fields_filled.append({"field": "Preferred Name", "value": matched["text"], "type": "select"})
                             except Exception:
                                 pass
                     elif any(k in sig for k in ["authorized", "eligib", "work permit", "right to work"]):
@@ -1643,8 +1697,8 @@ class BrowserFormFillerAgent:
                                 fields_filled.append({"field": "Visa Sponsorship", "value": matched["text"], "type": "select"})
                             except Exception:
                                 pass
-                    elif any(k in sig for k in ["hear about", "source"]):
-                        matched = next((o for o in valid_opts if "linkedin" in o["text"].lower() or "website" in o["text"].lower()), None)
+                    elif any(k in sig for k in ["hear about", "source", "applicantsource"]):
+                        matched = next((o for o in valid_opts if any(s in o["text"].lower() for s in ["linkedin", "website", "career", "job board", "internet"])), None)
                         if matched:
                             try:
                                 await target_loc.select_option(value=matched["value"])
@@ -1654,22 +1708,22 @@ class BrowserFormFillerAgent:
                     continue
 
                 # Text / Textarea handling
-                if any(k in sig for k in ["first name", "given name", "legal first", "firstname", "fname"]) and not any(k in sig for k in ["last", "middle"]):
+                if any(k in sig for k in ["first name", "given name", "legal first", "firstname", "fname", "cntryfields.firstname"]) and not any(k in sig for k in ["last", "family", "surname", "middle"]):
                     val_to_fill = data.get("first_name")
                     field_label = "First Name"
-                elif any(k in sig for k in ["last name", "surname", "family name", "lastname", "lname"]):
-                    val_to_fill = data.get("last_name")
+                elif any(k in sig for k in ["last name", "surname", "family name", "lastname", "lname", "cntryfields.lastname"]):
+                    val_to_fill = data.get("last_name") or "."
                     field_label = "Last Name"
-                elif any(k in sig for k in ["full name", "applicant name", "candidate name", "your name"]) and not any(k in sig for k in ["first", "last"]):
+                elif any(k in sig for k in ["full name", "applicant name", "candidate name", "your name"]) and not any(k in sig for k in ["first", "last", "family", "given"]):
                     val_to_fill = data.get("full_name")
                     field_label = "Full Name"
-                elif "email" in sig:
+                elif "email" in sig and not any(k in sig for k in ["opt", "consent", "subscribe"]):
                     val_to_fill = data.get("email")
                     field_label = "Email Address"
-                elif any(k in sig for k in ["phone", "mobile", "cell", "telephone", "contact number"]):
+                elif any(k in sig for k in ["phone", "mobile", "cell", "telephone", "contact number"]) and not any(k in sig for k in ["code", "country", "device", "type"]):
                     val_to_fill = data.get("phone_digits") or data.get("phone")
                     field_label = "Phone Number"
-                elif any(k in sig for k in ["city", "current location", "location (city)"]) and not any(k in sig for k in ["state", "country", "postal", "zip"]):
+                elif any(k in sig for k in ["city", "current location", "location (city)", "cntryfields.city"]) and not any(k in sig for k in ["state", "country", "postal", "zip"]):
                     val_to_fill = data.get("city")
                     field_label = "City"
                 elif any(k in sig for k in ["state", "province"]):
@@ -1762,7 +1816,10 @@ class BrowserFormFillerAgent:
                     cb = checkboxes.nth(i)
                     try:
                         if not await cb.is_checked():
-                            await cb.check(timeout=1000)
+                            try:
+                                await cb.check(timeout=1000)
+                            except Exception:
+                                await cb.click(timeout=1000)
                             fields_filled.append({"field": "Consent & Policy Agreement", "value": "Checked", "type": "checkbox"})
                     except Exception:
                         continue
@@ -1841,14 +1898,22 @@ class BrowserFormFillerAgent:
                 group_name = await radio.get_attribute("name") or ""
                 if not group_name or group_name in handled_groups:
                     continue
-                # If there is a "Yes" option in this radio group, check it
                 try:
-                    yes_radio = page.locator(f'input[type="radio"][name="{group_name}"][value="Yes"], input[type="radio"][name="{group_name}"][value="yes"]').first
-                    if await yes_radio.count() > 0:
-                        await yes_radio.check(timeout=1000)
+                    is_negative_question = any(k in group_name.lower() for k in ["previousworker", "former", "prior_employee", "criminal", "disciplinary", "conflict"])
+                    target_val = "No" if is_negative_question else "Yes"
+                    target_radio = page.locator(f'input[type="radio"][name="{group_name}"][value="{target_val}" i], input[type="radio"][id*="{group_name}.{target_val}" i]').first
+                    if await target_radio.count() > 0:
+                        await target_radio.check(timeout=1000)
                         handled_groups.add(group_name)
                         label = group_name.replace("_", " ").title()
-                        questions_answered.append({"field": label, "answer": "Yes"})
+                        questions_answered.append({"field": label, "answer": target_val})
+                    elif not is_negative_question:
+                        yes_radio = page.locator(f'input[type="radio"][name="{group_name}"][value="Yes" i]').first
+                        if await yes_radio.count() > 0:
+                            await yes_radio.check(timeout=1000)
+                            handled_groups.add(group_name)
+                            label = group_name.replace("_", " ").title()
+                            questions_answered.append({"field": label, "answer": "Yes"})
                 except Exception:
                     pass
         except Exception:

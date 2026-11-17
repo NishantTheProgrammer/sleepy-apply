@@ -6,6 +6,8 @@ interface User {
   id: string;
   discord_id: string;
   discord_username: string;
+  name?: string;
+  email?: string;
   discord_avatar?: string;
   role: "user" | "admin";
 }

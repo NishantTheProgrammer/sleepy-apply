@@ -396,8 +396,8 @@ async def auto_apply_form_preview(request: Request, job_id: str):
         }
 
     user = await db.users.find_one({"_id": ObjectId(user_id)})
-    profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
-    resume = await db.resumes.find_one({"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)})
+    profile = await db.profiles.find_one({"$or": [{"user_id": ObjectId(user_id)}, {"user_id": str(user_id)}]}) or {}
+    resume = await db.resumes.find_one({"$or": [{"user_id": ObjectId(user_id)}, {"user_id": str(user_id)}], "job_id": ObjectId(job_id)})
 
     from app.agents.browser_form_filler import form_filler
 

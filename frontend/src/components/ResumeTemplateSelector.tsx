@@ -6,7 +6,7 @@ import {
   Maximize2, Minimize2, CheckCircle2, ShieldCheck, ChevronRight,
   ExternalLink, Layers, Loader2
 } from "lucide-react";
-import { templatesApi, ResumeTemplateItem } from "@/lib/api";
+import { templatesApi, ResumeTemplateItem, formatSkillCategory, SKILL_CATEGORY_ORDER } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 
 function renderFormattedText(text: unknown, customBoldClass?: string) {
@@ -588,19 +588,25 @@ export default function ResumeTemplateSelector({
               <div className="mb-4">
                 <h2 className={theme.sectionHeader}>Technical Skills</h2>
                 <div className="space-y-1.5 text-xs sm:text-[13px] text-slate-700">
-                  {Object.entries(skills).map(([cat, tags]) => {
-                    if (!tags || tags.length === 0) return null;
-                    return (
-                      <div key={cat} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                        <span className="font-bold text-slate-900 capitalize text-xs shrink-0 sm:w-28">
-                          {cat}:
-                        </span>
-                        <span className="text-slate-700 text-xs leading-normal">
-                          {tags.join(", ")}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {Object.entries(skills)
+                    .sort(([a], [b]) => {
+                      const idxA = SKILL_CATEGORY_ORDER.indexOf(a.toLowerCase());
+                      const idxB = SKILL_CATEGORY_ORDER.indexOf(b.toLowerCase());
+                      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                    })
+                    .map(([cat, tags]) => {
+                      if (!tags || tags.length === 0) return null;
+                      return (
+                        <div key={cat} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                          <span className="font-bold text-slate-900 text-xs shrink-0 sm:w-44">
+                            {formatSkillCategory(cat)}:
+                          </span>
+                          <span className="text-slate-700 text-xs leading-normal">
+                            {tags.join(", ")}
+                          </span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

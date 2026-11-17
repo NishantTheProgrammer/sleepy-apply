@@ -145,10 +145,38 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             story.append(Paragraph("TECHNICAL & PROFESSIONAL SKILLS", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
 
+            def _fmt_cat(cat_name: str) -> str:
+                category_labels = {
+                    "languages": "Programming Languages",
+                    "frontend": "Frontend & UI",
+                    "backend": "Backend & APIs",
+                    "ai_ml": "AI & Machine Learning",
+                    "ai": "Artificial Intelligence",
+                    "generative_ai": "Generative AI & LLMs",
+                    "databases": "Databases",
+                    "tools": "DevOps & Tools",
+                    "architecture": "System Architecture",
+                    "ui": "UI & Styling",
+                    "specialized": "Specialized Skills",
+                }
+                k_lower = cat_name.strip().lower()
+                if k_lower in category_labels:
+                    return category_labels[k_lower]
+                words = re.split(r"[_\s-]+", cat_name.strip())
+                return " ".join(w.upper() if w.lower() in ["ai", "ml", "ui", "ux", "qa", "api", "db", "sql"] else w.capitalize() for w in words)
+
+            # Preferred professional ordering
+            cat_priority = ["languages", "frontend", "backend", "ai_ml", "databases", "tools", "architecture"]
+
             if isinstance(skills_raw, dict):
-                for cat, items in skills_raw.items():
+                sorted_cats = sorted(
+                    skills_raw.keys(),
+                    key=lambda c: cat_priority.index(c.lower()) if c.lower() in cat_priority else 99
+                )
+                for cat in sorted_cats:
+                    items = skills_raw[cat]
                     if items:
-                        cat_label = cat.capitalize()
+                        cat_label = _fmt_cat(cat)
                         story.append(Paragraph(f"<b>{cat_label}:</b> {', '.join(items)}", body_style))
             elif isinstance(skills_raw, list):
                 story.append(Paragraph(" • ".join(skills_raw), body_style))

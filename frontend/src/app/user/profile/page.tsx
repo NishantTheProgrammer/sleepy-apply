@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, User, CheckCircle, HelpCircle, Loader2, Plus, Trash2,
   Briefcase, GraduationCap, Award, Globe, Save, Sparkles, X, ChevronDown, ChevronUp, MapPin,
-  FileText, FileUp, AlertCircle
+  FileText, FileUp, AlertCircle, RefreshCw
 } from "lucide-react";
-import { profileApi, templatesApi } from "@/lib/api";
+import { profileApi, templatesApi, formatSkillCategory, SKILL_CATEGORY_ORDER } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ResumeTemplateSelector from "@/components/ResumeTemplateSelector";
 import ResumeScreeningQA from "@/components/ResumeScreeningQA";
@@ -108,11 +108,11 @@ export default function ProfilePage() {
   });
   const [summary, setSummary] = useState("");
   const [skills, setSkills] = useState<Record<string, string[]>>({
-    backend: [],
-    frontend: [],
     languages: [],
+    frontend: [],
+    backend: [],
+    ai_ml: [],
     databases: [],
-    ui: [],
     tools: [],
     architecture: [],
   });
@@ -148,6 +148,9 @@ export default function ProfilePage() {
     achievements: true,
     preferences: true,
   });
+
+  const [rematching, setRematching] = useState(false);
+  const [rematchMsg, setRematchMsg] = useState("");
 
   const toggleSection = (s: string) => setExpanded((prev) => ({ ...prev, [s]: !prev[s] }));
 
@@ -427,11 +430,11 @@ const sanitizeStr = (val: unknown): string => {
     });
     setSummary("");
     setSkills({
-      backend: [],
-      frontend: [],
       languages: [],
+      frontend: [],
+      backend: [],
+      ai_ml: [],
       databases: [],
-      ui: [],
       tools: [],
       architecture: [],
     });
@@ -458,6 +461,11 @@ const sanitizeStr = (val: unknown): string => {
       if (res?.profile) {
         populateForm(res.profile);
       }
+      setUploadMsg("✓ Resume uploaded as new source of truth! Rematching all jobs in background...");
+      void profileApi.rematch().then((r) => {
+        setUploadMsg(`✓ Resume parsed as new source of truth! Rematched ${r.matched_count} jobs.`);
+        setTimeout(() => setUploadMsg(""), 8000);
+      }).catch(() => {});
     } catch (err: unknown) {
       stopAnalysis();
       setUploadError(err instanceof Error ? err.message : "Upload failed");
@@ -528,10 +536,31 @@ const sanitizeStr = (val: unknown): string => {
       populateForm(res.profile);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
+
+      // Auto-trigger rematch in background with status
+      void profileApi.rematch().then((r) => {
+        setRematchMsg(`✓ Rematched ${r.matched_count} jobs against your updated profile.`);
+        setTimeout(() => setRematchMsg(""), 6000);
+      }).catch(() => {});
     } catch (err) {
       console.error("Save error:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRematchAllJobs = async () => {
+    setRematching(true);
+    setRematchMsg("");
+    try {
+      const res = await profileApi.rematch();
+      setRematchMsg(`✓ ${res.message}`);
+      setTimeout(() => setRematchMsg(""), 6000);
+    } catch (err: unknown) {
+      setRematchMsg(err instanceof Error ? err.message : "Rematching failed");
+      setTimeout(() => setRematchMsg(""), 6000);
+    } finally {
+      setRematching(false);
     }
   };
 
@@ -595,14 +624,25 @@ const sanitizeStr = (val: unknown): string => {
             Prefilled with AI from your resume. Edit and customize every detail for tailored applications.
           </p>
         </div>
-        <button
-          onClick={handleSaveProfile}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? "Saving…" : "Save Profile"}
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={handleRematchAllJobs}
+            disabled={rematching || saving}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-semibold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer"
+            title="Recalculate match scores for all active jobs in the portal against your latest profile"
+          >
+            {rematching ? <Loader2 className="w-4 h-4 animate-spin text-purple-400" /> : <RefreshCw className="w-4 h-4 text-purple-400" />}
+            {rematching ? "Rematching Jobs…" : "Rematch All Jobs"}
+          </button>
+          <button
+            onClick={handleSaveProfile}
+            disabled={saving || rematching}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? "Saving…" : "Save Profile"}
+          </button>
+        </div>
       </div>
 
       {/* Save Success Toast */}
@@ -612,10 +652,21 @@ const sanitizeStr = (val: unknown): string => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mb-6 p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2 shadow-lg"
+            className="mb-4 p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-2 shadow-lg"
           >
             <CheckCircle className="w-5 h-5 text-emerald-400" />
-            Profile changes saved successfully!
+            Profile changes saved successfully! Treated as authoritative new source of truth.
+          </motion.div>
+        )}
+        {rematchMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 p-4 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-200 text-sm flex items-center gap-2 shadow-lg"
+          >
+            <Sparkles className="w-5 h-5 text-purple-400" />
+            {rematchMsg}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1155,10 +1206,16 @@ const sanitizeStr = (val: unknown): string => {
           {expanded.skills && (
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(skills).map(([cat, list]) => (
+                {Object.entries(skills)
+                  .sort(([a], [b]) => {
+                    const idxA = SKILL_CATEGORY_ORDER.indexOf(a.toLowerCase());
+                    const idxB = SKILL_CATEGORY_ORDER.indexOf(b.toLowerCase());
+                    return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                  })
+                  .map(([cat, list]) => (
                   <div key={cat} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">{cat}</span>
+                      <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">{formatSkillCategory(cat)}</span>
                       <span className="text-[10px] text-slate-500">{list.length} skills</span>
                     </div>
 

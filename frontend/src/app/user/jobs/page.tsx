@@ -9,7 +9,7 @@ import {
   Eye, Download, RefreshCw, Copy, FileCode, LayoutTemplate, Trash2, Bot, Monitor,
   Mail, Phone, UserCheck, Contact, AlertCircle, Share2, MessageSquare, Plus, Link
 } from "lucide-react";
-import { jobsApi, type HRContactInfo } from "@/lib/api";
+import { jobsApi, type HRContactInfo, formatSkillCategory, SKILL_CATEGORY_ORDER } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ReactMarkdown from "react-markdown";
 
@@ -1291,11 +1291,11 @@ function JobsPageContent() {
                   </div>
 
                   {/* Primary Action Row */}
-                  <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                  <div className="flex items-center gap-2.5 pt-3 border-t border-white/10">
                     <button
                       onClick={() => handleApplyVisible(selectedItem.job._id, getValidJobUrl(selectedItem.job))}
                       disabled={launchingVisibleId === selectedItem.job._id || applying === selectedItem.job._id}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-60"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-60 whitespace-nowrap"
                       title="Opens real Google Chrome window on your desktop to autofill the form live without submitting"
                     >
                       {launchingVisibleId === selectedItem.job._id ? (
@@ -1307,40 +1307,27 @@ function JobsPageContent() {
                       ) : (
                         <Monitor className="w-3.5 h-3.5 text-amber-300" />
                       )}
-                      {launchingVisibleId === selectedItem.job._id
-                        ? "Opening Chrome on Desktop…"
-                        : "One-Click Auto-Apply (Watch Live in Chrome)"}
-                    </button>
-
-                    {/* Headless Snapshot Preview Button */}
-                    <button
-                      onClick={() => handleApply(selectedItem.job._id)}
-                      disabled={applying === selectedItem.job._id}
-                      className="px-3 py-2.5 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-                      title="Run quick headless background preview snapshot"
-                    >
-                      {applying === selectedItem.job._id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
-                      ) : (
-                        <Bot className="w-3.5 h-3.5 text-slate-400" />
-                      )}
-                      <span className="hidden sm:inline">Snapshot</span>
+                      <span>
+                        {launchingVisibleId === selectedItem.job._id
+                          ? "Opening Chrome…"
+                          : "Auto-Apply"}
+                      </span>
                     </button>
 
                     {selectedItem.tailored_resume ? (
                       <button
                         onClick={() => handleOpenPreview(selectedItem)}
-                        className="px-3 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        className="px-3.5 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                         title="Preview tailored resume & JSON"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Resume</span>
+                        <span>Resume</span>
                       </button>
                     ) : (
                       <button
                         onClick={() => handleGenerateResume(selectedItem.job._id, true)}
                         disabled={generatingResumeId === selectedItem.job._id}
-                        className="px-3 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                        className="px-3.5 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
                         title="Generate tailored resume"
                       >
                         {generatingResumeId === selectedItem.job._id ? (
@@ -1348,74 +1335,50 @@ function JobsPageContent() {
                         ) : (
                           <Sparkles className="w-3.5 h-3.5" />
                         )}
-                        <span className="hidden sm:inline">Tailor Resume</span>
+                        <span>Tailor Resume</span>
                       </button>
                     )}
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => handleShareToDiscord(selectedItem.job._id)}
-                        disabled={sharingDiscordId === selectedItem.job._id}
-                        className="px-3 py-2.5 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/10 hover:bg-[#5865F2]/20 text-[#818cf8] hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                        title="Share this job to Discord Channel (#community-found-jobs)"
-                      >
-                        {sharingDiscordId === selectedItem.job._id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : sharedDiscordSuccess?.id === selectedItem.job._id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <Share2 className="w-3.5 h-3.5" />
-                        )}
-                        <span className="hidden sm:inline">
-                          {sharingDiscordId === selectedItem.job._id
-                            ? "Sharing…"
-                            : sharedDiscordSuccess?.id === selectedItem.job._id
-                            ? "Shared!"
-                            : "Share to Discord"}
-                        </span>
-                      </button>
+                    <a
+                      href={getValidJobUrl(selectedItem.job)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`px-3.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                        selectedItem.job.source === "career-crawled"
+                          ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
+                          : selectedItem.job.source === "linkedin"
+                          ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
+                          : selectedItem.job.source === "naukri"
+                          ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
+                          : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
+                      }`}
+                      title="Direct link to original posting"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>
+                        {selectedItem.job.source === "career-crawled"
+                          ? "Career Portal"
+                          : selectedItem.job.source === "linkedin"
+                          ? "LinkedIn"
+                          : selectedItem.job.source === "naukri"
+                          ? "Naukri"
+                          : "Portal"}
+                      </span>
+                    </a>
 
-                      <a
-                        href={getValidJobUrl(selectedItem.job)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                          selectedItem.job.source === "career-crawled"
-                            ? "border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300"
-                            : selectedItem.job.source === "linkedin"
-                            ? "border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300"
-                            : selectedItem.job.source === "naukri"
-                            ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
-                            : "border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5"
-                        }`}
-                        title="Direct link to original posting"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">
-                          {selectedItem.job.source === "career-crawled"
-                            ? "Career Portal"
-                            : selectedItem.job.source === "linkedin"
-                            ? "LinkedIn"
-                            : selectedItem.job.source === "naukri"
-                            ? "Naukri"
-                            : "Portal"}
-                        </span>
-                      </a>
-
-                      <button
-                        onClick={() => handleDeleteJob(selectedItem.job._id)}
-                        disabled={deletingJobId === selectedItem.job._id}
-                        className="px-2.5 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
-                        title="Delete job manually from portal"
-                      >
-                        {deletingJobId === selectedItem.job._id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                        <span className="hidden sm:inline">Delete</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleDeleteJob(selectedItem.job._id)}
+                      disabled={deletingJobId === selectedItem.job._id}
+                      className="px-3 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                      title="Delete job manually from portal"
+                    >
+                      {deletingJobId === selectedItem.job._id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Delete</span>
+                    </button>
                   </div>
 
                   {sharedDiscordSuccess?.id === selectedItem.job._id && (
@@ -2179,13 +2142,19 @@ function JobsPageContent() {
                               </h2>
                               {typeof skillsData === "object" && !Array.isArray(skillsData) ? (
                                 <div className="space-y-1.5 text-xs sm:text-[13px]">
-                                  {Object.entries(skillsData).map(([cat, tags]) => {
+                                  {Object.entries(skillsData)
+                                    .sort(([a], [b]) => {
+                                      const idxA = SKILL_CATEGORY_ORDER.indexOf(a.toLowerCase());
+                                      const idxB = SKILL_CATEGORY_ORDER.indexOf(b.toLowerCase());
+                                      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+                                    })
+                                    .map(([cat, tags]) => {
                                     if (!tags || (Array.isArray(tags) && tags.length === 0)) return null;
                                     const items = Array.isArray(tags) ? tags : [String(tags)];
                                     return (
                                       <div key={cat} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                                        <span className="font-bold text-slate-900 shrink-0 sm:w-28 capitalize text-xs">
-                                          {cat}:
+                                        <span className="font-bold text-slate-900 shrink-0 sm:w-44 text-xs">
+                                          {formatSkillCategory(cat)}:
                                         </span>
                                         <span className={`text-xs leading-normal ${themeStyles.subText}`}>
                                           {items.map((sk, sIdx) => {

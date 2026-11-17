@@ -75,7 +75,11 @@ async def get_profile(request: Request):
                     "analyzed_at": now,
                     "updated_at": now,
                 }
-                await db.profiles.update_one({"user_id": ObjectId(user_id)}, {"$set": update_fields})
+                await db.profiles.replace_one(
+                    {"user_id": ObjectId(user_id)},
+                    {**doc, **update_fields, "updated_at": now},
+                    upsert=True,
+                )
                 doc.update(update_fields)
             else:
                 await db.profiles.update_one(
@@ -87,6 +91,48 @@ async def get_profile(request: Request):
     doc["_id"] = str(doc["_id"])
     doc["user_id"] = str(doc["user_id"])
     return {"profile": doc}
+
+
+async def rematch_all_active_jobs(user_id: str) -> int:
+    """
+    Rematches every active job in the system against the user's latest profile
+    treating it as the authoritative new source of truth.
+    """
+    db = get_db()
+    from app.agents.job_matcher import JobMatcherAgent
+    try:
+        p = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+        if not p:
+            return 0
+        matcher = JobMatcherAgent()
+        cursor = db.jobs.find({"is_active": True})
+        count = 0
+        async for job in cursor:
+            await matcher.match_user_and_job(
+                user_id=str(user_id),
+                job_id=str(job["_id"]),
+                profile=p,
+                job=job,
+                use_ai_reasoning=False,
+            )
+            count += 1
+        logger.info("Successfully rematched all active jobs", user_id=user_id, count=count)
+        return count
+    except Exception as e:
+        logger.warning("Rematch all active jobs failed", user_id=user_id, error=str(e))
+        return 0
+
+
+@router.post("/rematch")
+async def rematch_jobs_endpoint(request: Request):
+    """Explicitly rematch all active jobs against the user's latest profile (new source of truth)."""
+    user_id = get_current_user_id(request)
+    matched_count = await rematch_all_active_jobs(user_id)
+    return {
+        "ok": True,
+        "matched_count": matched_count,
+        "message": f"Successfully rematched {matched_count} jobs against your updated profile as the source of truth.",
+    }
 
 
 @router.patch("")
@@ -113,14 +159,23 @@ async def update_profile(request: Request):
     agent = ProfileCreatorAgent()
     current_doc = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
     merged = {**current_doc, **update}
-    update["completion_score"] = agent._calculate_completion_score(merged)
-    update["updated_at"] = now
+    merged["completion_score"] = agent._calculate_completion_score(merged)
+    merged["updated_at"] = now
+    merged["user_id"] = ObjectId(user_id)
+    if "created_at" not in merged:
+        merged["created_at"] = now
 
-    await db.profiles.update_one(
+    await db.profiles.replace_one({"user_id": ObjectId(user_id)}, merged, upsert=True)
+
+    # Clean old tailored resume JSON across all job matches so new generation is strictly from the updated profile
+    await db.job_matches.update_many(
         {"user_id": ObjectId(user_id)},
-        {"$set": update, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},
-        upsert=True,
+        {"$unset": {"tailored_resume": "", "resume_generated_at": "", "resume_docx_path": ""}}
     )
+    await db.resumes.delete_many({"user_id": ObjectId(user_id)})
+
+    # Treat this saved profile as the new source of truth and automatically rematch all jobs in background
+    asyncio.create_task(rematch_all_active_jobs(user_id))
 
     # If job preferences or target role updated, trigger matching & discovery in background
     if any(k in update for k in ["job_preferences", "jobPreferences", "target_role"]):
@@ -298,7 +353,8 @@ async def upload_resume(request: Request, file: UploadFile = File(...)):
     import asyncio
     from app.graphs.profile_graph import profile_pipeline
     asyncio.create_task(profile_pipeline.ainvoke({"user_id": user_id, "resume_text": cleaned_text}))
-    logger.info("Resume uploaded and profile pipeline triggered", user_id=user_id, filename=file.filename, chars=len(cleaned_text))
+    asyncio.create_task(rematch_all_active_jobs(str(user_id)))
+    logger.info("Resume uploaded, profile replaced as new source of truth, rematching triggered", user_id=user_id, filename=file.filename, chars=len(cleaned_text))
 
     # Prepare serialized response profile so UI auto-fills immediately on upload response
     response_profile = dict(fresh_profile)

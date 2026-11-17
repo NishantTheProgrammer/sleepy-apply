@@ -740,32 +740,137 @@ class ProfileCreatorAgent:
             raw_sum = sum_match.group(1).strip()
             summary_text = " ".join(l.strip() for l in raw_sum.split("\n") if l.strip())
 
-        # 7. Technical Skills: match comprehensive categories
+        # 7. Technical Skills: dynamically extract candidate skills directly from SKILLS section
+        # Formatted into clean, industry-standard categories without synthetic or awkward keys (e.g. no "ui" or "ai_ml" exposed directly)
+        skills: dict[str, list[str]] = {
+            "languages": [],
+            "frontend": [],
+            "backend": [],
+            "ai_ml": [],
+            "databases": [],
+            "tools": [],
+            "architecture": [],
+        }
+
+        def categorize_skill(skill_name: str) -> str:
+            sl = skill_name.strip().lower()
+            if re.search(r"\b(ai|genai|generative ai|llms?|rag|langgraph|nlp|machine learning|deep learning|artificial intelligence|prompt engineering)\b", sl):
+                return "ai_ml"
+            if re.search(r"\b(react(?:[\.-]?js)?|angular|vue(?:[\.-]?js)?|next(?:[\.-]?js)?|nuxt|svelte|frontend|redux|tailwind(?:css)?|bootstrap|material[ -]?ui|chakra|sass|scss|css(?:3)?|html(?:5)?)\b", sl):
+                return "frontend"
+            if re.search(r"\b(node(?:[\.-]?js)?|express(?:[\.-]?js)?|django|fastapi|spring(?: boot)?|flask|nest(?:[\.-]?js)?|ruby|rails|laravel|asp\.net|backend)\b", sl):
+                return "backend"
+            if re.search(r"\b(mongo(?:db)?|postgres(?:ql)?|sql|mysql|redis|dynamodb|cassandra|sqlite|database)\b", sl):
+                return "databases"
+            if re.search(r"\b(docker|kubernetes|k8s|git|github|linux|aws|gcp|azure|ci/cd|postman|jest|cypress|playwright|tools)\b", sl):
+                return "tools"
+            if re.search(r"\b(microservices?|system design|rest(?:ful)?(?: apis?)?|graphql|event[- ]driven|architecture)\b", sl):
+                return "architecture"
+            if re.search(r"\b(javascript|typescript|python|java|c\+\+|golang|go|rust|c#|php|bash)\b", sl):
+                return "languages"
+            return "specialized"
+
+        def normalize_canonical_name(name: str) -> str:
+            nl = name.strip().lower()
+            if nl in ["node js", "node.js", "nodejs"]:
+                return "Node.js"
+            if nl in ["express", "expressjs", "express.js"]:
+                return "Express"
+            if nl in ["next js", "next.js", "nextjs"]:
+                return "Next.js"
+            if nl in ["spring boot", "springboot"]:
+                return "Spring Boot"
+            if nl in ["tailwind", "tailwindcss"]:
+                return "Tailwind CSS"
+            if nl in ["material ui", "material-ui", "mui"]:
+                return "Material UI"
+            if nl in ["bootstrap"]:
+                return "Bootstrap"
+            if nl in ["rest api", "rest apis", "restful apis"]:
+                return "REST APIs"
+            if nl in ["vue", "vue js", "vue.js", "vuejs"]:
+                return "Vue"
+            if nl in ["react", "react js", "react.js", "reactjs"]:
+                return "React"
+            if nl in ["angular", "angularjs"]:
+                return "Angular"
+            if nl in ["postgres", "postgresql"]:
+                return "PostgreSQL"
+            if nl in ["mongo", "mongodb"]:
+                return "MongoDB"
+            if nl in ["html", "html5"]:
+                return "HTML5"
+            if nl in ["css", "css3"]:
+                return "CSS3"
+            if nl in ["generative ai", "genai", "gen ai"]:
+                return "Generative AI"
+            if nl in ["llm", "llms"]:
+                return "LLMs"
+            if nl in ["rag"]:
+                return "RAG"
+            if nl in ["langgraph"]:
+                return "LangGraph"
+            return name.strip()
+
+        # Step 7a: Extract explicit items from candidate's SKILLS section
+        skills_sec_match = re.search(
+            r"\b(?:SKILLS|TECHNICAL SKILLS)\b\s*\n+([\s\S]*?)(?=\n+\s*(?:EXPERIENCE|WORK EXPERIENCE|PROJECTS|RELEVANT PROJECTS|EDUCATION|ACHIEVEMENTS|CERTIFICATIONS)\b|\Z)",
+            text,
+            re.IGNORECASE,
+        )
+        if skills_sec_match:
+            sec_text = skills_sec_match.group(1).strip()
+            for line in sec_text.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                # Split by bullet points or multiple spaces (multi-column separation)
+                chunks = re.split(r"[●•·*|]|\s{3,}", line)
+                for chunk in chunks:
+                    chunk = chunk.strip()
+                    if not chunk:
+                        continue
+                    # Split comma or slash separated items
+                    items = re.split(r"[,/]", chunk)
+                    for raw_item in items:
+                        raw_item = raw_item.strip()
+                        if not raw_item or len(raw_item) < 2:
+                            continue
+                        canon = normalize_canonical_name(raw_item)
+                        cat = categorize_skill(canon)
+                        skills.setdefault(cat, [])
+                        if canon not in skills[cat]:
+                            skills[cat].append(canon)
+
+        # Step 7b: Also search standard SKILLS_MAP across the entire document
         SKILLS_MAP = {
-            "backend": ["Python", "Node JS", "Node.js", "Express", "ExpressJS", "Spring boot", "Spring Boot", "Hibernate", "Java", "Next Js", "Next.js", "FastAPI", "Django"],
-            "frontend": ["React", "Angular", "Vue", "Next.js", "Next Js", "HTML", "CSS", "JavaScript", "TypeScript"],
-            "databases": ["MongoDB", "PostgreSQL", "MySQL", "Redis", "SQL"],
-            "ui": ["Tailwind", "Bootstrap", "Material UI"],
+            "languages": ["JavaScript", "TypeScript", "Python", "Java", "SQL"],
+            "frontend": ["React", "Angular", "Vue", "Next.js", "Tailwind CSS", "Bootstrap", "Material UI"],
+            "backend": ["Node.js", "Express", "Django", "FastAPI", "Spring Boot"],
+            "ai_ml": ["Generative AI", "LLMs", "RAG", "LangGraph"],
+            "databases": ["MongoDB", "PostgreSQL", "MySQL", "Redis"],
             "tools": ["Docker", "Git", "Linux", "Jest", "Postman", "AWS"],
-            "languages": ["JavaScript", "TypeScript", "Java", "HTML", "CSS", "Python", "SQL"],
             "architecture": ["Microservices", "System Design", "REST APIs"],
         }
-        skills: dict[str, list[str]] = {cat: [] for cat in SKILLS_MAP}
         for cat, items in SKILLS_MAP.items():
-            found = [s for s in items if re.search(r"\b" + re.escape(s) + r"\b", text, re.IGNORECASE)]
-            if found:
-                norm = []
-                for f in found:
-                    canon = "Node.js" if f.lower() in ["node js", "node.js"] else (
-                        "Express" if f.lower() in ["express", "expressjs"] else (
-                            "Next.js" if f.lower() in ["next js", "next.js"] else (
-                                "Spring Boot" if f.lower() == "spring boot" else f
-                            )
-                        )
-                    )
-                    if canon not in norm:
-                        norm.append(canon)
-                skills[cat] = norm
+            for item in items:
+                canon = normalize_canonical_name(item)
+                pattern = r"\b" + re.escape(item) + r"\b"
+                if re.search(pattern, text, re.IGNORECASE):
+                    skills.setdefault(cat, [])
+                    if canon not in skills[cat]:
+                        skills[cat].append(canon)
+
+        # Enforce clean professional ordering and drop empty categories
+        ordered_keys = ["languages", "frontend", "backend", "ai_ml", "databases", "tools", "architecture"]
+        ordered_skills = {}
+        for k in ordered_keys:
+            if skills.get(k):
+                ordered_skills[k] = skills[k]
+        for k, v in skills.items():
+            if k not in ordered_skills and v:
+                ordered_skills[k] = v
+        skills = ordered_skills
 
         # 8. Work Experience: robust line-by-line parsing with clean bullet merging
         experience_list: list[dict[str, Any]] = []

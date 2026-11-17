@@ -113,11 +113,21 @@ async def save_profile_node(state: ProfileState) -> ProfileState:
         "updated_at": now,
     }
 
-    await db.profiles.update_one(
-        {"user_id": ObjectId(user_id)},
-        {"$set": update_fields, "$setOnInsert": {"user_id": ObjectId(user_id), "created_at": now}},
-        upsert=True,
-    )
+    existing = await db.profiles.find_one({"user_id": ObjectId(user_id)})
+    created_at = (existing or {}).get("created_at") or now
+    resume_raw_text = (existing or {}).get("resume_raw_text") or state.get("resume_text", "")
+    resume_filename = (existing or {}).get("resume_filename") or "Resume.pdf"
+
+    complete_profile = {
+        "user_id": ObjectId(user_id),
+        "resume_filename": resume_filename,
+        "resume_raw_text": resume_raw_text,
+        **update_fields,
+        "created_at": created_at,
+        "updated_at": now,
+    }
+
+    await db.profiles.replace_one({"user_id": ObjectId(user_id)}, complete_profile, upsert=True)
 
     # Sync candidate's parsed name to db.users
     full_name = parsed.get("personal", {}).get("fullName") or parsed.get("personal", {}).get("full_name")

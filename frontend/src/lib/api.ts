@@ -167,6 +167,10 @@ export const profileApi = {
       profile?: Record<string, unknown>;
     }>;
   },
+  rematch: () =>
+    request<{ ok: boolean; matched_count: number; message: string }>("/api/profile/rematch", {
+      method: "POST",
+    }),
   getQuestions: () => request<{ questions: unknown[] }>("/api/profile/questions"),
   submitAnswers: (answers: { question_id: string; answer: string }[]) =>
     request("/api/profile/answers", { method: "POST", body: JSON.stringify(answers) }),
@@ -602,4 +606,41 @@ export const companiesApi = {
   delete: (id: string) => request<{ ok: boolean; message: string }>(`/api/companies/${id}`, { method: "DELETE" }),
   seed: (force?: boolean) => request<{ ok: boolean; message: string }>(`/api/companies/seed?force=${!!force}`, { method: "POST" }),
 };
+
+export function formatSkillCategory(key: string): string {
+  const map: Record<string, string> = {
+    languages: "Programming Languages",
+    frontend: "Frontend & UI",
+    backend: "Backend & APIs",
+    ai_ml: "AI & Machine Learning",
+    ai: "Artificial Intelligence",
+    generative_ai: "Generative AI & LLMs",
+    ml: "Machine Learning",
+    databases: "Databases",
+    tools: "DevOps & Tools",
+    architecture: "System Architecture",
+    ui: "UI & Styling",
+    ui_ux: "UI / UX Design",
+    mobile: "Mobile Development",
+    cloud: "Cloud & Infrastructure",
+    testing: "Testing & QA",
+    specialized: "Specialized Skills",
+  };
+  const lower = key.trim().toLowerCase();
+  if (map[lower]) return map[lower];
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export const SKILL_CATEGORY_ORDER = [
+  "languages",
+  "frontend",
+  "backend",
+  "ai_ml",
+  "databases",
+  "tools",
+  "architecture",
+];
+
 

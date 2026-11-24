@@ -375,7 +375,7 @@ function JobsPageContent() {
   const [generatingResumeId, setGeneratingResumeId] = useState<string | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<JobItem | null>(null);
-  const [previewTab, setPreviewTab] = useState<"doc" | "json">("doc");
+  const [previewTab, setPreviewTab] = useState<"doc" | "ats" | "json">("doc");
   const [previewTemplate, setPreviewTemplate] = useState<string>("default");
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedNote, setCopiedNote] = useState<string | null>(null);
@@ -2063,7 +2063,7 @@ function JobsPageContent() {
                           href={jobsApi.getResumeDownloadUrl(selectedItem.job._id)}
                           download
                           className="p-2 rounded-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white hover:bg-white/5 transition-all"
-                          title="Download tailored Word document (.docx)"
+                          title="Download tailored PDF (.pdf)"
                         >
                           <Download className="w-4 h-4" />
                         </a>
@@ -2236,6 +2236,17 @@ function JobsPageContent() {
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Document Preview</span>
+                    </button>
+                    <button
+                      onClick={() => setPreviewTab("ats")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        previewTab === "ats"
+                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>ATS Score & Gaps</span>
                     </button>
                     <button
                       onClick={() => setPreviewTab("json")}
@@ -2673,6 +2684,138 @@ function JobsPageContent() {
                       );
                     })()}
                   </div>
+                ) : previewTab === "ats" ? (
+                  /* ── ATS SCORE & GAP ANALYSIS TAB ── */
+                  <div className="space-y-4 max-w-4xl mx-auto">
+                    {(() => {
+                      const tailored = previewItem.tailored_resume as Record<string, any> | undefined;
+                      const atsScore = tailored?.ats_score;
+                      const gapAnalysis = tailored?.gap_analysis;
+                      const overall = atsScore?.overall_score ?? (previewItem.compatibility_score || 75);
+                      const dimensions = atsScore?.dimensions || {};
+                      const mandCov = atsScore?.mandatory_skill_coverage_pct ?? 80;
+                      const prefCov = atsScore?.preferred_skill_coverage_pct ?? 70;
+                      const missingReqs = gapAnalysis?.missing_requirements || atsScore?.missing_requirements || [];
+                      const recommendations = gapAnalysis?.recommendations || atsScore?.recommendations || [];
+
+                      return (
+                        <>
+                          {/* Score Hero Card */}
+                          <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/30 via-slate-900 to-indigo-950/30 border border-emerald-500/30 shadow-xl">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                <div className="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 shadow-lg shadow-emerald-500/10 shrink-0">
+                                  <div className="text-center">
+                                    <span className="text-2xl font-black text-emerald-400">{overall}</span>
+                                    <span className="text-[10px] block text-emerald-300 font-bold">/ 100</span>
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-base font-black text-white">Explainable ATS Compatibility Score</h4>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      7 Dimensions
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-300 mt-1 max-w-md">
+                                    Heuristic evaluation based on mandatory & preferred skills coverage, verified employment tenure, architectural ownership, and strict zero-hallucination factual grounding.
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex sm:flex-col gap-3 w-full sm:w-auto shrink-0">
+                                <div className="flex-1 sm:w-44 p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs">
+                                  <div className="flex justify-between text-[11px] mb-1">
+                                    <span className="text-slate-400 font-medium">Mandatory Coverage</span>
+                                    <span className="text-emerald-400 font-bold">{mandCov}%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${mandCov}%` }} />
+                                  </div>
+                                </div>
+                                <div className="flex-1 sm:w-44 p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs">
+                                  <div className="flex justify-between text-[11px] mb-1">
+                                    <span className="text-slate-400 font-medium">Preferred Coverage</span>
+                                    <span className="text-purple-400 font-bold">{prefCov}%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <div className="h-full bg-purple-400 rounded-full transition-all" style={{ width: `${prefCov}%` }} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 7 Dimensions Breakdown Grid */}
+                          {Object.keys(dimensions).length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {Object.entries(dimensions).map(([key, dim]: [string, any]) => (
+                                <div key={key} className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col justify-between">
+                                  <div>
+                                    <div className="flex items-center justify-between text-xs mb-1">
+                                      <span className="font-bold text-white">{dim.name}</span>
+                                      <span className="text-slate-400 font-mono text-[11px]">
+                                        Weight: {Math.round((dim.weight || 0) * 100)}%
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 line-clamp-2 mb-2">{dim.description}</p>
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center justify-between text-xs mb-1">
+                                      <span className="text-[11px] text-slate-400">Score</span>
+                                      <span className="font-bold text-emerald-400">{dim.raw_score}% ({dim.weighted_score} pts)</span>
+                                    </div>
+                                    <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                      <div className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full" style={{ width: `${Math.min(100, dim.raw_score || 0)}%` }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Gaps & Hallucination Prevention Report */}
+                          {missingReqs.length > 0 && (
+                            <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 text-xs">
+                              <div className="flex items-center gap-2 mb-2 text-rose-300 font-bold">
+                                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                                <span>Factual Gaps & Omitted Skills (Hallucination Guarded)</span>
+                              </div>
+                              <p className="text-[11px] text-slate-300 mb-2.5">
+                                These requirements were demanded by the JD but have zero verified evidence in your master profile. To protect recruiter credibility, they were <strong>strictly omitted</strong> rather than fabricated.
+                              </p>
+                              <div className="space-y-1.5">
+                                {missingReqs.map((m: any, idx: number) => (
+                                  <div key={idx} className="p-2 rounded-lg bg-black/40 border border-rose-500/20 flex items-baseline justify-between text-[11px]">
+                                    <span className="font-bold text-rose-200">{m.requirement}</span>
+                                    <span className="text-slate-400 text-[10px]">{m.notes}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Recommendations */}
+                          {recommendations.length > 0 && (
+                            <div className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/30 text-xs">
+                              <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold">
+                                <Sparkles className="w-4 h-4 text-indigo-400" />
+                                <span>AI Improvement Recommendations</span>
+                              </div>
+                              <ul className="space-y-1.5 text-slate-300 text-[11px]">
+                                {recommendations.map((rec: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-1.5">
+                                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                                    <span>{rec}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 ) : (
                   /* ── TAILORED JSON TAB ── */
                   <div className="space-y-3">
@@ -2725,10 +2868,11 @@ function JobsPageContent() {
                   <a
                     href={jobsApi.getResumeDownloadUrl(previewItem.job._id, previewTemplate)}
                     download
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/30 text-white text-xs font-semibold transition-all shadow-sm"
+                    title="Download tailored ATS Resume (.pdf)"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download .docx</span>
+                    <span>Download .pdf</span>
                   </a>
 
                   <button

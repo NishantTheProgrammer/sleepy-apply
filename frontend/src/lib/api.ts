@@ -315,8 +315,8 @@ export const jobsApi = {
       tailored_resume: Record<string, unknown> | null;
       generated_at?: string;
     }>(`/api/jobs/${jobId}/resume`),
-  getResumeDownloadUrl: (jobId: string, template?: string) =>
-    `${API_URL}/api/jobs/${jobId}/resume/download${template ? `?template=${template}` : ""}`,
+  getResumeDownloadUrl: (jobId: string, template?: string, format: string = "pdf") =>
+    `${API_URL}/api/jobs/${jobId}/resume/download?format=${format}${template ? `&template=${template}` : ""}`,
   deleteResume: (jobId: string) =>
     request<{ ok: boolean; message: string; job_id: string }>(`/api/jobs/${jobId}/resume`, { method: "DELETE" }),
   crawlDelhiNcr: (options?: { concurrency?: number; restart?: boolean }) =>

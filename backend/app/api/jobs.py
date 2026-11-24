@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel
@@ -812,24 +813,25 @@ async def delete_job_manually(request: Request, job_id: str):
 
 
 @router.get("/{job_id}/resume/download")
-async def download_tailored_resume_docx(request: Request, job_id: str, template: str | None = None):
-    """Download the tailored .docx resume for this job and user."""
+async def download_tailored_resume(request: Request, job_id: str, template: str | None = None, format: str = "pdf"):
+    """Download the tailored resume (PDF by default, or DOCX) for this job and user."""
     user_id = get_current_user_id(request)
     db = get_db()
-    from fastapi.responses import StreamingResponse
+    from fastapi.responses import FileResponse, StreamingResponse
 
     # Check match or resume document
     match = await db.job_matches.find_one(
         {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
     )
     tailored = match.get("tailored_resume") if match else None
+    resume_doc = None
 
     if not tailored:
-        resume = await db.resumes.find_one(
+        resume_doc = await db.resumes.find_one(
             {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
         )
-        if resume:
-            tailored = resume.get("content")
+        if resume_doc:
+            tailored = resume_doc.get("content")
 
     # If still not generated, generate on the fly
     if not tailored:
@@ -838,33 +840,62 @@ async def download_tailored_resume_docx(request: Request, job_id: str, template:
         res = await agent.build_tailored_resume(user_id=user_id, job_id=job_id, template=template)
         if res:
             tailored = res.get("content")
+            resume_doc = res
 
     if not tailored:
         raise HTTPException(status_code=404, detail="Tailored resume not found")
 
-    from app.templates.manager import render_docx_for_profile
     profile = await db.profiles.find_one({"user_id": ObjectId(user_id)}) or {}
     template_id = template or tailored.get("template") or profile.get("selected_template") or "default"
 
     tailored_context = {
         **profile,
+        "target_headline": tailored.get("target_headline") or profile.get("target_headline", ""),
         "summary": tailored.get("tailored_summary") or tailored.get("summary") or profile.get("summary", ""),
         "skills": tailored.get("skills") or profile.get("skills", {}),
         "experience": tailored.get("experience") or profile.get("experience", []),
         "projects": tailored.get("projects") if tailored.get("projects") is not None else profile.get("projects", []),
         "matching_skills": tailored.get("matching_skills", []),
+        "achievements": tailored.get("achievements") or profile.get("achievements", []),
+        "education": tailored.get("education") or profile.get("education", []),
+        "personal": tailored.get("personal") or profile.get("personal", {}),
     }
 
+    company = str(tailored.get("company", "Job")).replace(" ", "_")
+    title = str(tailored.get("job_title", "Role")).replace(" ", "_")
+
+    if format.lower() == "pdf":
+        storage_dir = os.path.join(os.getcwd(), "storage", "resumes", str(user_id))
+        pdf_path = (match.get("resume_pdf_path") if match else None) or (resume_doc.get("pdf_path") if resume_doc else None)
+        if not pdf_path or not os.path.exists(pdf_path):
+            pdf_path = os.path.join(storage_dir, f"resume_{job_id}.pdf")
+
+        if not os.path.exists(pdf_path):
+            try:
+                from app.templates.default import DefaultATSResumeTemplate
+                os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+                DefaultATSResumeTemplate().render_pdf(tailored_context, pdf_path)
+            except Exception as e:
+                logger.error("Failed to render PDF on the fly", error=str(e))
+                raise HTTPException(status_code=500, detail="Failed to render PDF")
+
+        filename = f"Resume_{company}_{title}.pdf"
+        return FileResponse(
+            path=pdf_path,
+            media_type="application/pdf",
+            filename=filename,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # DOCX format fallback
+    from app.templates.manager import render_docx_for_profile
     try:
         stream = render_docx_for_profile(template_id, tailored_context)
     except Exception as e:
         logger.error("Failed to render docx", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to render document")
 
-    company = tailored.get("company", "Job").replace(" ", "_")
-    title = tailored.get("job_title", "Role").replace(" ", "_")
     filename = f"Resume_{company}_{title}.docx"
-
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

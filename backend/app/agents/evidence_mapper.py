@@ -26,6 +26,46 @@ class EvidenceItem(BaseModel):
     source_entity: str = ""  # e.g. "Dhwani Rural Information Systems", "StaffSync", "IGNOU"
     confidence: float = 0.0
     notes: str = ""
+    category: str = "technology"  # technology | experience_duration | domain | leadership | education | responsibility
+
+
+class JDAnalysisReport(BaseModel):
+    mandatory_technical_skills: list[str] = Field(default_factory=list)
+    preferred_technical_skills: list[str] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
+    frontend: list[str] = Field(default_factory=list)
+    backend: list[str] = Field(default_factory=list)
+    databases: list[str] = Field(default_factory=list)
+    cloud_devops: list[str] = Field(default_factory=list)
+    ai_ml: list[str] = Field(default_factory=list)
+    architecture: list[str] = Field(default_factory=list)
+    responsibilities: list[str] = Field(default_factory=list)
+    experience_requirements: list[str] = Field(default_factory=list)
+    domain_keywords: list[str] = Field(default_factory=list)
+    soft_skills: list[str] = Field(default_factory=list)
+    has_genai_or_agentic: bool = False
+    priority_weights: dict[str, float] = Field(default_factory=dict)
+
+
+class ATSDimensionScore(BaseModel):
+    name: str
+    weight: float
+    raw_score: float  # 0 - 100
+    weighted_score: float  # weight * raw_score
+    description: str = ""
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ATSScoringBreakdown(BaseModel):
+    overall_score: float = 0.0
+    dimensions: dict[str, ATSDimensionScore] = Field(default_factory=dict)
+    mandatory_skill_coverage_pct: float = 0.0
+    preferred_skill_coverage_pct: float = 0.0
+    missing_requirements: list[dict[str, Any]] = Field(default_factory=list)
+    partial_matches: list[dict[str, Any]] = Field(default_factory=list)
+    strong_matches: list[dict[str, Any]] = Field(default_factory=list)
+    formatting_warnings: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class SkillsClassification(BaseModel):
@@ -56,6 +96,8 @@ class EvidenceMappingResult(BaseModel):
     candidate_index: CandidateEvidenceIndex = Field(default_factory=CandidateEvidenceIndex)
     target_job_title: str = ""
     target_company: str = ""
+    jd_analysis: JDAnalysisReport = Field(default_factory=JDAnalysisReport)
+    ats_score: ATSScoringBreakdown = Field(default_factory=ATSScoringBreakdown)
 
 
 class EvidenceMapper:
@@ -126,6 +168,82 @@ class EvidenceMapper:
         "maven": "Maven",
         "tdd": "TDD",
         "test driven development": "TDD",
+        # Generative AI & LLMs
+        "langchain": "LangChain",
+        "langgraph": "LangGraph",
+        "ollama": "Ollama",
+        "chromadb": "ChromaDB",
+        "chroma": "ChromaDB",
+        "rag": "RAG",
+        "retrieval augmented generation": "RAG",
+        "retrieval-augmented generation": "RAG",
+        "embeddings": "Embeddings",
+        "vector database": "Vector Databases",
+        "vector db": "Vector Databases",
+        "vector search": "Vector Search",
+        "generative ai": "Generative AI",
+        "genai": "Generative AI",
+        "gen ai": "Generative AI",
+        "agentic ai": "Agentic AI",
+        "ai agents": "Agentic AI",
+        "prompt engineering": "Prompt Engineering",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "claude": "Claude",
+        "copilot": "Copilot",
+        "copilot studio": "Microsoft Copilot Studio",
+        "microsoft copilot studio": "Microsoft Copilot Studio",
+        "semantic kernel": "Semantic Kernel",
+        "document ingestion": "Document Ingestion",
+        "huggingface": "HuggingFace",
+        "hugging face": "HuggingFace",
+        "llamaindex": "LlamaIndex",
+        "llama index": "LlamaIndex",
+        # Cloud & DevOps
+        "aws": "AWS",
+        "amazon web services": "AWS",
+        "azure": "Azure",
+        "gcp": "GCP",
+        "google cloud": "GCP",
+        "kubernetes": "Kubernetes",
+        "k8s": "Kubernetes",
+        "terraform": "Terraform",
+        "ansible": "Ansible",
+        "github actions": "GitHub Actions",
+        "gitlab ci": "GitLab CI",
+        "helm": "Helm",
+        "prometheus": "Prometheus",
+        "grafana": "Grafana",
+        # Backend & Modern Languages
+        "graphql": "GraphQL",
+        "kafka": "Kafka",
+        "apache kafka": "Kafka",
+        "rabbitmq": "RabbitMQ",
+        "grpc": "gRPC",
+        "golang": "Go",
+        "go": "Go",
+        "c#": "C#",
+        "c++": "C++",
+        "rust": "Rust",
+        "kotlin": "Kotlin",
+        "scala": "Scala",
+        "php": "PHP",
+        "ruby": "Ruby",
+    }
+
+    TECH_CATEGORY_MAP = {
+        "languages": {"Python", "JavaScript", "TypeScript", "Java", "Go", "C#", "C++", "Rust", "Kotlin", "Scala", "PHP", "Ruby", "SQL", "HTML", "CSS"},
+        "frontend": {"React", "Next.js", "Vue", "Angular", "Flutter", "Ionic", "Tailwind", "Bootstrap", "Material UI", "HTML", "CSS"},
+        "backend": {"Node.js", "Express", "FastAPI", "Django", "Spring Boot", "Spring", "Hibernate", "REST APIs", "GraphQL", "gRPC", "Microservices"},
+        "databases": {"PostgreSQL", "MySQL", "MongoDB", "Redis", "SQL", "ChromaDB", "Vector Databases"},
+        "cloud_devops": {"Docker", "Kubernetes", "AWS", "Azure", "GCP", "CI/CD", "Jenkins", "GitHub Actions", "Terraform", "Ansible", "Helm", "Prometheus", "Grafana", "Linux", "Git", "Maven"},
+        "ai_ml": {
+            "Generative AI", "Agentic AI", "RAG", "LangChain", "LangGraph", "Ollama", "Embeddings",
+            "Vector Search", "Vector Databases", "Prompt Engineering", "OpenAI", "Anthropic", "Claude",
+            "Copilot", "Microsoft Copilot Studio", "Semantic Kernel", "Document Ingestion",
+            "HuggingFace", "LlamaIndex", "ChromaDB"
+        },
+        "architecture": {"System Design", "Microservices", "REST APIs", "TDD"},
     }
 
     _profile_index_cache: dict[str, CandidateEvidenceIndex] = {}
@@ -438,6 +556,21 @@ class EvidenceMapper:
             ("PostgreSQL", ["postgresql", "postgres"], "PostgreSQL", "desirable"),
             ("MongoDB", ["mongodb", "mongo"], "MongoDB", "desirable"),
             ("Docker", ["docker"], "Docker containerization", "desirable"),
+            # GenAI, Agentic & Cloud Patterns
+            ("LangChain", ["langchain"], "LangChain", "mandatory"),
+            ("LangGraph", ["langgraph"], "LangGraph", "mandatory"),
+            ("RAG", ["rag", "retrieval augmented generation", "retrieval-augmented generation"], "RAG Architecture", "mandatory"),
+            ("Ollama", ["ollama"], "Ollama Local LLMs", "desirable"),
+            ("ChromaDB", ["chromadb", "chroma"], "ChromaDB Vector Store", "desirable"),
+            ("Vector Search", ["vector search", "vector database", "vector db", "embeddings"], "Vector Search & Embeddings", "mandatory"),
+            ("Generative AI", ["generative ai", "genai", "gen ai", "llm", "large language models"], "Generative AI & LLMs", "mandatory"),
+            ("Agentic AI", ["agentic ai", "ai agents", "autonomous agents"], "Agentic AI & Multi-Agent Workflows", "mandatory"),
+            ("Prompt Engineering", ["prompt engineering", "few-shot", "prompt design"], "Prompt Engineering", "desirable"),
+            ("AWS", ["aws", "amazon web services"], "Amazon Web Services (AWS)", "desirable"),
+            ("Kubernetes", ["kubernetes", "k8s"], "Kubernetes Container Orchestration", "desirable"),
+            ("Terraform", ["terraform"], "Terraform IaC", "desirable"),
+            ("GraphQL", ["graphql"], "GraphQL APIs", "desirable"),
+            ("Kafka", ["kafka", "apache kafka"], "Apache Kafka Event Streaming", "desirable"),
         ]
 
         # Structured importance detector based on preceding JD section header
@@ -502,6 +635,280 @@ class EvidenceMapper:
         self._jd_reqs_cache[jd_hash] = reqs
         return reqs
 
+    def analyze_jd(
+        self, job_title: str, required_skills: list[str], job_description: str
+    ) -> tuple[list[dict[str, Any]], JDAnalysisReport]:
+        """Extracts and classifies requirements across all categories and computes priority weights."""
+        raw_reqs = self.extract_jd_requirements(job_title, required_skills, job_description)
+        report = JDAnalysisReport()
+
+        desc_lower = f"{job_title} {job_description}".lower()
+        report.has_genai_or_agentic = any(
+            k in desc_lower
+            for k in [
+                "generative ai", "genai", "gen ai", "agentic", "copilot", "rag",
+                "langchain", "langgraph", "ollama", "chromadb", "prompt engineering",
+                "llm", "large language model", "vector database", "vector search"
+            ]
+        )
+
+        for r in raw_reqs:
+            name = r["name"]
+            canon = self.canonical_tech(name)
+            cat = r["category"]
+            imp = r["importance"]
+            weight = 1.0 if imp == "mandatory" else 0.6
+            report.priority_weights[canon] = weight
+
+            if cat == "technology":
+                if imp == "mandatory":
+                    if canon not in report.mandatory_technical_skills:
+                        report.mandatory_technical_skills.append(canon)
+                else:
+                    if canon not in report.preferred_technical_skills:
+                        report.preferred_technical_skills.append(canon)
+
+                # Classify into specific technical subcategories
+                if canon in self.TECH_CATEGORY_MAP.get("languages", set()):
+                    if canon not in report.languages:
+                        report.languages.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("frontend", set()):
+                    if canon not in report.frontend:
+                        report.frontend.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("backend", set()):
+                    if canon not in report.backend:
+                        report.backend.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("databases", set()):
+                    if canon not in report.databases:
+                        report.databases.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("cloud_devops", set()):
+                    if canon not in report.cloud_devops:
+                        report.cloud_devops.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("ai_ml", set()):
+                    if canon not in report.ai_ml:
+                        report.ai_ml.append(canon)
+                if canon in self.TECH_CATEGORY_MAP.get("architecture", set()):
+                    if canon not in report.architecture:
+                        report.architecture.append(canon)
+            elif cat == "experience_duration":
+                report.experience_requirements.append(r["raw_text"])
+            elif cat == "domain":
+                report.domain_keywords.append(name)
+            elif cat == "leadership":
+                report.soft_skills.append(name)
+            elif cat == "education":
+                report.domain_keywords.append(name)
+
+        # Check for common soft skills in JD
+        for ss in ["Cross-functional collaboration", "Problem solving", "Agile/Scrum", "Mentoring", "Code reviews"]:
+            if ss.lower() in desc_lower and ss not in report.soft_skills and ss not in report.domain_keywords:
+                report.soft_skills.append(ss)
+
+        return raw_reqs, report
+
+    def compute_ats_score(
+        self,
+        mappings: list[EvidenceItem],
+        jd_analysis: JDAnalysisReport,
+        index: CandidateEvidenceIndex,
+    ) -> ATSScoringBreakdown:
+        """Calculates an explainable 7-dimension ATS compatibility score."""
+        # Dimension 1: Mandatory technical skills (30%)
+        mand_items = [m for m in mappings if m.importance == "mandatory" and m.category == "technology"]
+        mand_matched = [m.requirement for m in mand_items if m.status in ["MATCHED", "STRONG"]]
+        mand_partial = [m.requirement for m in mand_items if m.status == "PARTIAL"]
+        mand_missing = [m.requirement for m in mand_items if m.status in ["MISSING", "none"]]
+
+        if mand_items:
+            mand_val = sum(1.0 if m.status in ["MATCHED", "STRONG"] else (0.5 if m.status == "PARTIAL" else 0.0) for m in mand_items)
+            mand_raw = round((mand_val / len(mand_items)) * 100.0, 1)
+            mand_cov = round(((len(mand_matched) + 0.5 * len(mand_partial)) / max(1, len(mand_items))) * 100.0, 1)
+        else:
+            mand_raw = 100.0
+            mand_cov = 100.0
+
+        # Dimension 2: Preferred technical skills (15%)
+        pref_items = [m for m in mappings if m.importance == "desirable" and m.category == "technology"]
+        pref_matched = [m.requirement for m in pref_items if m.status in ["MATCHED", "STRONG"]]
+        pref_partial = [m.requirement for m in pref_items if m.status == "PARTIAL"]
+        pref_missing = [m.requirement for m in pref_items if m.status in ["MISSING", "none"]]
+
+        if pref_items:
+            pref_val = sum(1.0 if m.status in ["MATCHED", "STRONG"] else (0.6 if m.status == "PARTIAL" else 0.0) for m in pref_items)
+            pref_raw = round((pref_val / len(pref_items)) * 100.0, 1)
+            pref_cov = round((len(pref_matched) / len(pref_items)) * 100.0, 1)
+        else:
+            pref_raw = 85.0
+            pref_cov = 100.0
+
+        # Dimension 3: Relevant professional experience (20%)
+        exp_items = [m for m in mappings if m.category == "experience_duration"]
+        req_years = 5.0
+        if exp_items:
+            m = re.search(r"(\d+(?:\.\d+)?)", exp_items[0].requirement)
+            if m:
+                req_years = float(m.group(1))
+
+        cand_years = float(index.overall_years)
+        if cand_years >= req_years:
+            exp_raw = 100.0
+        else:
+            exp_raw = round((cand_years / max(1.0, req_years)) * 100.0, 1)
+
+        # Dimension 4: Responsibilities and project alignment (15%)
+        matched_areas = []
+        all_prof_text = (" ".join(r.get("raw_text", "") for r in index.professional_roles) + " " + " ".join(p.get("raw_text", "") for p in index.projects)).lower()
+        if any(k in all_prof_text for k in ["rest api", "microservices", "backend"]):
+            matched_areas.append("Backend & API Architecture")
+        if any(k in all_prof_text for k in ["database", "sql", "postgresql", "mysql", "query"]):
+            matched_areas.append("Database & Query Optimization")
+        if jd_analysis.has_genai_or_agentic:
+            if any(k in all_prof_text for k in ["langchain", "langgraph", "generative ai", "rag", "agentic", "ollama"]):
+                matched_areas.append("GenAI & Agentic AI Systems")
+        if any(k in all_prof_text for k in ["mentor", "interview", "review", "lead"]):
+            matched_areas.append("Engineering Mentorship & Quality")
+
+        resp_raw = min(100.0, max(60.0, len(matched_areas) * 25.0))
+
+        # Dimension 5: Domain and role-specific keywords (10%)
+        dom_items = [m for m in mappings if m.category in ["domain", "keyword"]]
+        if dom_items:
+            dom_matched = sum(1.0 for m in dom_items if m.status in ["MATCHED", "PARTIAL"])
+            dom_raw = round((dom_matched / len(dom_items)) * 100.0, 1)
+        else:
+            dom_raw = 85.0
+
+        # Dimension 6: Education and certifications (5%)
+        edu_items = [m for m in mappings if m.category == "education"]
+        if edu_items:
+            edu_status = edu_items[0].status
+            edu_raw = 100.0 if edu_status == "MATCHED" else (90.0 if edu_status == "PARTIAL" else 60.0)
+        else:
+            edu_raw = 95.0
+
+        # Dimension 7: ATS formatting and readability (5%)
+        format_raw = 98.0
+        formatting_warnings = []
+        if len(index.professional_roles) > 5:
+            formatting_warnings.append("Resume has many historical roles; recommended to condense older roles to fit within 2 pages.")
+
+        dimensions = {
+            "mandatory_technical_skills": ATSDimensionScore(
+                name="Mandatory Technical Skills",
+                weight=0.30,
+                raw_score=mand_raw,
+                weighted_score=round(mand_raw * 0.30, 2),
+                description="Coverage of hard requirements and primary core technologies explicitly demanded in the job description.",
+                details={"matched": mand_matched, "partial": mand_partial, "missing": mand_missing, "coverage_pct": mand_cov},
+            ),
+            "preferred_technical_skills": ATSDimensionScore(
+                name="Preferred Technical Skills",
+                weight=0.15,
+                raw_score=pref_raw,
+                weighted_score=round(pref_raw * 0.15, 2),
+                description="Coverage of desirable, secondary, and bonus technologies.",
+                details={"matched": pref_matched, "partial": pref_partial, "missing": pref_missing, "coverage_pct": pref_cov},
+            ),
+            "relevant_professional_experience": ATSDimensionScore(
+                name="Relevant Professional Experience",
+                weight=0.20,
+                raw_score=exp_raw,
+                weighted_score=round(exp_raw * 0.20, 2),
+                description="Candidate verified professional tenure compared to role seniority level.",
+                details={"candidate_years": cand_years, "required_years": req_years},
+            ),
+            "responsibilities_and_projects": ATSDimensionScore(
+                name="Responsibilities & Project Alignment",
+                weight=0.15,
+                raw_score=resp_raw,
+                weighted_score=round(resp_raw * 0.15, 2),
+                description="Alignment of projects, engineering ownership, and technical problem-solving.",
+                details={"aligned_areas": matched_areas},
+            ),
+            "domain_and_role_keywords": ATSDimensionScore(
+                name="Domain & Role-Specific Keywords",
+                weight=0.10,
+                raw_score=dom_raw,
+                weighted_score=round(dom_raw * 0.10, 2),
+                description="Presence of domain terminology, workflow standards, and architectural keywords.",
+                details={"domain_keywords": jd_analysis.domain_keywords},
+            ),
+            "education_and_certifications": ATSDimensionScore(
+                name="Education & Certifications",
+                weight=0.05,
+                raw_score=edu_raw,
+                weighted_score=round(edu_raw * 0.05, 2),
+                description="Degree qualifications, academic credentials, and verified certifications.",
+                details={"degrees": [e.get("degree") for e in index.education], "evaluation": edu_items[0].notes if edu_items else "Degree verified."},
+            ),
+            "ats_formatting_and_readability": ATSDimensionScore(
+                name="ATS Formatting & Readability",
+                weight=0.05,
+                raw_score=format_raw,
+                weighted_score=round(format_raw * 0.05, 2),
+                description="Strict ATS single-column typography, standard headings, clear chronology, and machine-extractable text.",
+                details={"standard_headings": True, "two_page_constraint": True, "clean_font": "Helvetica"},
+            ),
+        }
+
+        overall = round(sum(d.weighted_score for d in dimensions.values()), 1)
+        overall = max(0.0, min(100.0, overall))
+
+        missing_report = []
+        for m in mappings:
+            if m.status in ["MISSING", "none"] and m.category in ["technology", "experience_duration"]:
+                missing_report.append({
+                    "requirement": m.requirement,
+                    "importance": m.importance,
+                    "category": m.category,
+                    "notes": m.notes or "No evidence found in candidate profile. Omitted from resume to prevent hallucination.",
+                })
+
+        partial_report = []
+        for m in mappings:
+            if m.status == "PARTIAL":
+                partial_report.append({
+                    "requirement": m.requirement,
+                    "evidence_source": m.evidence_source,
+                    "source_entity": m.source_entity,
+                    "evidence_text": m.evidence_text,
+                    "notes": m.notes,
+                })
+
+        strong_report = []
+        for m in mappings:
+            if m.status in ["MATCHED", "STRONG"]:
+                strong_report.append({
+                    "requirement": m.requirement,
+                    "evidence_source": m.evidence_source,
+                    "source_entity": m.source_entity,
+                    "evidence_text": m.evidence_text,
+                })
+
+        recommendations = []
+        if mand_missing:
+            recommendations.append(f"Candidate has gaps in mandatory requirements: {', '.join(mand_missing[:3])}. Consider acquiring practical exposure.")
+        if pref_missing:
+            recommendations.append(f"Preferred skills not currently in profile: {', '.join(pref_missing[:3])}.")
+        if partial_report:
+            tech_partials = [p["requirement"] for p in partial_report if p.get("evidence_source") in ["project", "academic_project"]]
+            if tech_partials:
+                recommendations.append(f"Technologies {', '.join(tech_partials[:2])} are backed by personal projects. Highlight their architectural depth.")
+        if not recommendations:
+            recommendations.append("Strong overall match! Emphasize quantifiable business outcomes and production scaling in interviews.")
+
+        return ATSScoringBreakdown(
+            overall_score=overall,
+            dimensions=dimensions,
+            mandatory_skill_coverage_pct=mand_cov,
+            preferred_skill_coverage_pct=pref_cov,
+            missing_requirements=missing_report,
+            partial_matches=partial_report,
+            strong_matches=strong_report,
+            formatting_warnings=formatting_warnings,
+            recommendations=recommendations,
+        )
+
     def map_evidence(
         self,
         profile: dict[str, Any],
@@ -514,7 +921,7 @@ class EvidenceMapper:
         required_skills = job.get("required_skills") or []
         job_desc = job.get("description") or ""
 
-        reqs = self.extract_jd_requirements(job_title, required_skills, job_desc)
+        reqs, jd_analysis = self.analyze_jd(job_title, required_skills, job_desc)
 
         mappings: list[EvidenceItem] = []
         matched_skills: list[str] = []
@@ -529,6 +936,7 @@ class EvidenceMapper:
             importance = req["importance"]
 
             item = self._evaluate_requirement(canon_name, category, importance, req["raw_text"], index)
+            item.category = category
             mappings.append(item)
 
             # Classify technology skills into specific buckets
@@ -578,12 +986,16 @@ class EvidenceMapper:
                     cleaned_text = pat.sub("", cleaned_text).strip(" .-\t")
                 item.evidence_text = cleaned_text
 
+        ats_score = self.compute_ats_score(mappings, jd_analysis, index)
+
         return EvidenceMappingResult(
             mappings=mappings,
             skills_classification=skills_cls,
             candidate_index=index,
             target_job_title=job_title,
             target_company=company,
+            jd_analysis=jd_analysis,
+            ats_score=ats_score,
         )
 
     def _evaluate_requirement(

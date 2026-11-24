@@ -63,6 +63,12 @@ EVIDENCE MAPPING & FACTUAL BOUNDARIES (COMPLY STRICTLY):
 - NEVER invent corporate financial figures (e.g. "$40M revenue increase", "99.999% efficiency leap").
 - NO UNSUPPORTED OUTCOME CLAIMS: Do NOT invent outcomes like "enhancing workflow efficiency", "improving team coordination", "boosting productivity", or "streamlining operations" unless that exact outcome is explicitly present in the source candidate profile. Keep descriptions strictly factual based on what was built and used.
 
+9. AI & LLM OPTIMIZATION (WHEN TARGETING GENAI / AGENTIC / LLM ROLES):
+- If the role targets Generative AI, Agentic AI, LLM, or Copilot development:
+  * Prioritize verified LLM technologies (LangChain, LangGraph, Ollama, ChromaDB, Embeddings, RAG, Document Ingestion) prominently in the summary and projects.
+  * Clearly distinguish hands-on personal/independent projects from production enterprise deployments.
+  * ZERO HALLUCINATION MANDATE: NEVER claim Microsoft Copilot Studio, AWS Bedrock, or Azure OpenAI without explicit candidate profile evidence! Report unverified technologies as missing gaps.
+
 Return ONLY a valid JSON object matching this exact schema:
 {{
   "target_headline": "Professional Role Headline | Primary Verified Tech Stacks",
@@ -245,6 +251,15 @@ def select_and_tailor_projects(
                 score += 4
             if "node" in full_text and "api" in full_text:
                 score += 3
+
+        # Special boost for GenAI / Agentic / AI matching projects
+        is_ai_role = any(
+            ai_kw in job_title.lower() or ai_kw in " ".join(required_skills).lower()
+            for ai_kw in ["genai", "generative", "agent", "llm", "rag", "ai", "ml", "langchain", "langgraph"]
+        )
+        if is_ai_role:
+            if any(k in full_text for k in ["langgraph", "langchain", "ollama", "rag", "chromadb", "embeddings", "agent", "vector"]):
+                score += 7
 
         for jw in job_words:
             if jw in full_text:
@@ -1069,6 +1084,14 @@ class ResumeBuilderAgent:
                 "additional_relevant_skills": skills_cls.additional_relevant_skills,
             },
             "evidence_mappings": [m.model_dump() for m in evidence_result.mappings],
+            "jd_analysis": evidence_result.jd_analysis.model_dump(),
+            "ats_score": evidence_result.ats_score.model_dump(),
+            "gap_analysis": {
+                "missing_requirements": evidence_result.ats_score.missing_requirements,
+                "partial_matches": evidence_result.ats_score.partial_matches,
+                "strong_matches": evidence_result.ats_score.strong_matches,
+                "recommendations": evidence_result.ats_score.recommendations,
+            },
             "required_skills": required_skills,
             "personal": CanonicalDict({
                 **{k: v for k, v in personal_data.items() if k != "fullName"},
@@ -1194,6 +1217,7 @@ class ResumeBuilderAgent:
         if res.upserted_id:
             resume_doc["_id"] = str(res.upserted_id)
 
+        calculated_ats_score = int(round(evidence_result.ats_score.overall_score))
         await db.job_matches.update_one(
             {"user_id": ObjectId(user_id), "job_id": ObjectId(job_id)},
             {
@@ -1201,10 +1225,11 @@ class ResumeBuilderAgent:
                     "tailored_resume": resume_content,
                     "resume_generated_at": now.isoformat(),
                     "resume_docx_path": docx_path,
+                    "resume_pdf_path": pdf_path,
+                    "compatibility_score": calculated_ats_score,
                 },
                 "$setOnInsert": {
                     "status": "pending",
-                    "compatibility_score": 75,
                 },
             },
             upsert=True,

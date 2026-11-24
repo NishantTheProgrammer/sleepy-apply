@@ -1086,6 +1086,7 @@ class ResumeBuilderAgent:
             "evidence_mappings": [m.model_dump() for m in evidence_result.mappings],
             "jd_analysis": evidence_result.jd_analysis.model_dump(),
             "ats_score": evidence_result.ats_score.model_dump(),
+            "original_ats_score": evidence_result.original_ats_score.model_dump(),
             "gap_analysis": {
                 "missing_requirements": evidence_result.ats_score.missing_requirements,
                 "partial_matches": evidence_result.ats_score.partial_matches,

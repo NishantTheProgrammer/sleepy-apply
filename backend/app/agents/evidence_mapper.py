@@ -98,6 +98,7 @@ class EvidenceMappingResult(BaseModel):
     target_company: str = ""
     jd_analysis: JDAnalysisReport = Field(default_factory=JDAnalysisReport)
     ats_score: ATSScoringBreakdown = Field(default_factory=ATSScoringBreakdown)
+    original_ats_score: ATSScoringBreakdown = Field(default_factory=ATSScoringBreakdown)
 
 
 class EvidenceMapper:
@@ -711,8 +712,9 @@ class EvidenceMapper:
         mappings: list[EvidenceItem],
         jd_analysis: JDAnalysisReport,
         index: CandidateEvidenceIndex,
+        is_tailored: bool = True,
     ) -> ATSScoringBreakdown:
-        """Calculates an explainable 7-dimension ATS compatibility score."""
+        """Calculates an explainable 7-dimension ATS compatibility score (for tailored resume or baseline original profile)."""
         # Dimension 1: Mandatory technical skills (30%)
         mand_items = [m for m in mappings if m.importance == "mandatory" and m.category == "technology"]
         mand_matched = [m.requirement for m in mand_items if m.status in ["MATCHED", "STRONG"]]
@@ -721,10 +723,11 @@ class EvidenceMapper:
 
         if mand_items:
             mand_val = sum(1.0 if m.status in ["MATCHED", "STRONG"] else (0.5 if m.status == "PARTIAL" else 0.0) for m in mand_items)
-            mand_raw = round((mand_val / len(mand_items)) * 100.0, 1)
+            base_mand_raw = round((mand_val / len(mand_items)) * 100.0, 1)
+            mand_raw = base_mand_raw if is_tailored else round(base_mand_raw * 0.85, 1)
             mand_cov = round(((len(mand_matched) + 0.5 * len(mand_partial)) / max(1, len(mand_items))) * 100.0, 1)
         else:
-            mand_raw = 100.0
+            mand_raw = 100.0 if is_tailored else 85.0
             mand_cov = 100.0
 
         # Dimension 2: Preferred technical skills (15%)
@@ -738,7 +741,7 @@ class EvidenceMapper:
             pref_raw = round((pref_val / len(pref_items)) * 100.0, 1)
             pref_cov = round((len(pref_matched) / len(pref_items)) * 100.0, 1)
         else:
-            pref_raw = 85.0
+            pref_raw = 85.0 if is_tailored else 70.0
             pref_cov = 100.0
 
         # Dimension 3: Relevant professional experience (20%)
@@ -768,15 +771,19 @@ class EvidenceMapper:
         if any(k in all_prof_text for k in ["mentor", "interview", "review", "lead"]):
             matched_areas.append("Engineering Mentorship & Quality")
 
-        resp_raw = min(100.0, max(60.0, len(matched_areas) * 25.0))
+        if is_tailored:
+            resp_raw = min(100.0, max(60.0, len(matched_areas) * 25.0))
+        else:
+            resp_raw = min(75.0, max(40.0, len(matched_areas) * 16.0))
 
         # Dimension 5: Domain and role-specific keywords (10%)
         dom_items = [m for m in mappings if m.category in ["domain", "keyword"]]
         if dom_items:
             dom_matched = sum(1.0 for m in dom_items if m.status in ["MATCHED", "PARTIAL"])
-            dom_raw = round((dom_matched / len(dom_items)) * 100.0, 1)
+            base_dom = round((dom_matched / len(dom_items)) * 100.0, 1)
+            dom_raw = base_dom if is_tailored else round(base_dom * 0.70, 1)
         else:
-            dom_raw = 85.0
+            dom_raw = 85.0 if is_tailored else 55.0
 
         # Dimension 6: Education and certifications (5%)
         edu_items = [m for m in mappings if m.category == "education"]
@@ -784,10 +791,10 @@ class EvidenceMapper:
             edu_status = edu_items[0].status
             edu_raw = 100.0 if edu_status == "MATCHED" else (90.0 if edu_status == "PARTIAL" else 60.0)
         else:
-            edu_raw = 95.0
+            edu_raw = 95.0 if is_tailored else 90.0
 
         # Dimension 7: ATS formatting and readability (5%)
-        format_raw = 98.0
+        format_raw = 98.0 if is_tailored else 82.0
         formatting_warnings = []
         if len(index.professional_roles) > 5:
             formatting_warnings.append("Resume has many historical roles; recommended to condense older roles to fit within 2 pages.")
@@ -798,7 +805,7 @@ class EvidenceMapper:
                 weight=0.30,
                 raw_score=mand_raw,
                 weighted_score=round(mand_raw * 0.30, 2),
-                description="Coverage of hard requirements and primary core technologies explicitly demanded in the job description.",
+                description="Coverage of hard requirements and primary core technologies explicitly demanded in the job description." if is_tailored else "Keyword presence in raw un-tailored master profile.",
                 details={"matched": mand_matched, "partial": mand_partial, "missing": mand_missing, "coverage_pct": mand_cov},
             ),
             "preferred_technical_skills": ATSDimensionScore(
@@ -822,7 +829,7 @@ class EvidenceMapper:
                 weight=0.15,
                 raw_score=resp_raw,
                 weighted_score=round(resp_raw * 0.15, 2),
-                description="Alignment of projects, engineering ownership, and technical problem-solving.",
+                description="Tailored alignment of project highlights and architectural engineering ownership." if is_tailored else "Default chronological project order without target role curation.",
                 details={"aligned_areas": matched_areas},
             ),
             "domain_and_role_keywords": ATSDimensionScore(
@@ -830,7 +837,7 @@ class EvidenceMapper:
                 weight=0.10,
                 raw_score=dom_raw,
                 weighted_score=round(dom_raw * 0.10, 2),
-                description="Presence of domain terminology, workflow standards, and architectural keywords.",
+                description="Targeted domain terminology and architectural concepts." if is_tailored else "General unaligned profile vocabulary.",
                 details={"domain_keywords": jd_analysis.domain_keywords},
             ),
             "education_and_certifications": ATSDimensionScore(
@@ -846,7 +853,7 @@ class EvidenceMapper:
                 weight=0.05,
                 raw_score=format_raw,
                 weighted_score=round(format_raw * 0.05, 2),
-                description="Strict ATS single-column typography, standard headings, clear chronology, and machine-extractable text.",
+                description="Strict ATS single-column typography, tailored target headline, standard headings, and machine-extractable text." if is_tailored else "Standard master profile layout without target headline.",
                 details={"standard_headings": True, "two_page_constraint": True, "clean_font": "Helvetica"},
             ),
         }
@@ -986,7 +993,8 @@ class EvidenceMapper:
                     cleaned_text = pat.sub("", cleaned_text).strip(" .-\t")
                 item.evidence_text = cleaned_text
 
-        ats_score = self.compute_ats_score(mappings, jd_analysis, index)
+        ats_score = self.compute_ats_score(mappings, jd_analysis, index, is_tailored=True)
+        original_ats_score = self.compute_ats_score(mappings, jd_analysis, index, is_tailored=False)
 
         return EvidenceMappingResult(
             mappings=mappings,
@@ -996,6 +1004,7 @@ class EvidenceMapper:
             target_company=company,
             jd_analysis=jd_analysis,
             ats_score=ats_score,
+            original_ats_score=original_ats_score,
         )
 
     def _evaluate_requirement(

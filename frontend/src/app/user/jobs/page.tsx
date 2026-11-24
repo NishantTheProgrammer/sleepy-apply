@@ -409,6 +409,11 @@ function JobsPageContent() {
   } | null>(null);
   const [recentlyCompleted, setRecentlyCompleted] = useState(false);
 
+  const matchPercent = useMemo(() => {
+    if (!pipelineStatus?.matching_total || pipelineStatus.matching_total <= 0) return 0;
+    return Math.min(100, Math.max(1, Math.round((pipelineStatus.matching_progress / pipelineStatus.matching_total) * 100)));
+  }, [pipelineStatus?.matching_progress, pipelineStatus?.matching_total]);
+
   // Manual Delete State
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
@@ -553,6 +558,9 @@ function JobsPageContent() {
       }
     } catch (err) {
       console.warn("Failed to load user jobs:", err);
+      setTimeout(() => {
+        load(p, src, query);
+      }, 1500);
     } finally {
       setLoading(false);
     }
@@ -602,34 +610,35 @@ function JobsPageContent() {
       is_matching: true,
       is_discovering: true,
       matching_progress: 0,
-      matching_total: total || 1216,
+      matching_total: total || 1566,
       message: "Jobs matched and discovery running in background",
     });
     try {
       const res = await jobsApi.fetchNow();
-      setDiscoverMsg(res.message || "Jobs matched and discovery running in background");
       setDiscoverMsg(res.message || "Discovery started! Matching jobs to your profile…");
 
-      // Poll every 2 seconds until matched jobs arrive
+      // Poll every 1.5 seconds until matched jobs arrive
       let attempts = 0;
       const interval = setInterval(async () => {
         attempts += 1;
         try {
-          const fresh = await jobsApi.list({ page: 1, limit: 30, source: sourceFilter });
+          const fresh = await jobsApi.list({ page: 1, limit: 1000, min_score: 50, source: sourceFilter });
           const items = (fresh.items || []) as JobItem[];
-          if (items.length > 0 || attempts >= 6) {
-            clearInterval(interval);
+          if (items.length > 0) {
             setJobs(items);
             setTotal(fresh.total || items.length);
+          }
+          if (attempts >= 10 || !pipelineStatus?.is_running) {
+            clearInterval(interval);
             setDiscovering(false);
           }
         } catch {
-          if (attempts >= 6) {
+          if (attempts >= 10) {
             clearInterval(interval);
             setDiscovering(false);
           }
         }
-      }, 2000);
+      }, 1500);
     } catch (err: unknown) {
       setDiscoverMsg(err instanceof Error ? err.message : "Failed to trigger discovery");
       setDiscovering(false);
@@ -891,50 +900,82 @@ function JobsPageContent() {
 
           <button
             onClick={handleDiscoverJobs}
-            disabled={discovering || crawlingNcr}
+            disabled={discovering || (pipelineStatus?.is_running ?? false) || crawlingNcr}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
           >
-            {discovering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {discovering ? "Discovering & Scoring…" : "Discover Jobs Now"}
+            {pipelineStatus?.is_running || discovering ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>
+                  {pipelineStatus?.is_running && matchPercent > 0
+                    ? `Matching (${matchPercent}%)…`
+                    : "Discovering & Scoring…"}
+                </span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Discover Jobs Now</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
       {/* ── Active Background Pipeline Status Banner ── */}
       {pipelineStatus?.is_running && (
-        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 border border-indigo-500/40 shadow-xl backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 shrink-0">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">
-                  {pipelineStatus.is_discovering && !pipelineStatus.is_matching
-                    ? "AI discovery scanning career portals for fresh openings"
-                    : "Jobs matched and discovery running in background"}
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
-                  Live
-                </span>
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-900/90 border border-indigo-500/40 shadow-2xl backdrop-blur-md flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 shrink-0">
+                <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                {pipelineStatus.is_discovering && !pipelineStatus.is_matching
-                  ? `Evaluated all active positions against your profile. Now scanning live career sites for new openings...`
-                  : `AI matching engine is evaluating active positions against your profile${
-                      pipelineStatus.matching_total > 0
-                        ? ` (Processed ${pipelineStatus.matching_progress} / ${pipelineStatus.matching_total} jobs)...`
-                        : "..."
-                    }`}
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-white">
+                    {pipelineStatus.is_discovering && !pipelineStatus.is_matching
+                      ? "Phase 2: Scanning Career Portals for Fresh Postings"
+                      : "Phase 1: Evaluating & Matching Active Positions"}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                    Live ({matchPercent}%)
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  {pipelineStatus.is_discovering && !pipelineStatus.is_matching
+                    ? `Evaluated active positions. Now actively checking career portals for unlisted roles...`
+                    : `AI matching engine is evaluating active positions against your profile (${pipelineStatus.matching_progress} of ${pipelineStatus.matching_total || 1566} processed)`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-auto shrink-0">
+              <span className="text-xs font-mono font-bold text-indigo-300">
+                {matchPercent}%
+              </span>
+              <button
+                onClick={() => load(1)}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Refresh matched jobs list"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh List
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => load(1)}
-            className="self-end sm:self-auto px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh List
-          </button>
+
+          {/* Visual Progress Bar */}
+          <div className="w-full bg-slate-950/70 rounded-full h-2 p-0.5 border border-white/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                pipelineStatus.is_discovering && !pipelineStatus.is_matching
+                  ? "bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 animate-pulse"
+                  : "bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400"
+              }`}
+              style={{
+                width: pipelineStatus.is_discovering && !pipelineStatus.is_matching ? "100%" : `${matchPercent}%`,
+              }}
+            />
+          </div>
         </div>
       )}
 
@@ -1106,10 +1147,26 @@ function JobsPageContent() {
         {/* ── LEFT COLUMN: MASTER JOB LIST (Cols 1-7) ── */}
         <div className="xl:col-span-7 space-y-3">
           {loading || (discovering && filteredJobs.length === 0) ? (
-            <div className="glass rounded-2xl p-16 flex flex-col justify-center items-center gap-3 text-slate-400 text-sm">
-              <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
-              <span className="font-bold text-white text-base">Evaluating & Matching Jobs…</span>
-              <span className="text-xs text-slate-400">Scoring positions against your profile, skills, and HR contacts in real time</span>
+            <div className="glass rounded-2xl p-16 flex flex-col justify-center items-center gap-4 text-slate-400 text-sm max-w-xl mx-auto w-full">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              <div className="text-center">
+                <span className="font-bold text-white text-base block">Evaluating & Matching Jobs…</span>
+                <span className="text-xs text-slate-400 mt-1 block">
+                  {pipelineStatus?.is_running
+                    ? `Processed ${pipelineStatus.matching_progress} of ${pipelineStatus.matching_total || 1566} jobs (${matchPercent}%)`
+                    : "Scoring positions against your profile, skills, and HR contacts in real time"}
+                </span>
+              </div>
+
+              {/* Progress Bar inside Loading Card */}
+              {pipelineStatus?.is_running && (
+                <div className="w-full bg-slate-950/80 rounded-full h-2 p-0.5 border border-white/10 overflow-hidden mt-1">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${matchPercent}%` }}
+                  />
+                </div>
+              )}
             </div>
           ) : filteredJobs.length === 0 ? (
             <div className="glass rounded-2xl p-10 text-center">

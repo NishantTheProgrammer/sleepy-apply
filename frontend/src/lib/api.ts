@@ -6,7 +6,7 @@ const API_URL =
 let isRefreshingToken = false;
 let refreshPromise: Promise<boolean> | null = null;
 
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 20000): Promise<Response> {
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 20000, retries = 1): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(new Error("Request timed out")), timeoutMs);
   try {
@@ -15,6 +15,12 @@ async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 
       signal: options?.signal ?? controller.signal,
     });
     return res;
+  } catch (err) {
+    if (retries > 0 && !options?.signal?.aborted) {
+      await new Promise((r) => setTimeout(r, 600));
+      return fetchWithTimeout(url, options, timeoutMs, retries - 1);
+    }
+    throw err;
   } finally {
     clearTimeout(id);
   }

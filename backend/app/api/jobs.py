@@ -76,11 +76,12 @@ async def trigger_fetch_now(request: Request):
                 except Exception as match_err:
                     logger.debug("Job matching error on item", job_id=str(j.get("_id")), error=str(match_err))
                 count += 1
-                if count == 1 or count % 25 == 0 or count == total_active:
+                if count == 1 or count % 10 == 0 or count == total_active:
                     await db.user_pipeline_status.update_one(
                         {"user_id": ObjectId(user_id)},
                         {"$set": {
                             "matching_progress": count,
+                            "matching_total": total_active,
                             "updated_at": datetime.now(timezone.utc),
                         }}
                     )

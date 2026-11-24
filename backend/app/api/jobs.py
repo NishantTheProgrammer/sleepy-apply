@@ -137,6 +137,32 @@ async def get_pipeline_status(request: Request):
             "matching_total": 0,
             "message": "",
         }
+
+    # Auto-heal stale running status if background process terminated/reloaded (>30s without heartbeat)
+    if status.get("is_running"):
+        updated_at = status.get("updated_at")
+        if updated_at:
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            if (now - updated_at).total_seconds() > 30:
+                logger.info("Auto-healing stale pipeline status", user_id=user_id, elapsed=(now - updated_at).total_seconds())
+                await db.user_pipeline_status.update_one(
+                    {"_id": status["_id"]},
+                    {"$set": {
+                        "is_running": False,
+                        "is_matching": False,
+                        "is_discovering": False,
+                        "message": "Jobs matched and discovery complete",
+                        "completed_at": now,
+                        "updated_at": now,
+                    }}
+                )
+                status["is_running"] = False
+                status["is_matching"] = False
+                status["is_discovering"] = False
+                status["message"] = "Jobs matched and discovery complete"
+
     status["_id"] = str(status["_id"])
     status["user_id"] = str(status["user_id"])
     if status.get("started_at") and hasattr(status["started_at"], "isoformat"):

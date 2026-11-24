@@ -314,15 +314,7 @@ async def list_jobs(
     cursor = db.job_matches.aggregate(pipeline)
     results = []
     async for doc in cursor:
-        doc["_id"] = str(doc["_id"])
-        doc["user_id"] = str(doc["user_id"])
-        doc["job_id"] = str(doc["job_id"])
-        doc["job"]["_id"] = str(doc["job"]["_id"])
-        if doc.get("application"):
-            doc["application"]["_id"] = str(doc["application"]["_id"])
-        if hasattr(doc.get("resume_generated_at"), "isoformat"):
-            doc["resume_generated_at"] = doc["resume_generated_at"].isoformat()
-        results.append(doc)
+        results.append(serialize_mongo(doc))
 
     total = await db.job_matches.count_documents(match_filter)
     return {"items": results, "total": total, "page": page, "limit": limit}
@@ -338,27 +330,15 @@ async def get_job(request: Request, job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    job["_id"] = str(job["_id"])
-
     match = await db.job_matches.find_one(
         {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
     )
-    if match:
-        match["_id"] = str(match["_id"])
-        match["user_id"] = str(match["user_id"])
-        match["job_id"] = str(match["job_id"])
-        if hasattr(match.get("resume_generated_at"), "isoformat"):
-            match["resume_generated_at"] = match["resume_generated_at"].isoformat()
 
     application = await db.applications.find_one(
         {"job_id": ObjectId(job_id), "user_id": ObjectId(user_id)}
     )
-    if application:
-        application["_id"] = str(application["_id"])
-        application["user_id"] = str(application["user_id"])
-        application["job_id"] = str(application["job_id"])
 
-    return {"job": job, "match": match, "application": application}
+    return serialize_mongo({"job": job, "match": match, "application": application})
 
 
 @router.post("/{job_id}/apply")

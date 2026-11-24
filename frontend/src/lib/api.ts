@@ -6,7 +6,12 @@ const API_URL =
 let isRefreshingToken = false;
 let refreshPromise: Promise<boolean> | null = null;
 
-async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 20000, retries = 1): Promise<Response> {
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+  retries?: number;
+}
+
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 60000, retries = 1): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(new Error("Request timed out")), timeoutMs);
   try {
@@ -34,7 +39,7 @@ async function doTokenRefresh(): Promise<boolean> {
       const res = await fetchWithTimeout(`${API_URL}/api/auth/refresh`, {
         method: "POST",
         credentials: "include",
-      }, 8000);
+      }, 10000);
       return res.ok;
     } catch {
       return false;
@@ -46,12 +51,14 @@ async function doTokenRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestOptions): Promise<T> {
+  const timeoutMs = options?.timeoutMs ?? 60000;
+  const retries = options?.retries ?? 1;
   let res = await fetchWithTimeout(`${API_URL}${path}`, {
     credentials: "include", // send httpOnly cookies
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
-  });
+  }, timeoutMs, retries);
 
   // Transparently refresh token and retry if 401 Unauthorized
   if (
@@ -279,7 +286,7 @@ export const jobsApi = {
       screenshot_path?: string;
       screenshot_base64?: string;
       questions_answered?: Array<{ field: string; answer: string }>;
-    }>(`/api/jobs/${id}/auto-apply-form`, { method: "POST" }),
+    }>(`/api/jobs/${id}/auto-apply-form`, { method: "POST", timeoutMs: 120000, retries: 0 }),
   applyVisible: (jobId: string) =>
     request<{
       ok: boolean;
@@ -287,7 +294,7 @@ export const jobsApi = {
       message: string;
       target_url?: string;
       details?: Record<string, unknown>;
-    }>(`/api/jobs/${jobId}/apply-visible`, { method: "POST" }),
+    }>(`/api/jobs/${jobId}/apply-visible`, { method: "POST", timeoutMs: 120000, retries: 0 }),
   fetchNow: () => request<{ ok: boolean; message: string }>("/api/jobs/fetch-now", { method: "POST" }),
   generateResume: (jobId: string, template?: string) =>
     request<{
@@ -296,7 +303,11 @@ export const jobsApi = {
       tailored_resume: Record<string, unknown>;
       generated_at: string;
       docx_path?: string;
-    }>(`/api/jobs/${jobId}/generate-resume${template ? `?template=${template}` : ""}`, { method: "POST" }),
+    }>(`/api/jobs/${jobId}/generate-resume${template ? `?template=${template}` : ""}`, {
+      method: "POST",
+      timeoutMs: 180000, // 3 minutes for local Ollama models (e.g. qwen2.5-coder:14b)
+      retries: 0,
+    }),
   getResume: (jobId: string) =>
     request<{
       ok: boolean;
@@ -312,6 +323,8 @@ export const jobsApi = {
     request<{ ok: boolean; message: string; status?: CrawlerStatusResponse }>("/api/jobs/crawl-delhi-ncr", {
       method: "POST",
       body: JSON.stringify(options || {}),
+      timeoutMs: 180000,
+      retries: 0,
     }),
   getCrawlerStatus: () =>
     request<CrawlerStatusResponse>("/api/jobs/crawler-status"),

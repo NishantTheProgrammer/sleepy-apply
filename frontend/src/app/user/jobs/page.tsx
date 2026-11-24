@@ -751,8 +751,11 @@ function JobsPageContent() {
           })
         );
       }
-    } catch (err) {
-      console.error("Failed to generate tailored resume:", err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate tailored resume";
+      setDiscoverMsg(`Resume tailoring notice: ${msg}`);
+      setTimeout(() => setDiscoverMsg(""), 6000);
+      console.warn("Failed to generate tailored resume:", err);
     } finally {
       setGeneratingResumeId(null);
     }

@@ -61,8 +61,8 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             fontSize=11,
             leading=14,
             textColor=colors.HexColor("#1e293b"),
-            spaceBefore=8,
-            spaceAfter=3,
+            spaceBefore=10,
+            spaceAfter=4,
         )
 
         body_style = ParagraphStyle(
@@ -137,7 +137,7 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
             story.append(Paragraph("PROFESSIONAL SUMMARY", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
             story.append(Paragraph(summary, body_style))
-            story.append(Spacer(1, 4))
+            story.append(Spacer(1, 14))
 
         # 3. Skills (supports both categorized dict and flat list)
         skills_raw = content.get("skills")
@@ -180,14 +180,14 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                         story.append(Paragraph(f"<b>{cat_label}:</b> {', '.join(items)}", body_style))
             elif isinstance(skills_raw, list):
                 story.append(Paragraph(" • ".join(skills_raw), body_style))
-            story.append(Spacer(1, 4))
+            story.append(Spacer(1, 14))
 
         # 4. Experience
         experience = content.get("experience", [])
         if experience:
             story.append(Paragraph("WORK EXPERIENCE", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
-            for exp in experience:
+            for exp_idx, exp in enumerate(experience):
                 title = exp.get("jobTitle") or exp.get("title", "")
                 company = exp.get("company", "")
                 start = exp.get("startDate") or exp.get("start_date", "")
@@ -230,14 +230,17 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                 for ach in exp.get("achievements", []):
                     story.append(Paragraph(f"• {ach}", bullet_style))
 
-                story.append(Spacer(1, 4))
+                # Spacing between roles
+                if exp_idx < len(experience) - 1:
+                    story.append(Spacer(1, 8))
+            story.append(Spacer(1, 14))
 
         # 5. Independent Projects
         projects = content.get("projects", [])
         if projects:
             story.append(Paragraph("PROJECTS", section_heading))
             story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#cbd5e1"), spaceAfter=5))
-            for proj in projects:
+            for proj_idx, proj in enumerate(projects):
                 p_name = proj.get("name", "")
                 tech = ", ".join(proj.get("technologies", []))
                 p_desc = proj.get("description", "")
@@ -247,7 +250,9 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                 story.append(Paragraph(proj_line, item_title_style))
                 if p_desc:
                     story.append(Paragraph(f"• {p_desc}", bullet_style))
-                story.append(Spacer(1, 3))
+                if proj_idx < len(projects) - 1:
+                    story.append(Spacer(1, 6))
+            story.append(Spacer(1, 14))
 
         # 6. Education
         education = content.get("education", [])
@@ -263,6 +268,7 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                     line += f" <font color='#64748b'>({yr})</font>"
                 story.append(Paragraph(line, body_style))
                 story.append(Spacer(1, 3))
+            story.append(Spacer(1, 14))
 
         # 7. Achievements & Badges
         achievements = content.get("achievements", [])
@@ -273,7 +279,7 @@ class DefaultATSResumeTemplate(BaseResumeTemplate):
                 t = ach.get("title") if isinstance(ach, dict) else str(ach)
                 if t:
                     story.append(Paragraph(f"• {t}", bullet_style))
-            story.append(Spacer(1, 3))
+            story.append(Spacer(1, 14))
 
         doc.build(story)
         return output_path

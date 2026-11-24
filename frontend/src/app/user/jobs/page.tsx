@@ -2414,7 +2414,7 @@ function JobsPageContent() {
 
                           {/* ── PROFESSIONAL SUMMARY ── */}
                           {summaryText && (
-                            <div className="mb-4">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>
                                 {isDefault ? "PROFESSIONAL SUMMARY" : "SUMMARY"}
                               </h2>
@@ -2426,7 +2426,7 @@ function JobsPageContent() {
 
                           {/* ── TECHNICAL SKILLS / CORE COMPETENCIES ── */}
                           {skillsData && (
-                            <div className="mb-4">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>
                                 {isDefault ? "CORE COMPETENCIES & SKILLS" : "TECHNICAL SKILLS"}
                               </h2>
@@ -2503,11 +2503,11 @@ function JobsPageContent() {
 
                           {/* ── PROFESSIONAL EXPERIENCE ── */}
                           {experienceList.length > 0 && (
-                            <div className="mb-4">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>
                                 {isDefault ? "PROFESSIONAL EXPERIENCE" : "PROFESSIONAL EXPERIENCE"}
                               </h2>
-                              <div className="space-y-3.5">
+                              <div className="space-y-4">
                                 {experienceList.map((exp, idx) => {
                                   const expRecord = exp as Record<string, unknown>;
                                   const title = exp.title || expRecord.jobTitle || "Software Engineer";
@@ -2587,11 +2587,11 @@ function JobsPageContent() {
 
                           {/* ── FEATURED PROJECTS ── */}
                           {projectsList.length > 0 && (
-                            <div className="mb-4">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>
                                 {isDefault ? "FEATURED PROJECTS" : "PROJECTS"}
                               </h2>
-                              <div className="space-y-2.5">
+                              <div className="space-y-3">
                                 {projectsList.map((proj, idx) => {
                                   const projRecord = proj as Record<string, unknown>;
                                   const title = proj.title || projRecord.name || "Project";
@@ -2633,7 +2633,7 @@ function JobsPageContent() {
 
                           {/* ── EDUCATION ── */}
                           {educationList.length > 0 && (
-                            <div className="mb-2">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>
                                 {isDefault ? "EDUCATION" : "EDUCATION"}
                               </h2>
@@ -2670,7 +2670,7 @@ function JobsPageContent() {
 
                           {/* ── ACHIEVEMENTS (Optional) ── */}
                           {achievementsList.length > 0 && (
-                            <div className="mb-2">
+                            <div className="mb-6">
                               <h2 className={themeStyles.sectionHeader}>ACHIEVEMENTS</h2>
                               <ul className="list-disc list-outside pl-4 mt-1 space-y-0.5 text-slate-700 text-xs">
                                 {achievementsList.map((ach, idx) => {

@@ -252,6 +252,16 @@ export const jobsApi = {
   get: (id: string) => request(`/api/jobs/${id}`),
   delete: (id: string) => request<{ ok: boolean; message: string }>(`/api/jobs/${id}`, { method: "DELETE" }),
   apply: (id: string) => request(`/api/jobs/${id}/apply`, { method: "POST" }),
+  markApplied: (id: string, status: "APPLIED" | "DISCOVERED" = "APPLIED") =>
+    request<{
+      ok: boolean;
+      status: string;
+      job_id: string;
+      application: Record<string, unknown>;
+    }>(`/api/jobs/${id}/mark-applied`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
   autoApplyForm: (id: string) =>
     request<{
       ok: boolean;

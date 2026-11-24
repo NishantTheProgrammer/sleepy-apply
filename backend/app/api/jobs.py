@@ -11,6 +11,19 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 logger = structlog.get_logger()
 
 
+def serialize_mongo(obj):
+    """Recursively converts MongoDB ObjectIds and datetimes to JSON-serializable types."""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, list):
+        return [serialize_mongo(item) for item in obj]
+    if isinstance(obj, dict):
+        return {k: serialize_mongo(v) for k, v in obj.items()}
+    return obj
+
+
 @router.post("/fetch-now")
 async def trigger_fetch_now(request: Request):
     """Trigger job discovery and matching pipeline for current user."""
@@ -346,6 +359,90 @@ async def trigger_apply(request: Request, job_id: str):
     from app.graphs.application_graph import application_pipeline
     asyncio.create_task(application_pipeline.ainvoke({"user_id": user_id, "job_id": job_id}))
     return {"ok": True, "message": "Application pipeline triggered", "job_id": job_id}
+
+
+@router.post("/{job_id}/mark-applied")
+async def mark_job_applied(request: Request, job_id: str):
+    """
+    Manually mark (or unmark) a job application status as APPLIED.
+    Allows candidate to track positions they submitted on external portals or after dry-run review.
+    """
+    user_id = get_current_user_id(request)
+    db = get_db()
+
+    # Check job exists
+    try:
+        job_oid = ObjectId(job_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid job ID format")
+
+    job = await db.jobs.find_one({"_id": job_oid})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        pass
+
+    desired_status = (payload or {}).get("status", "APPLIED")
+    now = datetime.now(timezone.utc)
+    user_oid = ObjectId(user_id)
+
+    app_doc = await db.applications.find_one({"user_id": user_oid, "job_id": job_oid})
+    if not app_doc:
+        app_doc = {
+            "user_id": user_oid,
+            "job_id": job_oid,
+            "status": desired_status,
+            "status_history": [
+                {
+                    "status": desired_status,
+                    "timestamp": now,
+                    "reason": "Marked applied by candidate" if desired_status == "APPLIED" else "Status set by candidate",
+                }
+            ],
+            "applied_at": now if desired_status in ["APPLIED", "VERIFIED_SUCCESS"] else None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        res = await db.applications.insert_one(app_doc)
+        app_doc["_id"] = res.inserted_id
+    else:
+        update_fields = {
+            "status": desired_status,
+            "updated_at": now,
+        }
+        if desired_status in ["APPLIED", "VERIFIED_SUCCESS"]:
+            update_fields["applied_at"] = now
+        else:
+            update_fields["applied_at"] = None
+
+        await db.applications.update_one(
+            {"_id": app_doc["_id"]},
+            {
+                "$set": update_fields,
+                "$push": {
+                    "status_history": {
+                        "status": desired_status,
+                        "timestamp": now,
+                        "reason": "Updated status by candidate",
+                    }
+                },
+            },
+        )
+        app_doc["status"] = desired_status
+        app_doc["applied_at"] = update_fields["applied_at"]
+        app_doc["updated_at"] = now
+
+    logger.info("Application status updated by candidate", user_id=user_id, job_id=job_id, status=desired_status)
+    return {
+        "ok": True,
+        "status": desired_status,
+        "job_id": job_id,
+        "application": serialize_mongo(app_doc),
+    }
 
 
 @router.post("/{job_id}/auto-apply-form")

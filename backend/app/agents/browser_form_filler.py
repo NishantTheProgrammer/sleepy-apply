@@ -188,8 +188,8 @@ class BrowserFormFillerAgent:
         page = await context.new_page()
         return browser, context, page, False
 
-    async def _wait_for_login_if_needed(self, page: Any, actual_headless: bool) -> None:
-        """In visible mode, pause and wait for the user if the portal presents a login wall."""
+    async def _wait_for_login_if_needed(self, page: Any, actual_headless: bool, candidate_email: str = "") -> None:
+        """In visible mode, pause and wait for the user if the portal presents a login or account creation wall."""
         if actual_headless:
             return
 
@@ -207,7 +207,7 @@ class BrowserFormFillerAgent:
                         const nonAuthInputs = Array.from(
                             document.querySelectorAll('input:not([type="hidden"]):not([type="password"]):not([type="submit"]):not([type="button"]), textarea, select')
                         ).filter(isVisible);
-                        if (pwdInputs.length > 0 && nonAuthInputs.length <= 2) return true;
+                        if (pwdInputs.length > 0 && (nonAuthInputs.length <= 4 || /sign in|create account|log in/i.test(document.body?.innerText || ''))) return true;
 
                         // Detect Naukri slide-out login drawer
                         const naukriDrawer = document.querySelector('.naukri-drawer.open, .login-layer, .drawer-wrapper .login-layer');
@@ -215,9 +215,9 @@ class BrowserFormFillerAgent:
 
                         const url = (window.location.href || '').toLowerCase();
                         const looksLikeLoginUrl = /\\b(login|signin|sign-in|auth|sso|account)\\b/.test(url);
-                        if (looksLikeLoginUrl && nonAuthInputs.length <= 2) {
+                        if (looksLikeLoginUrl && nonAuthInputs.length <= 4) {
                             const text = (document.body?.innerText || '').toLowerCase();
-                            if (/sign in|log in|create account|continue with google/.test(text)) return true;
+                            if (/sign in|log in|create account|continue with google/i.test(text)) return true;
                         }
                         return false;
                     }"""
@@ -228,7 +228,19 @@ class BrowserFormFillerAgent:
         if not await _detect_login_wall():
             return
 
-        print("🔐 [Auto-Apply] Login wall detected — waiting up to 3 minutes for you to sign in...")
+        print("🔐 [Auto-Apply] Login / Account Creation wall detected — waiting up to 3 minutes for you to sign in...")
+
+        # Pre-fill candidate email into sign-in / create-account email field if empty
+        if candidate_email:
+            try:
+                email_loc = page.locator('input[type="email"], input[data-automation-id="email"], input[name="email"], input[id*="email" i], input[autocomplete="email"], input[autocomplete="username"], input#input-4').first
+                if await email_loc.count() > 0 and await email_loc.is_visible():
+                    cur_val = await email_loc.input_value()
+                    if not cur_val:
+                        await email_loc.fill(candidate_email, timeout=2000)
+            except Exception:
+                pass
+
         try:
             await page.evaluate(
                 """() => {
@@ -236,7 +248,7 @@ class BrowserFormFillerAgent:
                     const div = document.createElement('div');
                     div.id = 'sleepy-apply-login-banner';
                     div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;background:linear-gradient(90deg,#1e3a8a,#4338ca);color:#fff;padding:12px 20px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-                    div.textContent = '🔐 Login Required — Please sign in (or click Sign in with Google) in this window. Auto-Apply will resume automatically once the form loads...';
+                    div.textContent = '🔐 Workday / Account Required — Please sign in (or click Sign in with Google / Create Account) in this window. Auto-Apply will automatically resume form autofill once loaded...';
                     document.body.appendChild(div);
                 }"""
             )
@@ -307,8 +319,10 @@ class BrowserFormFillerAgent:
         name_parts = full_name.split() if full_name else []
         first_name = name_parts[0] if name_parts else ""
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else (personal.get("last_name") or personal.get("lastName") or "")
-        if not last_name:
-            last_name = "."
+        if not last_name or last_name.strip() in [".", "-", "_"]:
+            # Single-name candidates (e.g. Nishant): ATS forms validate names with ^[a-zA-Z\s'-]+$ and minlength>=2.
+            # Repeating first_name satisfies the mandatory Legal Family Name requirement without validation failure.
+            last_name = first_name
 
         email = (personal.get("email") or user.get("email") or "").strip()
         phone = (personal.get("phone") or "").strip()
@@ -553,6 +567,8 @@ class BrowserFormFillerAgent:
             "state": "Delhi" if "delhi" in city.lower() else "",
             "country": country or "India",
             "full_location": full_location,
+            "address": address or "Ashok Nagar",
+            "postal_code": location.get("postalCode") or location.get("postal_code") or location.get("zip") or "110093",
             "linkedin": linkedin,
             "github": github,
             "portfolio": portfolio,
@@ -621,7 +637,7 @@ class BrowserFormFillerAgent:
                 await self._dismiss_overlays_and_popups(page)
 
                 # Pause for manual sign-in if the portal requires an account first (visible mode only)
-                await self._wait_for_login_if_needed(page, actual_headless)
+                await self._wait_for_login_if_needed(page, actual_headless, candidate_email=email)
 
                 # ── 2a. Specialized ATS Handlers (e.g. Keka, Naukri) ──
                 is_keka = "keka" in page.url or await page.locator("#educationDetails, #skills-container").count() > 0
@@ -873,6 +889,8 @@ class BrowserFormFillerAgent:
         """Intelligently detects and dismisses cookie banners, tracking popups, and dialog overlays."""
         # 1. Target standard Accept / Dismiss buttons
         popup_triggers = [
+            'button[data-automation-id="legalNoticeAcceptButton"]',
+            'button:has-text("Accept Cookies")',
             'button:has-text("Accept")',
             'button:has-text("Accept All")',
             'button:has-text("Accept all cookies")',
@@ -964,6 +982,10 @@ class BrowserFormFillerAgent:
             pass
 
         apply_triggers = [
+            'a[data-automation-id="adventureButton"]',
+            'button[data-automation-id="adventureButton"]',
+            'a[data-automation-id="applyButton"]',
+            'button[data-automation-id="applyButton"]',
             'button:has-text("Apply on Company Site")',
             'a:has-text("Apply on Company Site")',
             'button:has-text("Apply on recruiter website")',
@@ -982,6 +1004,19 @@ class BrowserFormFillerAgent:
             '[data-qa="btn-apply"]',
             '.postings-btn',
         ]
+
+        # For SPA career portals (Workday, Phenom, Taleo, Greenhouse, Lever), wait for apply triggers to mount into DOM
+        try:
+            primary_triggers = apply_triggers[:8]
+            has_trigger = False
+            for psel in primary_triggers:
+                if await page.locator(psel).first.count() > 0:
+                    has_trigger = True
+                    break
+            if not has_trigger:
+                await page.wait_for_selector(", ".join(primary_triggers), timeout=6000)
+        except Exception:
+            pass
         for sel in apply_triggers:
             try:
                 loc = page.locator(sel).first
@@ -1046,8 +1081,40 @@ class BrowserFormFillerAgent:
                             break
             except Exception:
                 continue
-            except Exception:
-                continue
+
+        # Check if Workday, SmartRecruiters, or other portals opened a secondary menu / modal (e.g. "Apply Manually", "Autofill with Resume")
+        try:
+            sub_apply_triggers = [
+                '[data-automation-id="applyManually"]',
+                'a[data-automation-id="applyManually"]',
+                'button[data-automation-id="applyManually"]',
+                'a:has-text("Apply Manually")',
+                'button:has-text("Apply Manually")',
+                '[data-automation-id="autofillWithResume"]',
+                'a:has-text("Autofill with Resume")',
+                'button:has-text("Autofill with Resume")',
+                'a:has-text("Apply without registration")',
+                'button:has-text("Apply without registration")',
+                'a:has-text("Apply Online")',
+            ]
+            for sub_sel in sub_apply_triggers:
+                sub_loc = page.locator(sub_sel).first
+                if await sub_loc.count() > 0 and await sub_loc.is_visible():
+                    print(f"🔗 Clicking secondary apply option '{sub_sel}'...")
+                    href_sub = await sub_loc.get_attribute("href")
+                    try:
+                        await sub_loc.click(timeout=4000)
+                    except Exception:
+                        await sub_loc.dispatch_event("click")
+                    await page.wait_for_timeout(3000)
+                    if href_sub and href_sub.startswith("http") and "/apply" in href_sub and page.url != href_sub:
+                        await page.goto(href_sub, wait_until="domcontentloaded", timeout=20000)
+                        await page.wait_for_timeout(2000)
+                    await self._dismiss_overlays_and_popups(page)
+                    break
+        except Exception:
+            pass
+
         return page
 
     async def _fill_keka_specialized(self, page: Any, data: dict[str, Any], fields_filled: list[dict[str, Any]]) -> None:
@@ -1584,6 +1651,7 @@ class BrowserFormFillerAgent:
                             type: (el.type || 'text').toLowerCase(),
                             id: el.id || '',
                             name: el.name || '',
+                            dataAutoId: el.getAttribute('data-automation-id') || '',
                             placeholder: el.placeholder || '',
                             ariaLabel: el.getAttribute('aria-label') || '',
                             labelText: (labelText || '').trim(),
@@ -1601,10 +1669,13 @@ class BrowserFormFillerAgent:
                 if item.get("disabled") or item.get("value"):
                     continue
 
-                sig = f"{item['id']} {item['name']} {item['placeholder']} {item['ariaLabel']} {item['labelText']}".lower()
+                sig = f"{item['id']} {item['name']} {item.get('dataAutoId', '')} {item['placeholder']} {item['ariaLabel']} {item['labelText']}".lower()
                 if item.get("id"):
                     escaped_id = item["id"].replace('"', '\\"')
                     sel = f'[id="{escaped_id}"]'
+                elif item.get("dataAutoId"):
+                    escaped_aid = item["dataAutoId"].replace('"', '\\"')
+                    sel = f'[data-automation-id="{escaped_aid}"]'
                 elif item.get("name"):
                     escaped_name = item["name"].replace('"', '\\"')
                     sel = f'[name="{escaped_name}"]'
@@ -1707,12 +1778,19 @@ class BrowserFormFillerAgent:
                                 pass
                     continue
 
+                # Skip optional "local" (native script) name fields unless explicitly provided in non-Latin script
+                if any(k in sig for k in ["localfirstname", "localprimary", "local first", "local family", "local given", "legal local"]):
+                    continue
+
                 # Text / Textarea handling
-                if any(k in sig for k in ["first name", "given name", "legal first", "firstname", "fname", "cntryfields.firstname"]) and not any(k in sig for k in ["last", "family", "surname", "middle"]):
+                if any(k in sig for k in ["first name", "given name", "legal first", "firstname", "fname", "cntryfields.firstname"]) and not any(k in sig for k in ["last", "family", "surname", "middle", "local"]):
                     val_to_fill = data.get("first_name")
                     field_label = "First Name"
-                elif any(k in sig for k in ["last name", "surname", "family name", "lastname", "lname", "cntryfields.lastname"]):
-                    val_to_fill = data.get("last_name") or "."
+                elif any(k in sig for k in ["last name", "surname", "family name", "lastname", "lname", "cntryfields.lastname"]) and "local" not in sig:
+                    cand_ln = (data.get("last_name") or "").strip()
+                    if not cand_ln or cand_ln in [".", "-", "_"]:
+                        cand_ln = data.get("first_name") or "Applicant"
+                    val_to_fill = cand_ln
                     field_label = "Last Name"
                 elif any(k in sig for k in ["full name", "applicant name", "candidate name", "your name"]) and not any(k in sig for k in ["first", "last", "family", "given"]):
                     val_to_fill = data.get("full_name")
@@ -1720,13 +1798,19 @@ class BrowserFormFillerAgent:
                 elif "email" in sig and not any(k in sig for k in ["opt", "consent", "subscribe"]):
                     val_to_fill = data.get("email")
                     field_label = "Email Address"
-                elif any(k in sig for k in ["phone", "mobile", "cell", "telephone", "contact number"]) and not any(k in sig for k in ["code", "country", "device", "type"]):
-                    val_to_fill = data.get("phone_digits") or data.get("phone")
+                elif (any(k in sig for k in ["phone", "mobile", "cell", "telephone", "contact number"]) or any(k in item['id'].lower() for k in ["phonenumber", "phone_number", "mobilephone", "phonewidget"])) and item["tag"] != "select" and not any(k in sig for k in ["device", "devicetype"]):
+                    val_to_fill = data.get("phone_digits") or re.sub(r"\D", "", str(data.get("phone") or ""))[-10:]
                     field_label = "Phone Number"
-                elif any(k in sig for k in ["city", "current location", "location (city)", "cntryfields.city"]) and not any(k in sig for k in ["state", "country", "postal", "zip"]):
+                elif any(k in sig for k in ["city", "current location", "location (city)", "cntryfields.city", "addresssection_city"]) and not any(k in sig for k in ["state", "country", "postal", "zip"]):
                     val_to_fill = data.get("city")
                     field_label = "City"
-                elif any(k in sig for k in ["state", "province"]):
+                elif any(k in sig for k in ["address line", "street", "addresssection_addressline1"]) or (sig.strip() in ["address", "street address"]):
+                    val_to_fill = data.get("address")
+                    field_label = "Address"
+                elif any(k in sig for k in ["postal", "zip code", "zipcode", "pincode", "pin code", "addresssection_postalcode"]):
+                    val_to_fill = data.get("postal_code")
+                    field_label = "Postal Code"
+                elif any(k in sig for k in ["state", "province", "addresssection_countryregion"]):
                     val_to_fill = data.get("state")
                     field_label = "State"
                 elif "country" in sig and not any(k in sig for k in ["code", "dial"]):
@@ -1770,11 +1854,22 @@ class BrowserFormFillerAgent:
                     field_label = "Graduation Year"
 
                 if val_to_fill:
+                    filled_ok = False
                     try:
-                        await target_loc.fill(str(val_to_fill), timeout=1500)
-                        fields_filled.append({"field": field_label, "value": str(val_to_fill), "type": item["type"]})
+                        await target_loc.fill(str(val_to_fill), timeout=3500)
+                        filled_ok = True
                     except Exception:
-                        pass
+                        try:
+                            await target_loc.evaluate(
+                                "(el, val) => { el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); el.dispatchEvent(new Event('blur', { bubbles: true })); }",
+                                str(val_to_fill),
+                            )
+                            filled_ok = True
+                        except Exception:
+                            pass
+
+                    if filled_ok:
+                        fields_filled.append({"field": field_label, "value": str(val_to_fill), "type": item["type"]})
 
     async def _attach_resume_to_frames(self, page: Any, resume_path: str, fields_filled: list[dict[str, Any]]) -> None:
         """Finds and attaches candidate PDF resume to file inputs across all frames."""
@@ -1869,26 +1964,7 @@ class BrowserFormFillerAgent:
         except Exception:
             pass
 
-        # 2. Selects (Country, Work Authorization, etc.)
-        try:
-            selects = page.locator("select")
-            s_count = await selects.count()
-            for i in range(min(s_count, 5)):
-                sel = selects.nth(i)
-                if await sel.is_visible():
-                    html = await sel.inner_html()
-                    html_lower = html.lower()
-                    try:
-                        if "india" in html_lower:
-                            await sel.select_option(label="India")
-                        elif "yes" in html_lower:
-                            await sel.select_option(label="Yes")
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        # 3. Radio Buttons (e.g. Relocation, Notice Period, Authorization)
+        # 2. Radio Buttons (e.g. Former employee, Relocation, Notice Period, Authorization)
         try:
             radios = page.locator('input[type="radio"]')
             r_count = await radios.count()
@@ -1899,18 +1975,37 @@ class BrowserFormFillerAgent:
                 if not group_name or group_name in handled_groups:
                     continue
                 try:
-                    is_negative_question = any(k in group_name.lower() for k in ["previousworker", "former", "prior_employee", "criminal", "disciplinary", "conflict"])
+                    is_negative_question = any(k in group_name.lower() for k in [
+                        "previousworker", "former", "prior_employee", "employee_id", "cisco_employee",
+                        "criminal", "disciplinary", "conflict", "convict", "felon", "investigat"
+                    ])
                     target_val = "No" if is_negative_question else "Yes"
-                    target_radio = page.locator(f'input[type="radio"][name="{group_name}"][value="{target_val}" i], input[type="radio"][id*="{group_name}.{target_val}" i]').first
+                    target_radio = page.locator(
+                        f'input[type="radio"][name="{group_name}"][value="{target_val}" i], '
+                        f'input[type="radio"][name="{group_name}"][id*="{target_val}" i], '
+                        f'input[type="radio"][id*="{group_name}.{target_val}" i]'
+                    ).first
                     if await target_radio.count() > 0:
-                        await target_radio.check(timeout=1000)
+                        try:
+                            await target_radio.check(force=True, timeout=2000)
+                        except Exception:
+                            try:
+                                await target_radio.dispatch_event("click")
+                            except Exception:
+                                await target_radio.evaluate("el => el.click()")
                         handled_groups.add(group_name)
                         label = group_name.replace("_", " ").title()
                         questions_answered.append({"field": label, "answer": target_val})
                     elif not is_negative_question:
                         yes_radio = page.locator(f'input[type="radio"][name="{group_name}"][value="Yes" i]').first
                         if await yes_radio.count() > 0:
-                            await yes_radio.check(timeout=1000)
+                            try:
+                                await yes_radio.check(force=True, timeout=2000)
+                            except Exception:
+                                try:
+                                    await yes_radio.dispatch_event("click")
+                                except Exception:
+                                    await yes_radio.evaluate("el => el.click()")
                             handled_groups.add(group_name)
                             label = group_name.replace("_", " ").title()
                             questions_answered.append({"field": label, "answer": "Yes"})

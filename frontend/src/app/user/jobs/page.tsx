@@ -307,7 +307,8 @@ function getValidJobUrl(job: { application_url?: string; source_url?: string; so
 
 const STATUS_STYLE: Record<string, string> = {
   VERIFIED_SUCCESS: "text-emerald-300 bg-emerald-400/10 border-emerald-400/20",
-  APPLIED:          "text-blue-300 bg-blue-400/10 border-blue-400/20",
+  APPLIED:          "text-emerald-300 bg-emerald-400/20 border-emerald-400/40 font-bold",
+  FORM_FILLED_READY:"text-amber-300 bg-amber-400/15 border-amber-400/30 font-semibold",
   APPLYING:         "text-yellow-300 bg-yellow-400/10 border-yellow-400/20",
   FAILED:           "text-red-300 bg-red-400/10 border-red-400/20",
   REQUIRES_USER_ACTION: "text-orange-300 bg-orange-400/10 border-orange-400/20",
@@ -329,9 +330,46 @@ function JobsPageContent() {
   // Filters & Selected Job
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTab, setFilterTab] = useState<"all" | "delhi_ncr" | "high" | "remote" | "bengaluru" | "whatsapp">("all");
+  const [filterTab, setFilterTab] = useState<"all" | "delhi_ncr" | "high" | "remote" | "bengaluru" | "whatsapp" | "applied">("all");
   const [sourceFilter, setSourceFilter] = useState<"all" | "discord_community" | "career-crawled" | "career" | "linkedin" | "naukri">("all");
   const [descExpanded, setDescExpanded] = useState(false);
+
+  // Manual Mark Applied State
+  const [markingAppliedId, setMarkingAppliedId] = useState<string | null>(null);
+
+  const handleMarkApplied = async (jobId: string, customStatus: "APPLIED" | "DISCOVERED" = "APPLIED") => {
+    setMarkingAppliedId(jobId);
+    try {
+      const res = await jobsApi.markApplied(jobId, customStatus);
+      setJobs((prev) =>
+        prev.map((j) => {
+          if (j.job._id === jobId || j._id === jobId || j.job_id === jobId) {
+            return {
+              ...j,
+              application: {
+                ...(j.application || {}),
+                _id: (res.application?._id as string) || j.application?._id,
+                status: res.status,
+                updated_at: new Date().toISOString(),
+              },
+            };
+          }
+          return j;
+        })
+      );
+      if (formFillResult?.job_id === jobId) {
+        setFormFillResult(null);
+      }
+      setDiscoverMsg(customStatus === "APPLIED" ? "✅ Marked as Applied! Status updated." : "Application status reset.");
+      setTimeout(() => setDiscoverMsg(""), 5000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to update application status";
+      setDiscoverMsg(msg);
+      setTimeout(() => setDiscoverMsg(""), 5000);
+    } finally {
+      setMarkingAppliedId(null);
+    }
+  };
 
   // Tailored Resume State & Modal
   const [generatingResumeId, setGeneratingResumeId] = useState<string | null>(null);
@@ -778,6 +816,9 @@ function JobsPageContent() {
         if (s !== sourceFilter) return false;
       }
 
+      if (filterTab === "applied") {
+        return item.application?.status === "APPLIED" || item.application?.status === "VERIFIED_SUCCESS";
+      }
       if (filterTab === "whatsapp") {
         return Boolean(item.job.hr_contact?.phone);
       }
@@ -1044,6 +1085,18 @@ function JobsPageContent() {
               <Phone className="w-3 h-3" />
               WhatsApp / Phone
             </button>
+            <button
+              onClick={() => setFilterTab("applied")}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                filterTab === "applied"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-emerald-300"
+              }`}
+              title="Filter jobs marked as applied"
+            >
+              <CheckCircle className="w-3 h-3" />
+              Applied ({jobs.filter((j) => j.application?.status === "APPLIED" || j.application?.status === "VERIFIED_SUCCESS").length})
+            </button>
           </div>
         </div>
       </div>
@@ -1307,6 +1360,31 @@ function JobsPageContent() {
                             )}
                           </button>
 
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const isApp = item.application?.status === "APPLIED" || item.application?.status === "VERIFIED_SUCCESS";
+                              handleMarkApplied(item.job._id, isApp ? "DISCOVERED" : "APPLIED");
+                            }}
+                            disabled={markingAppliedId === item.job._id}
+                            className={`p-1.5 rounded-lg border text-[10px] transition-all cursor-pointer disabled:opacity-50 ${
+                              item.application?.status === "APPLIED" || item.application?.status === "VERIFIED_SUCCESS"
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30"
+                                : "bg-white/5 text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/10 border-white/5 hover:border-emerald-500/20"
+                            }`}
+                            title={
+                              item.application?.status === "APPLIED" || item.application?.status === "VERIFIED_SUCCESS"
+                                ? "Applied (click to unmark)"
+                                : "Mark as Applied"
+                            }
+                          >
+                            {markingAppliedId === item.job._id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3 h-3" />
+                            )}
+                          </button>
+
                           {item.tailored_resume ? (
                             <button
                               onClick={(e) => {
@@ -1475,6 +1553,37 @@ function JobsPageContent() {
                           : "Portal"}
                       </span>
                     </a>
+
+                    {/* Mark Applied Button */}
+                    {selectedItem.application?.status === "APPLIED" || selectedItem.application?.status === "VERIFIED_SUCCESS" ? (
+                      <button
+                        onClick={() => handleMarkApplied(selectedItem.job._id, "DISCOVERED")}
+                        disabled={markingAppliedId === selectedItem.job._id}
+                        className="px-3.5 py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-lg shadow-emerald-500/10"
+                        title="Position marked as Applied. Click to unmark"
+                      >
+                        {markingAppliedId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        )}
+                        <span>Applied ✓</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleMarkApplied(selectedItem.job._id, "APPLIED")}
+                        disabled={markingAppliedId === selectedItem.job._id}
+                        className="px-3.5 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                        title="Mark this job as submitted / applied"
+                      >
+                        {markingAppliedId === selectedItem.job._id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        )}
+                        <span>Mark Applied</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => handleDeleteJob(selectedItem.job._id)}
@@ -2572,6 +2681,24 @@ function JobsPageContent() {
                   </button>
 
                   <button
+                    onClick={() => handleMarkApplied(previewItem.job._id, previewItem.application?.status === "APPLIED" ? "DISCOVERED" : "APPLIED")}
+                    disabled={markingAppliedId === previewItem.job._id}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs border transition-all cursor-pointer disabled:opacity-50 ${
+                      previewItem.application?.status === "APPLIED" || previewItem.application?.status === "VERIFIED_SUCCESS"
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30"
+                        : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/20"
+                    }`}
+                    title={previewItem.application?.status === "APPLIED" ? "Position marked as Applied. Click to unmark" : "Mark as Applied"}
+                  >
+                    {markingAppliedId === previewItem.job._id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span>{previewItem.application?.status === "APPLIED" || previewItem.application?.status === "VERIFIED_SUCCESS" ? "Applied ✓" : "Mark Applied"}</span>
+                  </button>
+
+                  <button
                     onClick={() => {
                       handleApply(previewItem.job._id);
                       setPreviewModalOpen(false);
@@ -2715,6 +2842,19 @@ function JobsPageContent() {
                     <span>Open Career Portal to Submit</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
+                  <button
+                    onClick={() => handleMarkApplied(formFillResult.job_id, "APPLIED")}
+                    disabled={markingAppliedId === formFillResult.job_id}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
+                    title="Mark this job as Applied after submitting on the career portal"
+                  >
+                    {markingAppliedId === formFillResult.job_id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    )}
+                    <span>I Submitted — Mark Applied</span>
+                  </button>
                 </div>
               </div>
             </motion.div>

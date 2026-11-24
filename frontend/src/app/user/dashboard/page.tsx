@@ -278,9 +278,12 @@ export default function DashboardPage() {
 
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">4. Tailored & Applied</p>
-                <p className="text-xl font-bold text-purple-400 mt-1">0 <span className="text-xs font-normal text-slate-400">pending queue</span></p>
+                <p className="text-xl font-bold text-purple-400 mt-1">
+                  {jobs.items.filter((i) => i.application?.status === "APPLIED" || i.application?.status === "VERIFIED_SUCCESS").length}{" "}
+                  <span className="text-xs font-normal text-slate-400">applied</span>
+                </p>
                 <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div className="bg-purple-500 h-full rounded-full" style={{ width: "15%" }} />
+                  <div className="bg-purple-500 h-full rounded-full" style={{ width: "25%" }} />
                 </div>
               </div>
             </div>
@@ -386,18 +389,25 @@ export default function DashboardPage() {
                         >
                           Inspect
                         </Link>
-                        <button
-                          onClick={() => handleApply(job._id || item._id)}
-                          disabled={applyingId === (job._id || item._id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-sm shadow-indigo-600/30 disabled:opacity-50 cursor-pointer"
-                        >
-                          {applyingId === (job._id || item._id) ? (
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Zap className="w-3 h-3" />
-                          )}
-                          Apply
-                        </button>
+                        {item.application?.status === "APPLIED" || item.application?.status === "VERIFIED_SUCCESS" ? (
+                          <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold text-xs">
+                            <CheckCircle className="w-3 h-3 text-emerald-400" />
+                            Applied
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleApply(job._id || item._id)}
+                            disabled={applyingId === (job._id || item._id)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-sm shadow-indigo-600/30 disabled:opacity-50 cursor-pointer"
+                          >
+                            {applyingId === (job._id || item._id) ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Zap className="w-3 h-3" />
+                            )}
+                            Apply
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
